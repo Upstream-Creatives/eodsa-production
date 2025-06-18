@@ -48,6 +48,7 @@ export default function RegionalEventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedPerformanceType, setSelectedPerformanceType] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [autoRedirecting, setAutoRedirecting] = useState(false);
 
   useEffect(() => {
     if (region && eodsaId) {
@@ -55,6 +56,40 @@ export default function RegionalEventsPage() {
       loadRegionalEvents();
     }
   }, [region, eodsaId]);
+
+  // New effect for auto-assignment logic
+  useEffect(() => {
+    if (events.length > 0 && !autoRedirecting) {
+      checkForAutoAssignment();
+    }
+  }, [events, autoRedirecting]);
+
+  const checkForAutoAssignment = () => {
+    // If there's only one event total in this region, auto-redirect to it
+    if (events.length === 1) {
+      const singleEvent = events[0];
+      setAutoRedirecting(true);
+      router.push(`/event-dashboard/${region}/${singleEvent.performanceType.toLowerCase()}?eodsaId=${eodsaId}&autoAssigned=true`);
+      return;
+    }
+
+    // Check if there's only one performance type with events
+    const performanceTypesWithEvents = PERFORMANCE_TYPES.filter(type => 
+      events.some(event => event.performanceType === type)
+    );
+
+    if (performanceTypesWithEvents.length === 1) {
+      const singlePerformanceType = performanceTypesWithEvents[0];
+      const eventsForType = events.filter(event => event.performanceType === singlePerformanceType);
+      
+      // If there's only one event for this performance type, auto-redirect
+      if (eventsForType.length === 1) {
+        setAutoRedirecting(true);
+        router.push(`/event-dashboard/${region}/${singlePerformanceType.toLowerCase()}?eodsaId=${eodsaId}&autoAssigned=true`);
+        return;
+      }
+    }
+  };
 
   const loadContestant = async (id: string) => {
     try {
@@ -65,13 +100,16 @@ export default function RegionalEventsPage() {
         if (unifiedData.success && unifiedData.dancer) {
           const dancer = unifiedData.dancer;
           // Transform single dancer to contestant format
+          // Correctly label based on studio association
+          const isStudioLinked = dancer.studioAssociation !== null;
           setContestant({
             id: dancer.id,
             eodsaId: dancer.eodsaId,
             name: dancer.name,
             email: dancer.email || '',
             phone: dancer.phone || '',
-            type: 'private' as const,
+            type: isStudioLinked ? ('studio' as const) : ('private' as const),
+            studioName: dancer.studioAssociation?.studioName,
             dancers: [{
               id: dancer.id,
               name: dancer.name,
@@ -121,8 +159,12 @@ export default function RegionalEventsPage() {
     setSelectedPerformanceType(performanceType);
     // Find events that match this performance type
     const matchingEvents = events.filter(event => event.performanceType === performanceType);
-    if (matchingEvents.length > 0) {
-      // Navigate to event entry with specific event
+    
+    if (matchingEvents.length === 1) {
+      // Auto-redirect if only one event for this performance type
+      router.push(`/event-dashboard/${region}/${performanceType.toLowerCase()}?eodsaId=${eodsaId}&autoAssigned=true`);
+    } else if (matchingEvents.length > 1) {
+      // Multiple events - show selection page
       router.push(`/event-dashboard/${region}/${performanceType.toLowerCase()}?eodsaId=${eodsaId}`);
     }
   };
@@ -154,6 +196,20 @@ export default function RegionalEventsPage() {
           >
             Back to Home
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auto-redirecting state
+  if (autoRedirecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-8 text-center">
+          <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-400 rounded-full animate-spin mx-auto mb-6"></div>
+          <h2 className="text-2xl font-bold text-white mb-4">Auto-Assigning Event</h2>
+          <p className="text-gray-300 mb-2">We found the perfect event for you!</p>
+          <p className="text-sm text-purple-400">Redirecting to event registration...</p>
         </div>
       </div>
     );
@@ -201,12 +257,19 @@ export default function RegionalEventsPage() {
           </div>
         )}
 
-        {/* Performance Type Selection - Matches Flowchart */}
+        {/* Performance Type Selection - Enhanced with Auto-Assignment Logic */}
         <div className="max-w-6xl mx-auto">
           <div className="bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-8">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-white mb-4">Select Performance Type</h2>
               <p className="text-gray-300">Choose the type of performance you want to register for</p>
+              {events.length > 0 && (
+                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                  <p className="text-blue-300 text-sm">
+                    💡 <strong>Smart Selection:</strong> If there's only one event available, we'll automatically take you there!
+                  </p>
+                </div>
+              )}
             </div>
 
             {isLoading ? (
@@ -214,12 +277,28 @@ export default function RegionalEventsPage() {
                 <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-400 rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-gray-300">Loading events...</p>
               </div>
+            ) : events.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-6">📅</div>
+                <h3 className="text-2xl font-bold text-white mb-4">No Events Available</h3>
+                <p className="text-gray-300 mb-6">There are currently no open events in the {region} region.</p>
+                <Link 
+                  href={`/event-dashboard?eodsaId=${eodsaId}`}
+                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back to Dashboard
+                </Link>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {PERFORMANCE_TYPES.map((performanceType) => {
                   const requirements = getParticipantRequirements(performanceType);
                   const availableEvents = getEventsByPerformanceType(performanceType);
                   const hasEvents = availableEvents.length > 0;
+                  const eventCount = availableEvents.length;
                   
                   return (
                     <div
@@ -256,7 +335,15 @@ export default function RegionalEventsPage() {
                           {hasEvents && (
                             <div className="rounded-lg p-3 bg-emerald-900/30">
                               <p className="text-sm font-semibold text-emerald-300">
-                                Click to view events
+                                {eventCount === 1 ? '🚀 Auto-redirect to event' : `📋 ${eventCount} events available`}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {!hasEvents && (
+                            <div className="rounded-lg p-3 bg-red-900/30">
+                              <p className="text-sm font-semibold text-red-300">
+                                No events available
                               </p>
                             </div>
                           )}
@@ -267,8 +354,6 @@ export default function RegionalEventsPage() {
                 })}
               </div>
             )}
-
-
           </div>
         </div>
       </div>

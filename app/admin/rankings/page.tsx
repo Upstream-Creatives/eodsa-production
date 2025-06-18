@@ -13,7 +13,9 @@ interface RankingData {
   performanceType: string;
   title: string;
   itemStyle: string;
-  contestantName: string;
+  contestantName: string; // Now displays participant names instead of contestant name
+  participantNames?: string[]; // Original participant names for reference
+  studioName?: string; // Studio information for display
   totalScore: number;
   averageScore: number;
   rank: number;
@@ -37,7 +39,6 @@ interface EventWithScores {
 export default function AdminRankingsPage() {
   const [rankings, setRankings] = useState<RankingData[]>([]);
   const [filteredRankings, setFilteredRankings] = useState<RankingData[]>([]);
-  const [eventsWithScores, setEventsWithScores] = useState<EventWithScores[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -47,8 +48,6 @@ export default function AdminRankingsPage() {
   const [selectedRegion, setSelectedRegion] = useState('');
   const [selectedAgeCategory, setSelectedAgeCategory] = useState('');
   const [selectedPerformanceType, setSelectedPerformanceType] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState('');
-  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'all' | 'top5_age' | 'top5_style'>('all');
 
   useEffect(() => {
@@ -76,46 +75,26 @@ export default function AdminRankingsPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [rankings, selectedStyle, viewMode]);
+  }, [rankings, viewMode]);
 
   // Trigger rankings reload when server-side filters change
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       loadRankings();
     }
-  }, [selectedRegion, selectedAgeCategory, selectedPerformanceType, selectedEvents]);
+  }, [selectedRegion, selectedAgeCategory, selectedPerformanceType]);
 
   const loadInitialData = async () => {
     setIsLoading(true);
     setError('');
     
     try {
-      // Load events with scores first
-      await loadEventsWithScores();
-      
       // Load all rankings
       await loadRankings();
     } catch (error) {
       setError('Failed to load data');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadEventsWithScores = async () => {
-    try {
-      const response = await fetch('/api/rankings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'getEventsWithScores' })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setEventsWithScores(data.events || []);
-      }
-    } catch (error) {
-      console.error('Error loading events with scores:', error);
     }
   };
 
@@ -131,11 +110,9 @@ export default function AdminRankingsPage() {
       if (selectedRegion) params.append('region', selectedRegion);
       if (selectedAgeCategory) params.append('ageCategory', selectedAgeCategory);
       if (selectedPerformanceType) params.append('performanceType', selectedPerformanceType);
-      if (selectedEvents.length > 0) params.append('eventIds', selectedEvents.join(','));
       
       const url = `/api/rankings?${params.toString()}`;
       console.log('Loading rankings from:', url);
-      console.log('Selected events:', selectedEvents);
       
       const response = await fetch(url);
       if (response.ok) {
@@ -159,10 +136,6 @@ export default function AdminRankingsPage() {
     // Only apply client-side filters that weren't applied server-side
     // Region, age category, performance type, and event selection are handled server-side
     
-    if (selectedStyle) {
-      filtered = filtered.filter(r => r.itemStyle === selectedStyle);
-    }
-
     // Apply view mode filters
     if (viewMode === 'top5_age') {
       // Group by age category and get top 5 from each
@@ -199,25 +172,7 @@ export default function AdminRankingsPage() {
     setSelectedRegion('');
     setSelectedAgeCategory('');
     setSelectedPerformanceType('');
-    setSelectedStyle('');
-    setSelectedEvents([]);
     setViewMode('all');
-  };
-
-  const handleEventSelection = (eventId: string) => {
-    setSelectedEvents(prev => 
-      prev.includes(eventId) 
-        ? prev.filter(id => id !== eventId)
-        : [...prev, eventId]
-    );
-  };
-
-  const selectAllEvents = () => {
-    setSelectedEvents(eventsWithScores.map(e => e.id));
-  };
-
-  const deselectAllEvents = () => {
-    setSelectedEvents([]);
   };
 
   const getRankBadgeColor = (rank: number) => {
@@ -387,107 +342,125 @@ export default function AdminRankingsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Enhanced Statistics Overview */}
         {filteredRankings.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-indigo-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-600">{filteredRankings.length}</div>
-                <div className="text-sm text-gray-700 font-medium">Performances</div>
+          <div className="space-y-8 mb-8">
+            {/* Main Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-indigo-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-indigo-600">{filteredRankings.length}</div>
+                  <div className="text-sm text-gray-700 font-medium">Performances</div>
+                </div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-purple-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {new Set(filteredRankings.map(r => r.region)).size}
+                  </div>
+                  <div className="text-sm text-gray-700 font-medium">Regions</div>
+                </div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-pink-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-pink-600">
+                    {new Set(filteredRankings.map(r => r.ageCategory)).size}
+                  </div>
+                  <div className="text-sm text-gray-700 font-medium">Categories</div>
+                </div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-teal-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-teal-600">
+                    {new Set(filteredRankings.map(r => r.performanceType)).size}
+                  </div>
+                  <div className="text-sm text-gray-700 font-medium">Types</div>
+                </div>
               </div>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-purple-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {new Set(filteredRankings.map(r => r.region)).size}
+
+            {/* Regional Breakdown */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-indigo-100">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm">📍</span>
                 </div>
-                <div className="text-sm text-gray-700 font-medium">Regions</div>
+                <h3 className="text-xl font-bold text-gray-900">Total Items per Region</h3>
               </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-pink-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-pink-600">
-                  {new Set(filteredRankings.map(r => r.ageCategory)).size}
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {(() => {
+                  // Calculate items per region
+                  const regionCounts = filteredRankings.reduce((acc, ranking) => {
+                    acc[ranking.region] = (acc[ranking.region] || 0) + 1;
+                    return acc;
+                  }, {} as Record<string, number>);
+
+                  // Sort regions by count (descending) then alphabetically
+                  const sortedRegions = Object.entries(regionCounts)
+                    .sort(([a, countA], [b, countB]) => {
+                      if (countB !== countA) return countB - countA;
+                      return a.localeCompare(b);
+                    });
+
+                  return sortedRegions.map(([region, count], index) => (
+                    <div
+                      key={region}
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-lg ${
+                        index === 0 
+                          ? 'border-emerald-500 bg-emerald-50' 
+                          : index === 1 
+                          ? 'border-blue-500 bg-blue-50'
+                          : index === 2
+                          ? 'border-amber-500 bg-amber-50'
+                          : 'border-gray-300 bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-gray-900 text-sm">{region}</div>
+                          <div className="text-xs text-gray-600">
+                            {((count / filteredRankings.length) * 100).toFixed(1)}% of total
+                          </div>
+                        </div>
+                        <div className={`text-xl font-bold ${
+                          index === 0 
+                            ? 'text-emerald-600' 
+                            : index === 1 
+                            ? 'text-blue-600'
+                            : index === 2
+                            ? 'text-amber-600'
+                            : 'text-gray-600'
+                        }`}>
+                          {count}
+                        </div>
+                      </div>
+                      {index < 3 && (
+                        <div className="mt-2 flex items-center space-x-1">
+                          <span className="text-xs">
+                            {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                          </span>
+                          <span className="text-xs text-gray-600 font-medium">
+                            {index === 0 ? 'Most items' : index === 1 ? '2nd most' : '3rd most'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ));
+                })()}
+              </div>
+              
+              {Object.keys(filteredRankings.reduce((acc, ranking) => {
+                acc[ranking.region] = true;
+                return acc;
+              }, {} as Record<string, boolean>)).length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-4">📍</div>
+                  <p className="text-lg font-medium">No regional data available</p>
+                  <p className="text-sm">Regional breakdown will appear when rankings are loaded</p>
                 </div>
-                <div className="text-sm text-gray-700 font-medium">Categories</div>
-              </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-teal-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-teal-600">
-                  {new Set(filteredRankings.map(r => r.performanceType)).size}
-                </div>
-                <div className="text-sm text-gray-700 font-medium">Types</div>
-              </div>
+              )}
             </div>
           </div>
         )}
-
-        {/* Event Selection Section */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-indigo-100">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-sm">🏆</span>
-            </div>
-            <h2 className="text-xl font-bold text-gray-900">Select Events with Scores</h2>
-            <div className="flex gap-2 ml-auto">
-              <button
-                onClick={selectAllEvents}
-                className="px-3 py-1 text-sm bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
-              >
-                Select All
-              </button>
-              <button
-                onClick={deselectAllEvents}
-                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
-
-          {eventsWithScores.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">📊</span>
-              </div>
-              <h3 className="text-lg font-medium mb-2">No Events with Scores</h3>
-              <p className="text-sm">Events will appear here once performances have been scored by judges.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {eventsWithScores.map((event) => (
-                <div
-                  key={event.id}
-                  onClick={() => handleEventSelection(event.id)}
-                  className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                    selectedEvents.includes(event.id)
-                      ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                      : 'border-gray-200 bg-white hover:border-indigo-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="font-bold text-gray-900 text-sm leading-tight">{event.name}</h3>
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                      selectedEvents.includes(event.id)
-                        ? 'border-indigo-500 bg-indigo-500'
-                        : 'border-gray-300'
-                    }`}>
-                      {selectedEvents.includes(event.id) && (
-                        <span className="text-white text-xs">✓</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    <div>{event.region} • {event.ageCategory} • {event.performanceType}</div>
-                    <div>{new Date(event.eventDate).toLocaleDateString()} • {event.venue}</div>
-                    <div className="text-indigo-600 font-medium">
-                      {event.scoreCount} scores • {event.performanceCount} performances
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Enhanced Filters with View Mode Tabs */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-indigo-100">
@@ -532,7 +505,7 @@ export default function AdminRankingsPage() {
             <h2 className="text-xl font-bold text-gray-900">Filter Rankings</h2>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">Region</label>
               <select
@@ -571,20 +544,6 @@ export default function AdminRankingsPage() {
                 <option value="">All Types</option>
                 {PERFORMANCE_TYPES.map(type => (
                   <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Style</label>
-              <select
-                value={selectedStyle}
-                onChange={(e) => setSelectedStyle(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
-              >
-                <option value="">All Styles</option>
-                {ITEM_STYLES.map(style => (
-                  <option key={style} value={style}>{style}</option>
                 ))}
               </select>
             </div>
@@ -676,6 +635,11 @@ export default function AdminRankingsPage() {
                                 <div className="text-sm font-bold text-gray-900">
                                   {ranking.contestantName}
                                 </div>
+                                {ranking.studioName && (
+                                  <div className="text-xs text-blue-600 font-medium">
+                                    {ranking.studioName}
+                                  </div>
+                                )}
                                 <div className="text-xs text-gray-500 sm:hidden">
                                   {ranking.title}
                                 </div>

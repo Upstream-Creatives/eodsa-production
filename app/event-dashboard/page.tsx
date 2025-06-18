@@ -68,13 +68,16 @@ function EventDashboardContent() {
         if (unifiedData.success && unifiedData.dancer) {
           const dancer = unifiedData.dancer;
           // Transform single dancer to contestant format
+          // Correctly label based on studio association
+          const isStudioLinked = dancer.studioAssociation !== null;
           setContestant({
             id: dancer.id,
             eodsaId: dancer.eodsaId,
             contactName: dancer.name,
             email: dancer.email || '',
             phone: dancer.phone || '',
-            type: 'private' as const,
+            type: isStudioLinked ? ('studio' as const) : ('private' as const),
+            studioName: dancer.studioAssociation?.studioName,
             dancers: [{
               id: dancer.id,
               firstName: dancer.name.split(' ')[0] || dancer.name,
@@ -235,7 +238,7 @@ function EventDashboardContent() {
                 <p className="text-xl text-gray-300">Welcome to your competition entry portal</p>
                 <div className="mt-4 p-4 bg-purple-900/30 rounded-xl border border-purple-500/50">
                   <p className="text-purple-300 font-bold text-lg">EODSA ID: {eodsaId}</p>
-                  <p className="text-gray-300">{contestant.type === 'studio' ? `${contestant.studioName} (Studio)` : 'Private Dancer'}</p>
+                  <p className="text-gray-300">{contestant.type === 'studio' ? `${contestant.studioName} (Studio-Linked)` : 'Private Dancer'}</p>
                   
                   <div className="mt-3">
                     <p className="text-sm text-gray-300">Registered Dancers</p>

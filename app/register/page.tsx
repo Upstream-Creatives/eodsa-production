@@ -179,8 +179,35 @@ export default function RegisterPage() {
         return;
       }
 
-      // Validate guardian info for minors
+      // Calculate age for validation
       const age = calculateAge(formData.dateOfBirth);
+      
+      // Validate email and phone for adults (≥18)
+      if (age >= 18) {
+        if (!formData.email || !formData.phone) {
+          warning('Email and phone number are required for dancers 18 years and older.', 7000);
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+          warning('Please enter a valid email address.', 6000);
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Basic phone validation (at least 10 digits)
+        const phoneRegex = /\d{10,}/;
+        if (!phoneRegex.test(formData.phone.replace(/\D/g, ''))) {
+          warning('Please enter a valid phone number with at least 10 digits.', 6000);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Validate guardian info for minors
       if (age < 18) {
         if (!formData.guardianInfo?.name || !formData.guardianInfo?.email || !formData.guardianInfo?.cell) {
           warning('Complete guardian information is required for dancers under 18 years old.', 7000);
@@ -474,35 +501,35 @@ export default function RegisterPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                       <div>
                         <label htmlFor="email" className="block text-sm font-semibold text-white mb-3">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
+                          Email Address {formData.dateOfBirth && calculateAge(formData.dateOfBirth) >= 18 ? '*' : '(Optional for minors)'}
+                        </label>
+                        <input
+                          type="email"
+                          id="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
                           className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white placeholder-gray-300 text-lg"
                           placeholder="your@email.com"
-                  required
-                />
-              </div>
+                          required={formData.dateOfBirth ? calculateAge(formData.dateOfBirth) >= 18 : true}
+                        />
+                      </div>
                       
                       <div>
                         <label htmlFor="phone" className="block text-sm font-semibold text-white mb-3">
-                  Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
+                          Phone Number {formData.dateOfBirth && calculateAge(formData.dateOfBirth) >= 18 ? '*' : '(Optional for minors)'}
+                        </label>
+                        <input
+                          type="tel"
+                          id="phone"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleInputChange}
                           className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white placeholder-gray-300 text-lg"
                           placeholder="081 234 5678"
-                  required
-                />
-                    </div>
+                          required={formData.dateOfBirth ? calculateAge(formData.dateOfBirth) >= 18 : true}
+                        />
+                      </div>
                     
                       <div>
                         <label htmlFor="dateOfBirth" className="block text-sm font-semibold text-white mb-3">
@@ -526,20 +553,34 @@ export default function RegisterPage() {
                     </div>
                     </div>
                     
-                    {/* Show message if minor */}
-                    {isMinor(formData.dateOfBirth) && (
-                    <div className="mt-8">
-                        <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-xl p-4">
-                          <div className="flex items-center">
-                            <svg className="w-5 h-5 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L1.998 19.5c-.77.833.192 2.5 1.732 2.5z" />
-                            </svg>
-                            <span className="text-yellow-300 font-medium">Guardian Required</span>
+                    {/* Show message based on age */}
+                    {formData.dateOfBirth && (
+                      <div className="mt-8">
+                        {isMinor(formData.dateOfBirth) ? (
+                          <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-xl p-4">
+                            <div className="flex items-center">
+                              <svg className="w-5 h-5 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L1.998 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                              <span className="text-yellow-300 font-medium">Guardian Required</span>
+                            </div>
+                            <p className="text-yellow-200 text-sm mt-1">
+                              Parent/Guardian Consent Required ⚠️ Under 18, a parent or guardian must complete this registration.
+                            </p>
                           </div>
-                          <p className="text-yellow-200 text-sm mt-1">
-                            Parent/Guardian Consent Required ⚠️ Under 18, a parent or guardian must complete this registration.
-                          </p>
-                        </div>
+                        ) : (
+                          <div className="bg-blue-900/30 border border-blue-500/50 rounded-xl p-4">
+                            <div className="flex items-center">
+                              <svg className="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                              </svg>
+                              <span className="text-blue-300 font-medium">Adult Registration</span>
+                            </div>
+                            <p className="text-blue-200 text-sm mt-1">
+                              Contact Information Required ✅ As an adult (18+), email and phone number are required for communication and event notifications.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   

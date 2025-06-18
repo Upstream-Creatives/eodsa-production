@@ -27,9 +27,23 @@ export async function GET(
       );
     }
 
+    // Get dancer's studio applications to determine studio association
+    const applications = await unifiedDb.getDancerApplications(dancer.id);
+    const acceptedApplication = applications.find(app => app.status === 'accepted');
+
+    // Enhance dancer data with studio information
+    const enhancedDancer = {
+      ...dancer,
+      studioAssociation: acceptedApplication ? {
+        studioId: acceptedApplication.studioId,
+        studioName: acceptedApplication.studio.name,
+        joinedAt: acceptedApplication.respondedAt
+      } : null
+    };
+
     return NextResponse.json({
       success: true,
-      dancer
+      dancer: enhancedDancer
     });
   } catch (error) {
     console.error('Error getting dancer by EODSA ID:', error);

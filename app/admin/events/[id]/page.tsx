@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
+import { calculateEODSAFee } from '@/lib/types';
 
 interface Event {
   id: string;
@@ -280,23 +281,40 @@ export default function EventParticipantsPage() {
   const exportToExcel = async () => {
     setIsExporting(true);
     try {
-      // Prepare data for export
-      const exportData = entries.map((entry) => ({
-        'Item Number': entry.itemNumber || 'Not Assigned',
-        'EODSA ID': entry.eodsaId,
-        'Name': entry.contestantName,
-        'Performance Type': event?.performanceType || '',
-        'Mastery Level': entry.mastery,
-        'Style': entry.itemStyle,
-        'Age Category': event?.ageCategory || '',
-        'Fee': `R${entry.calculatedFee.toFixed(2)}`,
-        'Qualified for Nationals': entry.qualifiedForNationals ? 'Yes' : 'No',
-        'Payment Status': entry.paymentStatus.toUpperCase(),
-        'Entry Status': entry.approved ? 'APPROVED' : 'PENDING',
-        'Choreographer': entry.choreographer,
-        'Duration (minutes)': entry.estimatedDuration || 'N/A',
-        'Submitted Date': new Date(entry.submittedAt).toLocaleDateString()
-      }));
+      // Prepare data for export with enhanced fee breakdown
+      const exportData = entries.map((entry) => {
+        // Calculate fee breakdown for each entry
+        const feeBreakdown = calculateEODSAFee(
+          entry.mastery,
+          event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
+          entry.participantIds?.length || 1,
+          {
+            soloCount: 1,
+            includeRegistration: true
+          }
+        );
+
+        return {
+          'Item Number': entry.itemNumber || 'Not Assigned',
+          'EODSA ID': entry.eodsaId,
+          'Name': entry.contestantName,
+          'Performance Type': event?.performanceType || '',
+          'Mastery Level': entry.mastery,
+          'Style': entry.itemStyle,
+          'Age Category': event?.ageCategory || '',
+          'Participants': entry.participantIds?.length || 1,
+          'Registration Fee': `R${feeBreakdown.registrationFee.toFixed(2)}`,
+          'Performance Fee': `R${feeBreakdown.performanceFee.toFixed(2)}`,
+          'Fee Breakdown': feeBreakdown.breakdown,
+          'Total Fee': `R${entry.calculatedFee.toFixed(2)}`,
+          'Qualified for Nationals': entry.qualifiedForNationals ? 'Yes' : 'No',
+          'Payment Status': entry.paymentStatus.toUpperCase(),
+          'Entry Status': entry.approved ? 'APPROVED' : 'PENDING',
+          'Choreographer': entry.choreographer,
+          'Duration (minutes)': entry.estimatedDuration || 'N/A',
+          'Submitted Date': new Date(entry.submittedAt).toLocaleDateString()
+        };
+      });
 
       // Convert to CSV format
       if (exportData.length === 0) {

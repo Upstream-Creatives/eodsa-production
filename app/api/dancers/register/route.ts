@@ -59,6 +59,16 @@ export async function POST(request: NextRequest) {
       // Calculate age
       const age = unifiedDb.calculateAge(dateOfBirth);
       
+      // If 18 or older, require email and phone
+      if (age >= 18) {
+        if (!email || !phone) {
+          return NextResponse.json(
+            { error: 'Email and phone number are required for dancers 18 years and older' },
+            { status: 400 }
+          );
+        }
+      }
+      
       // If under 18, require guardian information
       if (age < 18 && (!guardianName || !guardianEmail || !guardianPhone)) {
         return NextResponse.json(

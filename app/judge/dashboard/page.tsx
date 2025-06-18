@@ -48,6 +48,8 @@ interface Score {
 interface PerformanceWithScore extends Performance {
   hasScore?: boolean;
   judgeScore?: any;
+  isFullyScored?: boolean;
+  scoringStatus?: any;
 }
 
 export default function JudgeDashboard() {
@@ -123,13 +125,20 @@ export default function JudgeDashboard() {
             
             // Check score status for each performance
             for (const performance of performancesData.performances || []) {
+              // Check if this judge has scored this performance
               const scoreResponse = await fetch(`/api/scores/${performance.id}/${judgeId}`);
               const scoreData = await scoreResponse.json();
               
+              // Check the complete scoring status (all judges)
+              const scoringStatusResponse = await fetch(`/api/scores/performance/${performance.id}`);
+              const scoringStatusData = await scoringStatusResponse.json();
+              
               allPerformances.push({
                 ...performance,
-                hasScore: scoreData.success && scoreData.score,
-                judgeScore: scoreData.score
+                hasScore: scoreData.success && scoreData.score, // Judge's individual score status
+                judgeScore: scoreData.score,
+                isFullyScored: scoringStatusData.success ? scoringStatusData.scoringStatus.isFullyScored : false, // All judges scored
+                scoringStatus: scoringStatusData.success ? scoringStatusData.scoringStatus : null
               });
             }
           }
@@ -149,9 +158,9 @@ export default function JudgeDashboard() {
     
     // Apply status filter
     if (filterStatus === 'scored') {
-      filtered = filtered.filter(p => p.hasScore);
+      filtered = filtered.filter(p => p.isFullyScored); // Only show fully scored performances
     } else if (filterStatus === 'not_scored') {
-      filtered = filtered.filter(p => !p.hasScore);
+      filtered = filtered.filter(p => !p.hasScore); // Show performances this judge hasn't scored
     }
 
     // Apply search term filter (name, title)
@@ -336,12 +345,12 @@ export default function JudgeDashboard() {
                   <h1 className="text-2xl font-bold text-gray-900">
                     {selectedPerformance.hasScore ? 'Update Score' : 'Score Performance'}
                   </h1>
-                  <p className="text-gray-600">{selectedPerformance.title}</p>
+                  <p className="text-gray-700 font-medium">{selectedPerformance.title}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600">Judge: {judgeName}</p>
-                <p className="text-sm text-gray-600">Duration: {selectedPerformance.duration} min</p>
+                <p className="text-sm text-gray-700 font-medium">Judge: {judgeName}</p>
+                <p className="text-sm text-gray-700 font-medium">Duration: {selectedPerformance.duration} min</p>
                 {selectedPerformance.hasScore && (
                   <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full mt-1">
                     Previously Scored
@@ -362,28 +371,28 @@ export default function JudgeDashboard() {
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">Contestant:</span>
-                    <p className="font-medium text-gray-900">{selectedPerformance.contestantName || 'Loading...'}</p>
+                    <span className="text-gray-700 font-medium">Contestant:</span>
+                    <p className="font-bold text-gray-900">{selectedPerformance.contestantName || 'Loading...'}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Participants:</span>
-                    <p className="font-medium text-gray-900">{selectedPerformance.participantNames?.join(', ') || 'Loading...'}</p>
+                    <span className="text-gray-700 font-medium">Participants:</span>
+                    <p className="font-bold text-gray-900">{selectedPerformance.participantNames?.join(', ') || 'Loading...'}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Style:</span>
-                    <p className="font-medium text-gray-900">{selectedPerformance.itemStyle || 'Not specified'}</p>
+                    <span className="text-gray-700 font-medium">Style:</span>
+                    <p className="font-bold text-gray-900">{selectedPerformance.itemStyle || 'Not specified'}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Mastery:</span>
-                    <p className="font-medium text-gray-900">{selectedPerformance.mastery || 'Not specified'}</p>
+                    <span className="text-gray-700 font-medium">Mastery:</span>
+                    <p className="font-bold text-gray-900">{selectedPerformance.mastery || 'Not specified'}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Duration:</span>
-                    <p className="font-medium text-gray-900">{selectedPerformance.duration} minutes</p>
+                    <span className="text-gray-700 font-medium">Duration:</span>
+                    <p className="font-bold text-gray-900">{selectedPerformance.duration} minutes</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Choreographer:</span>
-                    <p className="font-medium text-gray-900">{selectedPerformance.choreographer || 'Not specified'}</p>
+                    <span className="text-gray-700 font-medium">Choreographer:</span>
+                    <p className="font-bold text-gray-900">{selectedPerformance.choreographer || 'Not specified'}</p>
                   </div>
                 </div>
               </div>
@@ -405,14 +414,14 @@ export default function JudgeDashboard() {
                     { key: 'overallImpression', label: 'Overall Impression', description: 'First impression, lasting impact' }
                   ].map(({ key, label, description }) => (
                     <div key={key} className="space-y-3">
-                      <div>
+                                            <div>
                         <label className="block text-sm font-bold text-gray-900 mb-1">
                           {label}
                         </label>
-                        <p className="text-xs text-gray-600">{description}</p>
+                        <p className="text-xs text-gray-700">{description}</p>
                       </div>
                       
-                                             {/* Score Input */}
+                      {/* Score Input */}
                        <div className="flex items-center space-x-4">
                          <input
                            type="number"
@@ -423,10 +432,11 @@ export default function JudgeDashboard() {
                              const value = Math.min(20, Math.max(0, parseInt(e.target.value) || 0));
                              handleScoreChange(key as keyof Score, value);
                            }}
-                           className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-center font-bold text-lg"
+                           className="w-20 px-3 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-center font-bold text-xl text-gray-900 bg-white shadow-sm"
                            placeholder="0"
+                           style={{ color: '#111827' }}
                          />
-                         <span className="text-sm text-gray-600">/ 20 points</span>
+                         <span className="text-sm text-gray-800 font-medium">/ 20 points</span>
                          <div className="flex-1 bg-gray-200 rounded-full h-2">
                            <div 
                              className="bg-gradient-to-r from-purple-500 to-pink-600 h-2 rounded-full transition-all duration-300"
@@ -435,8 +445,8 @@ export default function JudgeDashboard() {
                          </div>
                        </div>
                        <div className="text-right">
-                         <span className="text-sm text-gray-600">
-                           Score: <span className="font-bold text-purple-600">{currentScore[key as keyof Score] as number || 0} / 20</span>
+                         <span className="text-sm text-gray-800 font-medium">
+                           Score: <span className="font-bold text-purple-700">{currentScore[key as keyof Score] as number || 0} / 20</span>
                          </span>
                        </div>
                     </div>
@@ -450,11 +460,11 @@ export default function JudgeDashboard() {
                         <div className="text-3xl font-bold text-purple-600">
                           {(currentScore.technique + currentScore.musicality + currentScore.performance + currentScore.styling + currentScore.overallImpression).toFixed(0)} / 100
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">Sum of all criteria (5 × 20 = 100 max)</p>
+                        <p className="text-xs text-gray-700 mt-1 font-medium">Sum of all criteria (5 × 20 = 100 max)</p>
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-gray-900 mb-2">Percentage & Ranking</label>
-                        <div className="text-2xl font-bold text-indigo-600">
+                        <div className="text-2xl font-bold text-indigo-700">
                           {((currentScore.technique + currentScore.musicality + currentScore.performance + currentScore.styling + currentScore.overallImpression)).toFixed(0)}%
                         </div>
                         <div className="mt-2">
@@ -488,7 +498,7 @@ export default function JudgeDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="mt-4 text-xs text-gray-500">
+                    <div className="mt-4 text-xs text-gray-700 font-medium">
                       <p><strong>Ranking System:</strong> Bronze (≤69) • Silver (70-74) • Silver Plus (75-79) • Gold (80-89) • Pro Gold (90+)</p>
                       <p><strong>Final Score:</strong> 3 judges × 100 points = 300 max → converted to percentage</p>
                     </div>
@@ -502,8 +512,9 @@ export default function JudgeDashboard() {
                     <textarea
                       value={currentScore.comments}
                       onChange={(e) => handleScoreChange('comments', e.target.value)}
-                      className="w-full h-24 px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-gray-900"
+                      className="w-full h-24 px-3 py-2 border-2 border-gray-400 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-gray-900 bg-white shadow-sm font-medium"
                       placeholder="Add constructive feedback for the participant..."
+                      style={{ color: '#111827' }}
                     />
                   </div>
           
@@ -552,7 +563,7 @@ export default function JudgeDashboard() {
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                   Judge Dashboard
                 </h1>
-                <p className="text-gray-600 font-medium">Welcome, {judgeName}</p>
+                <p className="text-gray-700 font-semibold">Welcome, {judgeName}</p>
               </div>
             </div>
               <button
@@ -589,7 +600,7 @@ export default function JudgeDashboard() {
               <select
                 value={selectedEventId}
                 onChange={(e) => setSelectedEventId(e.target.value)}
-                className="w-full bg-white px-4 py-3 border-2 border-gray-200 hover:border-purple-400 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-lg font-medium text-gray-900"
+                className="w-full bg-white px-4 py-3 border-2 border-gray-400 hover:border-purple-400 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-lg font-semibold text-gray-900 shadow-sm"
               >
                 <option value="">Choose an event to judge...</option>
                 {assignments.map((assignment) => (
@@ -621,7 +632,7 @@ export default function JudgeDashboard() {
                     {(() => {
                       const stats = getCompletionStats();
                       return (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-700 font-medium">
                           Progress: {stats.scored}/{stats.total} completed ({stats.percentage}%)
                         </p>
                       );
@@ -640,7 +651,7 @@ export default function JudgeDashboard() {
                           style={{ width: `${stats.percentage}%` }}
                         ></div>
                       </div>
-                      <p className="text-xs text-gray-600 mt-1 text-center">{stats.percentage}%</p>
+                      <p className="text-xs text-gray-700 font-medium mt-1 text-center">{stats.percentage}%</p>
                     </div>
                   );
                 })()}
@@ -680,7 +691,7 @@ export default function JudgeDashboard() {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    Scored ({performances.filter(p => p.eventId === selectedEventId && p.hasScore).length})
+                    Fully Scored ({performances.filter(p => p.eventId === selectedEventId && p.isFullyScored).length})
                   </button>
                 </div>
 
@@ -692,7 +703,7 @@ export default function JudgeDashboard() {
                       placeholder="Search by name, title..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm"
+                      className="w-full px-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm font-medium text-gray-900 bg-white"
                     />
                   </div>
                   <div className="flex-1 md:w-32">
@@ -702,7 +713,7 @@ export default function JudgeDashboard() {
                       value={itemNumberSearch}
                       onChange={(e) => setItemNumberSearch(e.target.value)}
                       onKeyPress={handleItemNumberSearchKeyPress}
-                      className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm font-bold"
+                      className="w-full px-4 py-2 border-2 border-purple-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm font-bold text-gray-900 bg-white"
                     />
                   </div>
                   <button
@@ -722,7 +733,7 @@ export default function JudgeDashboard() {
 
               {/* Pagination Info (moved slightly for better layout with search) */}
               {totalPages > 1 && (
-                  <div className="text-sm text-gray-600 mb-4 text-center md:text-right">
+                  <div className="text-sm text-gray-700 font-medium mb-4 text-center md:text-right">
                     Page {currentPage} of {totalPages}
                   </div>
               )}
@@ -754,9 +765,19 @@ export default function JudgeDashboard() {
                                 }`}>
                                   {performance.status.replace('_', ' ').toUpperCase()}
                                 </span>
-                                {performance.hasScore && (
+                                {performance.isFullyScored && (
                                   <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800">
                                     SCORED
+                                  </span>
+                                )}
+                                {performance.hasScore && !performance.isFullyScored && (
+                                  <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800">
+                                    PARTIAL
+                                  </span>
+                                )}
+                                {performance.scoringStatus && (
+                                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
+                                    {performance.scoringStatus.scoredJudges}/{performance.scoringStatus.totalJudges} judges
                                   </span>
                                 )}
                               </div>

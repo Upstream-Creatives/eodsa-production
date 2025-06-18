@@ -58,9 +58,18 @@ export default function PerformanceTypeEntryPage() {
   const region = params?.region as string;
   const performanceType = params?.performanceType as string;
   const eodsaId = searchParams?.get('eodsaId') || '';
+  const autoAssigned = searchParams?.get('autoAssigned') === 'true';
+  
+  // Check if this performance type allows empty participant start
+  const allowEmptyStart = ['duet', 'trio', 'group'].includes(performanceType?.toLowerCase());
   
   const [contestant, setContestant] = useState<Contestant | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showParticipantSearch, setShowParticipantSearch] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [formData, setFormData] = useState<EventEntryForm>({
     eventId: '',
     participantIds: [],
@@ -82,14 +91,27 @@ export default function PerformanceTypeEntryPage() {
   useEffect(() => {
     if (eodsaId) {
       loadContestant(eodsaId);
+    } else if (allowEmptyStart) {
+      // For group/duet/trio entries, we can start without an EODSA ID
+      setContestant({
+        id: 'temp-group-entry',
+        eodsaId: '',
+        name: 'Group Entry',
+        email: '',
+        phone: '',
+        type: 'private',
+        dancers: [] // Start with empty participants
+      });
+      setShowParticipantSearch(true);
     }
     loadMatchingEvents();
-  }, [region, performanceType, eodsaId]);
+  }, [region, performanceType, eodsaId, allowEmptyStart]);
 
   useEffect(() => {
     if (formData.eventId) {
       const selectedEvent = events.find(e => e.id === formData.eventId);
       if (selectedEvent) {
+        setSelectedEvent(selectedEvent);
         setCalculatedFee(selectedEvent.entryFee);
         setFormData(prev => ({
           ...prev,
@@ -101,11 +123,15 @@ export default function PerformanceTypeEntryPage() {
 
   useEffect(() => {
     if (formData.eventId && formData.mastery && formData.participantIds.length > 0) {
-      // Use EODSA fee calculation
+      // Use EODSA fee calculation with proper options
       const feeBreakdown = calculateEODSAFee(
         formData.mastery,
         performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group',
-        formData.participantIds.length
+        formData.participantIds.length,
+        {
+          soloCount: 1, // Default to 1 solo per entry (can be enhanced later for multiple solos)
+          includeRegistration: true
+        }
       );
       setCalculatedFee(feeBreakdown.totalFee);
     }
@@ -120,13 +146,16 @@ export default function PerformanceTypeEntryPage() {
         if (unifiedData.success && unifiedData.dancer) {
           const dancer = unifiedData.dancer;
           // Transform single dancer to contestant format
+          // Correctly label based on studio association
+          const isStudioLinked = dancer.studioAssociation !== null;
           const transformedContestant = {
             id: dancer.id,
             eodsaId: dancer.eodsaId,
             name: dancer.name,
             email: dancer.email || '',
             phone: dancer.phone || '',
-            type: 'private' as const,
+            type: isStudioLinked ? ('studio' as const) : ('private' as const),
+            studioName: dancer.studioAssociation?.studioName,
             dancers: [{
               id: dancer.id,
               name: dancer.name,
@@ -187,12 +216,29 @@ export default function PerformanceTypeEntryPage() {
           );
           setEvents(matchingEvents);
           
-          // Auto-select if only one event
+          // Auto-select if only one event (enhanced logic)
           if (matchingEvents.length === 1) {
             setFormData(prev => ({
               ...prev,
               eventId: matchingEvents[0].id
             }));
+            
+            // Skip Step 1 entirely when there's only one event - go directly to Step 2
+            setStep(2);
+            
+            // Show success message for auto-assignment
+            setTimeout(() => {
+              showAlert(
+                `🎯 Event auto-selected! We've selected "${matchingEvents[0].name}" and skipped the event selection step since it's the only ${performanceType} event available in ${region}.`,
+                'success'
+              );
+            }, 500);
+          } else if (matchingEvents.length === 0) {
+            // No events available
+            showAlert(
+              `No ${performanceType} events are currently available in ${region}. Please check other regions or performance types.`,
+              'warning'
+            );
           }
         }
       }
@@ -234,6 +280,67 @@ export default function PerformanceTypeEntryPage() {
         participantIds: newParticipantIds
       };
     });
+  };
+
+  // Search for participants
+  const searchParticipants = async (query: string) => {
+    if (!query || query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/dancers/search?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setSearchResults(data.dancers);
+      } else {
+        setSearchResults([]);
+        showAlert('Search failed. Please try again.', 'error');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+      showAlert('Search failed. Please try again.', 'error');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Add participant from search results
+  const addParticipantFromSearch = (dancer: any) => {
+    // Add the dancer to the contestant's dancers list if not already there
+    setContestant(prev => {
+      if (!prev) return prev;
+      
+      const existingDancer = prev.dancers.find(d => d.id === dancer.id);
+      if (existingDancer) {
+        showAlert('This dancer is already in the participant list', 'warning');
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        dancers: [...prev.dancers, {
+          id: dancer.id,
+          name: dancer.name,
+          age: dancer.age,
+          style: dancer.studioName || 'Private',
+          nationalId: dancer.nationalId
+        }]
+      };
+    });
+
+    // Auto-select the dancer
+    handleParticipantToggle(dancer.id);
+    
+    // Clear search
+    setSearchQuery('');
+    setSearchResults([]);
+    
+    showAlert(`Added ${dancer.name} to participants`, 'success');
   };
 
   const getParticipantLimits = () => {
@@ -307,13 +414,46 @@ export default function PerformanceTypeEntryPage() {
       const feeBreakdown = calculateEODSAFee(
         formData.mastery,
         performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group',
-        formData.participantIds.length
+        formData.participantIds.length,
+        {
+          soloCount: 1,
+          includeRegistration: true
+        }
       );
+
+      // For group entries without initial EODSA ID, use the first participant's EODSA ID
+      let finalEodsaId = eodsaId;
+      let finalContestantId = contestant!.id;
+      
+      if (!finalEodsaId && formData.participantIds.length > 0 && contestant?.dancers && contestant.dancers.length > 0) {
+        // Use the first participant's information
+        const firstParticipant = contestant.dancers.find(d => d.id === formData.participantIds[0]);
+        if (firstParticipant) {
+          // Try to get EODSA ID from the dancer data
+          try {
+            const response = await fetch(`/api/dancers/by-eodsa-id/${firstParticipant.id}`);
+            if (response.ok) {
+              const dancerData = await response.json();
+              if (dancerData.success && dancerData.dancer) {
+                finalEodsaId = dancerData.dancer.eodsaId;
+                finalContestantId = dancerData.dancer.id;
+              }
+            }
+          } catch (error) {
+            console.warn('Could not fetch dancer EODSA ID:', error);
+          }
+          
+          // Fallback: generate a temporary EODSA ID based on first participant
+          if (!finalEodsaId) {
+            finalEodsaId = `GROUP-${Date.now()}`;
+          }
+        }
+      }
 
       const eventEntryData = {
         eventId: formData.eventId,
-        contestantId: contestant!.id,
-        eodsaId: eodsaId,
+        contestantId: finalContestantId,
+        eodsaId: finalEodsaId,
         participantIds: formData.participantIds,
         calculatedFee: feeBreakdown.totalFee,
         paymentStatus: 'pending',
@@ -357,6 +497,11 @@ export default function PerformanceTypeEntryPage() {
       showAlert('Please select participants', 'warning');
       return;
     }
+    if (step === 2 && formData.participantIds.length < getParticipantLimits().min) {
+      const limits = getParticipantLimits();
+      showAlert(`${performanceType} requires at least ${limits.min} participant(s)`, 'warning');
+      return;
+    }
     if (step === 2 && !formData.itemName) {
       showAlert('Please fill in all performance details', 'warning');
       return;
@@ -371,6 +516,12 @@ export default function PerformanceTypeEntryPage() {
   };
 
   const prevStep = () => {
+    // If we're at step 2 and there's only one event (meaning we skipped step 1), 
+    // go back to the region selection page
+    if (step === 2 && events.length === 1) {
+      router.push(`/event-dashboard/${region}?eodsaId=${eodsaId}`);
+      return;
+    }
     setStep(prev => Math.max(prev - 1, 1));
   };
 
@@ -389,13 +540,32 @@ export default function PerformanceTypeEntryPage() {
             const feeBreakdown = calculateEODSAFee(
               formData.mastery,
               performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group',
-              formData.participantIds.length
+              formData.participantIds.length,
+              {
+                soloCount: 1,
+                includeRegistration: true
+              }
             );
             return (
               <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-500/40 rounded-2xl p-6 mb-6">
                 <p className="text-lg font-bold text-green-300 mb-4">📧 Expect an Email Invoice for:</p>
-                <p className="text-3xl font-bold text-green-100">R{feeBreakdown.totalFee.toFixed(2)}</p>
-                <p className="text-sm text-green-400 mt-2">Gabriel's team will send payment instructions via email</p>
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-green-200">
+                    <span>Registration Fee ({formData.participantIds.length} dancer{formData.participantIds.length > 1 ? 's' : ''})</span>
+                    <span>R{feeBreakdown.registrationFee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-green-200">
+                    <span>Performance Fee ({feeBreakdown.breakdown})</span>
+                    <span>R{feeBreakdown.performanceFee.toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-green-400/30 pt-2">
+                    <div className="flex justify-between">
+                      <span className="text-lg font-bold text-green-100">Total Amount:</span>
+                      <span className="text-2xl font-bold text-green-100">R{feeBreakdown.totalFee.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-green-400">Gabriel's team will send payment instructions via email</p>
               </div>
             );
           })()}
@@ -423,7 +593,7 @@ export default function PerformanceTypeEntryPage() {
     );
   }
 
-  if (!region || !performanceType || !eodsaId) {
+  if (!region || !performanceType || (!eodsaId && !allowEmptyStart)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-8 text-center">
@@ -499,6 +669,24 @@ export default function PerformanceTypeEntryPage() {
             {step === 1 && (
               <div>
                 <h2 className="text-2xl font-bold text-white mb-6">Select Event</h2>
+                
+                {/* Auto-Assignment Notification */}
+                {autoAssigned && events.length === 1 && formData.eventId && (
+                  <div className="mb-6 p-4 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-500/40 rounded-xl">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-lg">🎯</span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-green-300">Smart Selection Applied!</h3>
+                        <p className="text-green-200 text-sm">
+                          We automatically selected this event since it's the only {performanceType} event in {region}.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {isLoading ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-400 rounded-full animate-spin mx-auto mb-4"></div>
@@ -516,14 +704,24 @@ export default function PerformanceTypeEntryPage() {
                       <div
                         key={event.id}
                         onClick={() => setFormData(prev => ({ ...prev, eventId: event.id }))}
-                        className={`border-2 rounded-xl p-6 cursor-pointer transition-all duration-300 ${
+                        className={`border-2 rounded-xl p-6 cursor-pointer transition-all duration-300 relative ${
                           formData.eventId === event.id
                             ? 'border-purple-400 bg-purple-900/30'
                             : 'border-gray-600 hover:border-purple-400 bg-gray-700/50'
                         }`}
                       >
+                        {/* Auto-selected indicator */}
+                        {autoAssigned && formData.eventId === event.id && events.length === 1 && (
+                          <div className="absolute top-4 right-4">
+                            <div className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1">
+                              <span>🚀</span>
+                              <span>Auto-Selected</span>
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="flex justify-between items-start">
-                          <div>
+                          <div className="flex-1 pr-4">
                             <h3 className="text-lg font-bold text-white mb-2">{event.name}</h3>
                             <p className="text-gray-300 mb-2">{event.description}</p>
                             <div className="text-sm text-gray-400 space-y-1">
@@ -550,39 +748,129 @@ export default function PerformanceTypeEntryPage() {
               <div>
                 <h2 className="text-2xl font-bold text-white mb-6">Performance Details</h2>
                 
+                {/* Auto-Selected Event Info */}
+                {events.length === 1 && formData.eventId && (
+                  <div className="mb-6 p-4 bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border-2 border-blue-500/40 rounded-xl">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-lg">ℹ️</span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-blue-300">Event Auto-Selected</h3>
+                        <p className="text-blue-200 text-sm">
+                          Selected: {events.find(e => e.id === formData.eventId)?.name} - We skipped the event selection step since it's the only {performanceType} event in {region}.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Participant Selection */}
                 {contestant && (
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-white mb-4">Select Participants</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {contestant.dancers.map((dancer) => (
-                        <div
-                          key={dancer.id}
-                          onClick={() => handleParticipantToggle(dancer.id)}
-                          className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 ${
-                            formData.participantIds.includes(dancer.id)
-                              ? 'border-purple-400 bg-purple-900/30'
-                              : 'border-gray-600 hover:border-purple-400 bg-gray-700/50'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                              formData.participantIds.includes(dancer.id)
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-gray-600 text-gray-300'
-                            }`}>
-                              {dancer.name.charAt(0)}
+                    
+                    {/* Show participant search for group/duet/trio entries */}
+                    {showParticipantSearch && (
+                      <div className="mb-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
+                        <h4 className="text-blue-300 font-semibold mb-3">🔍 Search & Add Participants</h4>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => {
+                              setSearchQuery(e.target.value);
+                              searchParticipants(e.target.value);
+                            }}
+                            placeholder="Search by name, EODSA ID, or National ID..."
+                            className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400"
+                          />
+                          {isSearching && (
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
                             </div>
-                            <div>
-                              <p className="font-semibold text-white">{dancer.name}</p>
-                              <p className="text-sm text-gray-400">Age: {dancer.age} | Style: {dancer.style}</p>
+                          )}
+                        </div>
+                        
+                        {/* Search Results */}
+                        {searchResults.length > 0 && (
+                          <div className="mt-4 max-h-40 overflow-y-auto">
+                            <p className="text-blue-300 text-sm mb-2">Found {searchResults.length} dancers:</p>
+                            {searchResults.map((dancer) => (
+                              <div
+                                key={dancer.id}
+                                onClick={() => addParticipantFromSearch(dancer)}
+                                className="p-3 bg-gray-700/50 hover:bg-gray-600/50 rounded-lg mb-2 cursor-pointer transition-all"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="font-medium text-white">{dancer.name}</p>
+                                    <p className="text-sm text-gray-400">
+                                      {dancer.eodsaId} • Age: {dancer.age} • {dancer.studioName || 'Private'}
+                                    </p>
+                                  </div>
+                                  <button className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+                                    Add
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+                          <p className="text-gray-400 text-sm mt-2">No dancers found matching "{searchQuery}"</p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Selected Participants Display */}
+                    {contestant.dancers.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {contestant.dancers.map((dancer) => (
+                          <div
+                            key={dancer.id}
+                            onClick={() => handleParticipantToggle(dancer.id)}
+                            className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 ${
+                              formData.participantIds.includes(dancer.id)
+                                ? 'border-purple-400 bg-purple-900/30'
+                                : 'border-gray-600 hover:border-purple-400 bg-gray-700/50'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                                formData.participantIds.includes(dancer.id)
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-gray-600 text-gray-300'
+                              }`}>
+                                {dancer.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-white">{dancer.name}</p>
+                                <p className="text-sm text-gray-400">Age: {dancer.age} | Style: {dancer.style}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Instructions for empty participant list */}
+                    {contestant.dancers.length === 0 && showParticipantSearch && (
+                      <div className="text-center py-8 text-gray-400">
+                        <div className="text-4xl mb-4">👥</div>
+                        <p className="text-lg font-medium">No participants selected yet</p>
+                        <p className="text-sm">Use the search above to find and add dancers to your {performanceType.toLowerCase()}</p>
+                      </div>
+                    )}
+                    
                     <p className="text-sm text-gray-400 mt-2">
                       Selected: {formData.participantIds.length} / {getParticipantLimits().max}
+                      {getParticipantLimits().min > 1 && (
+                        <span className="ml-2 text-yellow-400">
+                          (Minimum: {getParticipantLimits().min})
+                        </span>
+                      )}
                     </p>
                   </div>
                 )}
@@ -614,8 +902,6 @@ export default function PerformanceTypeEntryPage() {
                       required
                     />
                   </div>
-
-
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -740,7 +1026,11 @@ export default function PerformanceTypeEntryPage() {
                     const feeBreakdown = calculateEODSAFee(
                       formData.mastery,
                       performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group',
-                      formData.participantIds.length
+                      formData.participantIds.length,
+                      {
+                        soloCount: 1,
+                        includeRegistration: true
+                      }
                     );
                     return (
                       <div className="space-y-3">
@@ -749,7 +1039,7 @@ export default function PerformanceTypeEntryPage() {
                           <span className="font-semibold">R{feeBreakdown.registrationFee.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between items-center text-purple-200 text-lg">
-                          <span>Performance Fee ({performanceType})</span>
+                          <span>Performance Fee ({feeBreakdown.breakdown})</span>
                           <span className="font-semibold">R{feeBreakdown.performanceFee.toFixed(2)}</span>
                         </div>
                         <div className="border-t border-purple-400/30 pt-3">
@@ -833,7 +1123,11 @@ export default function PerformanceTypeEntryPage() {
                       const feeBreakdown = calculateEODSAFee(
                         formData.mastery,
                         performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group',
-                        formData.participantIds.length
+                        formData.participantIds.length,
+                        {
+                          soloCount: 1,
+                          includeRegistration: true
+                        }
                       );
                       return (
                         <div className="space-y-3">
@@ -842,7 +1136,7 @@ export default function PerformanceTypeEntryPage() {
                             <span className="font-semibold">R{feeBreakdown.registrationFee.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-purple-200 text-lg">
-                            <span>Performance Fee ({performanceType})</span>
+                            <span>Performance Fee ({feeBreakdown.breakdown})</span>
                             <span className="font-semibold">R{feeBreakdown.performanceFee.toFixed(2)}</span>
                           </div>
                           <div className="border-t border-purple-400/30 pt-3 mt-4">
@@ -885,10 +1179,10 @@ export default function PerformanceTypeEntryPage() {
             <div className="flex justify-between mt-8">
               <button
                 onClick={prevStep}
-                disabled={step === 1}
+                disabled={step === 1 && events.length > 1} // Only disable if we're at step 1 with multiple events
                 className="px-6 py-3 border-2 border-gray-600 text-gray-300 rounded-xl hover:bg-gray-700 hover:border-gray-500 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Previous
+                {step === 2 && events.length === 1 ? 'Back to Region' : 'Previous'}
               </button>
               
               {step < 4 ? (

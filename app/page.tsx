@@ -104,11 +104,11 @@ export default function HomePage() {
           {/* Additional Links */}
           <div className="text-center space-y-4">
             <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <Link href="/admin" className="text-blue-400 hover:text-blue-300 transition-colors">
+              <Link href="/portal/admin" className="text-blue-400 hover:text-blue-300 transition-colors">
                 Admin Portal
               </Link>
               <span className="text-gray-600">•</span>
-              <Link href="/judge" className="text-green-400 hover:text-green-300 transition-colors">
+              <Link href="/portal/judge" className="text-green-400 hover:text-green-300 transition-colors">
                 Judge Portal
               </Link>
             </div>

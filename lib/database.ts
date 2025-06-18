@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { Contestant, Performance, Judge, Score, Dancer, EventEntry, Ranking, Event } from './types';
+import type { Contestant, Performance, Judge, Score, Dancer, EventEntry, Ranking, Event } from './types';
 
 // Create database connection using Neon serverless driver
 // Only initialize if we have a DATABASE_URL (server-side only)
@@ -999,6 +999,35 @@ export const db = {
     })) as (Performance & { contestantName: string })[];
   },
 
+  async getPerformanceById(performanceId: string) {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT p.*, c.name as contestant_name 
+      FROM performances p 
+      JOIN contestants c ON p.contestant_id = c.id 
+      WHERE p.id = ${performanceId}
+    ` as any[];
+    
+    if (result.length === 0) return null;
+    
+    const row = result[0];
+    return {
+      id: row.id,
+      eventId: row.event_id,
+      eventEntryId: row.event_entry_id,
+      contestantId: row.contestant_id,
+      title: row.title,
+      participantNames: JSON.parse(row.participant_names),
+      duration: row.duration,
+      choreographer: row.choreographer,
+      mastery: row.mastery,
+      itemStyle: row.item_style,
+      scheduledTime: row.scheduled_time,
+      status: row.status,
+      contestantName: row.contestant_name
+    } as Performance & { contestantName: string };
+  },
+
   // Rankings and Tabulation
   async calculateRankings(region?: string, ageCategory?: string, performanceType?: string, eventIds?: string[]) {
     const sqlClient = getSql();
@@ -1025,7 +1054,10 @@ export const db = {
               e.performance_type,
               p.title,
               p.item_style,
+              p.participant_names,
               c.name as contestant_name,
+              c.type as contestant_type,
+              c.studio_name,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG((s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) / 5) as average_score,
               COUNT(s.id) as judge_count
@@ -1034,7 +1066,7 @@ export const db = {
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
             WHERE e.id = ${eventId}
-            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, c.name
+            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
@@ -1052,7 +1084,10 @@ export const db = {
                 e.performance_type,
                 p.title,
                 p.item_style,
+                p.participant_names,
                 c.name as contestant_name,
+                c.type as contestant_type,
+                c.studio_name,
                 AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
                 AVG((s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) / 5) as average_score,
                 COUNT(s.id) as judge_count
@@ -1061,7 +1096,7 @@ export const db = {
               JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN scores s ON p.id = s.performance_id
               WHERE e.id = ${eventId}
-              GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, c.name
+              GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
               HAVING COUNT(s.id) > 0
               ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
             ` as any[];
@@ -1082,7 +1117,10 @@ export const db = {
               e.performance_type,
               p.title,
               p.item_style,
+              p.participant_names,
               c.name as contestant_name,
+              c.type as contestant_type,
+              c.studio_name,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG((s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) / 5) as average_score,
               COUNT(s.id) as judge_count
@@ -1091,7 +1129,7 @@ export const db = {
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
             WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType}
-            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, c.name
+            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
@@ -1106,7 +1144,10 @@ export const db = {
               e.performance_type,
               p.title,
               p.item_style,
+              p.participant_names,
               c.name as contestant_name,
+              c.type as contestant_type,
+              c.studio_name,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG((s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) / 5) as average_score,
               COUNT(s.id) as judge_count
@@ -1115,7 +1156,7 @@ export const db = {
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
             WHERE e.region = ${region} AND e.age_category = ${ageCategory}
-            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, c.name
+            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
@@ -1130,7 +1171,10 @@ export const db = {
               e.performance_type,
               p.title,
               p.item_style,
+              p.participant_names,
               c.name as contestant_name,
+              c.type as contestant_type,
+              c.studio_name,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG((s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) / 5) as average_score,
               COUNT(s.id) as judge_count
@@ -1139,7 +1183,7 @@ export const db = {
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
             WHERE e.region = ${region}
-            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, c.name
+            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
@@ -1154,7 +1198,10 @@ export const db = {
               e.performance_type,
               p.title,
               p.item_style,
+              p.participant_names,
               c.name as contestant_name,
+              c.type as contestant_type,
+              c.studio_name,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG((s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) / 5) as average_score,
               COUNT(s.id) as judge_count
@@ -1162,7 +1209,7 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, c.name
+            GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
@@ -1197,6 +1244,32 @@ export const db = {
           currentRank = index + 1;
         }
         
+        // Parse participant names from JSON
+        let participantNames: string[] = [];
+        try {
+          participantNames = JSON.parse(row.participant_names || '[]');
+        } catch (error) {
+          console.warn('Error parsing participant names:', error);
+          participantNames = [row.contestant_name]; // Fallback to contestant name
+        }
+        
+        // Create display name based on performance type and data available
+        let displayName = '';
+        let studioInfo = '';
+        
+        if (participantNames.length > 0) {
+          // Use actual participant names (the dancers)
+          displayName = participantNames.join(', ');
+        } else {
+          // Fallback to contestant name if no participant names
+          displayName = row.contestant_name || 'Unknown Participant';
+        }
+        
+        // Add studio information if available
+        if (row.contestant_type === 'studio' && row.studio_name) {
+          studioInfo = row.studio_name;
+        }
+        
         return {
           performanceId: row.performance_id,
           eventId: row.event_id,
@@ -1206,7 +1279,9 @@ export const db = {
           performanceType: row.performance_type,
           title: row.title,
           itemStyle: row.item_style,
-          contestantName: row.contestant_name,
+          contestantName: displayName, // Now shows participant names instead of contestant name
+          participantNames: participantNames, // Keep original participant names for reference
+          studioName: studioInfo, // Studio information for display
           totalScore: parseFloat(row.total_score) || 0,
           averageScore: parseFloat(row.average_score) || 0,
           rank: currentRank,
@@ -2934,6 +3009,56 @@ export const unifiedDb = {
     `;
   },
 
+  // Search dancers by name, EODSA ID, or national ID
+  async searchDancers(query: string, limit: number = 20): Promise<any[]> {
+    const sqlClient = getSql();
+    
+    // Search in both dancers and contestants tables
+    const searchPattern = `%${query.toLowerCase()}%`;
+    
+    try {
+      // Search unified dancers first
+      const dancersResult = await sqlClient`
+        SELECT d.*, 
+               CASE WHEN sa.studio_id IS NOT NULL THEN json_build_object(
+                 'studioId', s.id,
+                 'studioName', s.name
+               ) ELSE NULL END as studio_association
+        FROM dancers d
+        LEFT JOIN studio_applications sa ON d.id = sa.dancer_id AND sa.status = 'accepted'
+        LEFT JOIN studios s ON sa.studio_id = s.id
+        WHERE (
+          LOWER(d.name) LIKE ${searchPattern} OR
+          LOWER(d.eodsa_id) LIKE ${searchPattern} OR
+          LOWER(d.national_id) LIKE ${searchPattern}
+        )
+        AND d.approved = true
+        ORDER BY d.name
+        LIMIT ${limit}
+      ` as any[];
+
+      return dancersResult.map((row: any) => ({
+        id: row.id,
+        eodsaId: row.eodsa_id,
+        name: row.name,
+        age: row.age,
+        dateOfBirth: row.date_of_birth,
+        nationalId: row.national_id,
+        email: row.email,
+        phone: row.phone,
+        guardianName: row.guardian_name,
+        guardianEmail: row.guardian_email,
+        guardianPhone: row.guardian_phone,
+        approved: row.approved,
+        rejectionReason: row.rejection_reason,
+        studioAssociation: row.studio_association
+      }));
+    } catch (error) {
+      console.error('Error searching dancers:', error);
+      return [];
+    }
+  },
+
   // Utility function to calculate age
   calculateAge(dateOfBirth: string): number {
     const today = new Date();
@@ -3036,4 +3161,4 @@ export const unifiedDb = {
   }
 };
 
-export default db; 
+ 
