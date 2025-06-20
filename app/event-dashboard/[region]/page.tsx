@@ -37,24 +37,40 @@ interface Contestant {
   }[];
 }
 
+interface StudioSession {
+  id: string;
+  name: string;
+  email: string;
+  registrationNumber: string;
+}
+
 export default function RegionalEventsPage() {
   const searchParams = useSearchParams();
   const params = useParams();
   const router = useRouter();
   const region = decodeURIComponent(params?.region as string || '');
   const eodsaId = searchParams?.get('eodsaId') || '';
+  const studioId = searchParams?.get('studioId') || '';
   
   const [contestant, setContestant] = useState<Contestant | null>(null);
+  const [studioInfo, setStudioInfo] = useState<StudioSession | null>(null);
+  const [availableDancers, setAvailableDancers] = useState<any[]>([]);
+  const [isStudioMode, setIsStudioMode] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [groupedEvents, setGroupedEvents] = useState<{[key: string]: Event[]}>({});
 
   useEffect(() => {
     if (region && eodsaId) {
+      setIsStudioMode(false);
       loadContestant(eodsaId);
       loadRegionalEvents();
+    } else if (region && studioId) {
+      setIsStudioMode(true);
+      loadStudioData(studioId);
+      loadRegionalEvents();
     }
-  }, [region, eodsaId]);
+  }, [region, eodsaId, studioId]);
 
   // Group events by performance type after loading
   useEffect(() => {
@@ -111,6 +127,36 @@ export default function RegionalEventsPage() {
     }
   };
 
+  const loadStudioData = async (id: string) => {
+    try {
+      // Verify studio session
+      const studioSession = localStorage.getItem('studioSession');
+      if (!studioSession) {
+        router.push('/studio-login');
+        return;
+      }
+
+      const parsedSession = JSON.parse(studioSession);
+      
+      // Verify the studio ID matches the session
+      if (parsedSession.id !== id) {
+        router.push('/studio-login');
+        return;
+      }
+
+      // Load studio's dancers
+      const response = await fetch(`/api/studios/dancers-new?studioId=${id}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setStudioInfo(parsedSession);
+        setAvailableDancers(data.dancers);
+      }
+    } catch (error) {
+      console.error('Failed to load studio data:', error);
+    }
+  };
+
   const loadRegionalEvents = async () => {
     setIsLoading(true);
     try {
@@ -147,13 +193,13 @@ export default function RegionalEventsPage() {
     }
   };
 
-  if (!region || !eodsaId) {
+  if (!region || (!eodsaId && !studioId)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-8 text-center">
           <div className="text-6xl mb-6">❌</div>
           <h2 className="text-2xl font-bold text-white mb-4">Missing Information</h2>
-          <p className="text-gray-300 mb-6">Region or EODSA ID not provided.</p>
+          <p className="text-gray-300 mb-6">Region or authentication not provided.</p>
           <Link 
             href="/"
             className="block w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
@@ -182,7 +228,7 @@ export default function RegionalEventsPage() {
         {/* Back Navigation */}
         <div className="mb-6">
           <Link 
-            href={`/event-dashboard?eodsaId=${eodsaId}`}
+            href={`/event-dashboard?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
             className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-700/50 text-gray-300 rounded-xl hover:bg-gray-700 transition-all duration-300 group"
           >
             <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -197,18 +243,31 @@ export default function RegionalEventsPage() {
           <h1 className="text-4xl font-bold text-white mb-2">
             {region} Events
           </h1>
-          {contestant && (
+          {(contestant || studioInfo) && (
             <div className="bg-gray-800/50 backdrop-blur rounded-2xl p-4 inline-block">
-              <p className="text-gray-300">
-                Welcome, <span className="text-purple-400 font-semibold">{contestant.name}</span>
-              </p>
-              <p className="text-sm text-gray-400">
-                EODSA ID: {contestant.eodsaId} • 
-                {contestant.type === 'studio' && contestant.studioName && 
-                  ` Studio: ${contestant.studioName}`
-                }
-                {contestant.type === 'private' && ' Independent Dancer'}
-              </p>
+              {isStudioMode ? (
+                <>
+                  <p className="text-gray-300">
+                    Studio: <span className="text-green-400 font-semibold">{studioInfo?.name}</span>
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Registration #: {studioInfo?.registrationNumber} • {availableDancers.length} dancers available
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-300">
+                    Welcome, <span className="text-purple-400 font-semibold">{contestant?.name}</span>
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    EODSA ID: {contestant?.eodsaId} • 
+                    {contestant?.type === 'studio' && contestant.studioName && 
+                      ` Studio: ${contestant.studioName}`
+                    }
+                    {contestant?.type === 'private' && ' Independent Dancer'}
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -221,7 +280,7 @@ export default function RegionalEventsPage() {
               There are currently no open events in {region}. Please check back later.
             </p>
             <Link 
-              href={`/event-dashboard?eodsaId=${eodsaId}`}
+              href={`/event-dashboard?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
               className="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
             >
               Browse Other Regions
@@ -306,7 +365,7 @@ export default function RegionalEventsPage() {
                           
                           <div className="ml-6">
                             <button
-                              onClick={() => router.push(`/event-dashboard/${region}/${performanceType.toLowerCase()}?eodsaId=${eodsaId}&eventId=${event.id}`)}
+                              onClick={() => router.push(`/event-dashboard/${region}/${performanceType.toLowerCase()}?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}&eventId=${event.id}`)}
                               className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold flex items-center space-x-2"
                             >
                               <span>Enter Competition</span>

@@ -39,6 +39,13 @@ interface Contestant {
   }[];
 }
 
+interface StudioSession {
+  id: string;
+  name: string;
+  email: string;
+  registrationNumber: string;
+}
+
 interface EventEntryForm {
   eventId: string;
   participantIds: string[];
@@ -59,6 +66,7 @@ export default function PerformanceTypeEntryPage() {
   const region = params?.region as string;
   const performanceType = params?.performanceType as string;
   const eodsaId = searchParams?.get('eodsaId') || '';
+  const studioId = searchParams?.get('studioId') || '';
   const autoAssigned = searchParams?.get('autoAssigned') === 'true';
   const preSelectedEventId = searchParams?.get('eventId') || '';
   
@@ -66,6 +74,9 @@ export default function PerformanceTypeEntryPage() {
   const allowEmptyStart = ['duet', 'trio', 'group'].includes(performanceType?.toLowerCase());
   
   const [contestant, setContestant] = useState<Contestant | null>(null);
+  const [studioInfo, setStudioInfo] = useState<StudioSession | null>(null);
+  const [availableDancers, setAvailableDancers] = useState<any[]>([]);
+  const [isStudioMode, setIsStudioMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -93,7 +104,11 @@ export default function PerformanceTypeEntryPage() {
 
   useEffect(() => {
     if (eodsaId) {
+      setIsStudioMode(false);
       loadContestant(eodsaId);
+    } else if (studioId) {
+      setIsStudioMode(true);
+      loadStudioData(studioId);
     } else if (allowEmptyStart) {
       // For group/duet/trio entries, we can start without an EODSA ID
       setContestant({
@@ -108,7 +123,7 @@ export default function PerformanceTypeEntryPage() {
       setShowParticipantSearch(true);
     }
     loadMatchingEvents();
-  }, [region, performanceType, eodsaId, allowEmptyStart]);
+  }, [region, performanceType, eodsaId, studioId, allowEmptyStart]);
 
   useEffect(() => {
     if (formData.eventId) {
@@ -153,6 +168,28 @@ export default function PerformanceTypeEntryPage() {
       setCalculatedFee(feeBreakdown.totalFee);
     }
   }, [formData.eventId, formData.mastery, formData.participantIds.length, performanceType]);
+
+  // Sync multi-select state with form data
+  useEffect(() => {
+    if (contestant && formData.participantIds.length > 0) {
+      const selectedDancers = formData.participantIds.map(id => {
+        const dancer = contestant.dancers.find(d => d.id === id);
+        if (dancer) {
+          return {
+            id: dancer.id,
+            name: dancer.name,
+            age: dancer.age,
+            eodsaId: contestant.eodsaId || '',
+            studioName: dancer.style || (isStudioMode ? studioInfo?.name : 'Private'),
+            nationalId: dancer.nationalId
+          };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      setSelectedDancersForMultiSelect(selectedDancers);
+    }
+  }, [contestant, formData.participantIds, isStudioMode, studioInfo]);
 
   const loadContestant = async (id: string) => {
     try {
@@ -219,6 +256,57 @@ export default function PerformanceTypeEntryPage() {
     }
   };
 
+  const loadStudioData = async (id: string) => {
+    try {
+      // Verify studio session
+      const studioSession = localStorage.getItem('studioSession');
+      if (!studioSession) {
+        router.push('/studio-login');
+        return;
+      }
+
+      const parsedSession = JSON.parse(studioSession);
+      
+      // Verify the studio ID matches the session
+      if (parsedSession.id !== id) {
+        router.push('/studio-login');
+        return;
+      }
+
+      // Load studio's dancers
+      const response = await fetch(`/api/studios/dancers-new?studioId=${id}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setStudioInfo(parsedSession);
+        setAvailableDancers(data.dancers);
+        
+        // Create a pseudo-contestant for studios to enable form functionality
+        setContestant({
+          id: `studio-${id}`,
+          eodsaId: '',
+          name: parsedSession.name,
+          email: parsedSession.email,
+          phone: '',
+          type: 'studio',
+          studioName: parsedSession.name,
+          dancers: data.dancers.map((dancer: any) => ({
+            id: dancer.id,
+            name: dancer.name,
+            age: dancer.age,
+            style: 'Studio Dancer',
+            nationalId: dancer.nationalId
+          }))
+        });
+
+        // Enable participant search for studios (they can select from their dancers)
+        setShowParticipantSearch(true);
+      }
+    } catch (error) {
+      console.error('Failed to load studio data:', error);
+    }
+  };
+
   const loadMatchingEvents = async () => {
     setIsLoading(true);
     try {
@@ -233,8 +321,8 @@ export default function PerformanceTypeEntryPage() {
           );
           setEvents(matchingEvents);
           
-          // Auto-select if only one event (enhanced logic)
-          if (matchingEvents.length === 1) {
+          // Auto-select if only one event (enhanced logic) - but only if no event was pre-selected
+          if (matchingEvents.length === 1 && !preSelectedEventId) {
             setFormData(prev => ({
               ...prev,
               eventId: matchingEvents[0].id
@@ -242,14 +330,6 @@ export default function PerformanceTypeEntryPage() {
             
             // Skip Step 1 entirely when there's only one event - go directly to Step 2
             setStep(2);
-            
-            // Show success message for auto-assignment
-            setTimeout(() => {
-              showAlert(
-                `🎯 Event auto-selected! We've selected "${matchingEvents[0].name}" and skipped the event selection step since it's the only ${performanceType} event available in ${region}.`,
-                'success'
-              );
-            }, 500);
           } else if (matchingEvents.length === 0) {
             // No events available
             showAlert(
@@ -333,6 +413,24 @@ export default function PerformanceTypeEntryPage() {
     }
     
     try {
+      // For studio mode, search only within the studio's dancers
+      if (isStudioMode && availableDancers.length > 0) {
+        const filtered = availableDancers.filter(dancer => 
+          dancer.name.toLowerCase().includes(query.toLowerCase()) ||
+          dancer.nationalId?.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        return filtered.map((dancer: any) => ({
+          id: dancer.id,
+          name: dancer.name,
+          age: dancer.age,
+          eodsaId: dancer.eodsaId || '',
+          studioName: studioInfo?.name || 'Studio Dancer',
+          nationalId: dancer.nationalId
+        }));
+      }
+      
+      // For individual mode, search all dancers
       const response = await fetch(`/api/dancers/search?q=${encodeURIComponent(query)}`);
       const data = await response.json();
       
@@ -389,6 +487,7 @@ export default function PerformanceTypeEntryPage() {
 
   // Handle dancer selection change from multi-select component
   const handleDancerSelectionChange = (dancers: any[]) => {
+    console.log('🎭 Dancer selection changed:', dancers);
     setSelectedDancersForMultiSelect(dancers);
     
     // Update form participant IDs
@@ -397,29 +496,25 @@ export default function PerformanceTypeEntryPage() {
       participantIds: dancers.map(d => d.id)
     }));
 
-    // Update contestant dancers list
+    // Update contestant dancers list - replace, don't merge
     setContestant(prev => {
       if (!prev) return prev;
       
-      // Merge existing dancers with newly selected ones
-      const updatedDancers = [...prev.dancers];
+      // Keep existing dancers not in selection, plus add selected dancers
+      const selectedIds = dancers.map(d => d.id);
+      const keepExisting = prev.dancers.filter(d => !selectedIds.includes(d.id));
       
-      dancers.forEach(newDancer => {
-        const exists = updatedDancers.find(d => d.id === newDancer.id);
-        if (!exists) {
-          updatedDancers.push({
-            id: newDancer.id,
-            name: newDancer.name,
-            age: newDancer.age,
-            style: newDancer.studioName || 'Private',
-            nationalId: newDancer.nationalId
-          });
-        }
-      });
+      const newDancers = dancers.map(newDancer => ({
+        id: newDancer.id,
+        name: newDancer.name,
+        age: newDancer.age,
+        style: newDancer.studioName || 'Private',
+        nationalId: newDancer.nationalId
+      }));
       
       return {
         ...prev,
-        dancers: updatedDancers
+        dancers: [...keepExisting, ...newDancers]
       };
     });
   };
@@ -886,22 +981,7 @@ export default function PerformanceTypeEntryPage() {
               <div>
                 <h2 className="text-2xl font-bold text-white mb-6">Performance Details</h2>
                 
-                {/* Auto-Selected Event Info */}
-                {events.length === 1 && formData.eventId && (
-                  <div className="mb-6 p-4 bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border-2 border-blue-500/40 rounded-xl">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-lg">ℹ️</span>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-blue-300">Event Auto-Selected</h3>
-                        <p className="text-blue-200 text-sm">
-                          Selected: {events.find(e => e.id === formData.eventId)?.name} - We skipped the event selection step since it's the only {performanceType} event in {region}.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+
                 
                 {/* Participant Selection - Enhanced Multi-Select */}
                 {contestant && (
@@ -917,54 +997,6 @@ export default function PerformanceTypeEntryPage() {
                       minSelections={getParticipantLimits().min}
                       className="mb-4"
                     />
-                    
-                    {/* Show existing dancers from contestant if any */}
-                    {contestant.dancers.length > 0 && selectedDancersForMultiSelect.length === 0 && (
-                      <div className="mt-4">
-                        <h4 className="text-white font-medium mb-2">Available Dancers from Your Account</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {contestant.dancers.map((dancer) => (
-                            <div
-                              key={dancer.id}
-                              onClick={() => {
-                                const dancerForMultiSelect = {
-                                  id: dancer.id,
-                                  name: dancer.name,
-                                  age: dancer.age,
-                                  eodsaId: contestant.eodsaId,
-                                  studioName: dancer.style,
-                                  nationalId: dancer.nationalId
-                                };
-                                handleDancerSelectionChange([...selectedDancersForMultiSelect, dancerForMultiSelect]);
-                              }}
-                              className="border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 border-gray-600 hover:border-purple-400 bg-gray-700/50"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-gray-600 text-gray-300">
-                                  {dancer.name.charAt(0)}
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-white">{dancer.name}</p>
-                                  <p className="text-sm text-gray-400">Age: {dancer.age} | {dancer.style}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Selection Status */}
-                    <div className="mt-2 text-sm text-gray-400 flex justify-between items-center">
-                      <span>
-                        Selected: {formData.participantIds.length} of {getParticipantLimits().max} dancers
-                      </span>
-                      {getParticipantLimits().min > 1 && formData.participantIds.length < getParticipantLimits().min && (
-                        <span className="text-yellow-400">
-                          Need {getParticipantLimits().min - formData.participantIds.length} more
-                        </span>
-                      )}
-                    </div>
                   </div>
                 )}
 

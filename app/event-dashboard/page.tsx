@@ -38,12 +38,24 @@ interface Event {
   entryFee: number;
 }
 
+// Studio session interface
+interface StudioSession {
+  id: string;
+  name: string;
+  email: string;
+  registrationNumber: string;
+}
+
 // Component that uses searchParams - wrapped in Suspense
 function EventDashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [eodsaId, setEodsaId] = useState(searchParams?.get('eodsaId') || '');
+  const [studioId, setStudioId] = useState(searchParams?.get('studioId') || '');
   const [contestant, setContestant] = useState<Contestant | null>(null);
+  const [studioInfo, setStudioInfo] = useState<StudioSession | null>(null);
+  const [availableDancers, setAvailableDancers] = useState<any[]>([]);
+  const [isStudioMode, setIsStudioMode] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [dancers, setDancers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,10 +63,15 @@ function EventDashboardContent() {
 
   useEffect(() => {
     if (eodsaId) {
+      setIsStudioMode(false);
       loadContestantData(eodsaId);
       loadEvents();
+    } else if (studioId) {
+      setIsStudioMode(true);
+      loadStudioData(studioId);
+      loadEvents();
     }
-  }, [eodsaId]);
+  }, [eodsaId, studioId]);
 
   const loadContestantData = async (id: string) => {
     setIsLoading(true);
@@ -115,6 +132,54 @@ function EventDashboardContent() {
     }
   };
 
+  const loadStudioData = async (id: string) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      // Verify studio session
+      const studioSession = localStorage.getItem('studioSession');
+      if (!studioSession) {
+        setError('Studio session expired. Please log in again.');
+        router.push('/studio-login');
+        return;
+      }
+
+      const parsedSession = JSON.parse(studioSession);
+      
+      // Verify the studio ID matches the session
+      if (parsedSession.id !== id) {
+        setError('Invalid studio session. Please log in again.');
+        router.push('/studio-login');
+        return;
+      }
+
+      // Load studio's dancers
+      const response = await fetch(`/api/studios/dancers-new?studioId=${id}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setStudioInfo(parsedSession);
+        setAvailableDancers(data.dancers);
+        setDancers(data.dancers.map((dancer: any) => ({
+          id: dancer.id,
+          firstName: dancer.name.split(' ')[0] || dancer.name,
+          lastName: dancer.name.split(' ').slice(1).join(' ') || '',
+          age: dancer.age,
+          style: 'Studio Dancer',
+          nationalId: dancer.nationalId
+        })));
+      } else {
+        setError(data.error || 'Failed to load studio dancers');
+      }
+    } catch (error) {
+      console.error('Failed to load studio data:', error);
+      setError('Failed to load studio data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const loadEvents = async () => {
     try {
       const response = await fetch('/api/events');
@@ -141,19 +206,33 @@ function EventDashboardContent() {
     };
   };
 
-  if (!eodsaId) {
+  if (!eodsaId && !studioId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-8 text-center">
           <div className="text-6xl mb-6">🔍</div>
-          <h2 className="text-2xl font-bold text-white mb-4">EODSA ID Required</h2>
-          <p className="text-gray-300 mb-6">Please enter your EODSA ID to access the event dashboard.</p>
-          <Link 
-            href="/"
-            className="block w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
-          >
-            Back to Home
-          </Link>
+          <h2 className="text-2xl font-bold text-white mb-4">Authentication Required</h2>
+          <p className="text-gray-300 mb-6">Please log in to access the event dashboard.</p>
+          <div className="space-y-3">
+            <Link 
+              href="/dancer-login"
+              className="block w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-semibold"
+            >
+              Dancer Login
+            </Link>
+            <Link 
+              href="/studio-login"
+              className="block w-full px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 font-semibold"
+            >
+              Studio Login
+            </Link>
+            <Link 
+              href="/"
+              className="block w-full px-6 py-3 border-2 border-gray-600 text-gray-300 rounded-xl hover:bg-gray-700 hover:border-gray-500 transition-all duration-300 font-semibold"
+            >
+              Back to Home
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -239,30 +318,58 @@ function EventDashboardContent() {
         </div>
 
         {/* Main Dashboard Content */}
-        {contestant && (
+        {(contestant || studioInfo) && (
           <div className="space-y-8">
             {/* Welcome Section */}
             <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-700/50">
               <div className="text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-white text-xl">🎪</span>
+                  <span className="text-white text-xl">{isStudioMode ? '🏢' : '🎪'}</span>
                 </div>
-                <h2 className="text-3xl font-bold text-white mb-2">Welcome, {contestant.contactName}!</h2>
-                <p className="text-xl text-gray-300">Welcome to your competition entry portal</p>
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  Welcome, {isStudioMode ? studioInfo?.name : contestant?.contactName}!
+                </h2>
+                <p className="text-xl text-gray-300">
+                  {isStudioMode ? 'Studio Competition Entry Portal' : 'Welcome to your competition entry portal'}
+                </p>
                 <div className="mt-4 p-4 bg-purple-900/30 rounded-xl border border-purple-500/50">
-                  <p className="text-purple-300 font-bold text-lg">EODSA ID: {eodsaId}</p>
-                  <p className="text-gray-300">{contestant.type === 'studio' ? `${contestant.studioName} (Studio-Linked)` : 'Private Dancer'}</p>
-                  
-                  <div className="mt-3">
-                    <p className="text-sm text-gray-300">Registered Dancers</p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {dancers.map((dancer, index) => (
-                        <span key={index} className="px-3 py-1 bg-purple-500/30 border border-purple-400 text-purple-200 rounded-full text-sm font-medium">
-                          {dancer.firstName} {dancer.lastName}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  {isStudioMode ? (
+                    <>
+                      <p className="text-purple-300 font-bold text-lg">Studio: {studioInfo?.name}</p>
+                      <p className="text-gray-300">Registration #: {studioInfo?.registrationNumber}</p>
+                      <div className="mt-3">
+                        <p className="text-sm text-gray-300">Available Dancers ({availableDancers.length})</p>
+                        <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto">
+                          {availableDancers.slice(0, 10).map((dancer, index) => (
+                            <span key={index} className="px-3 py-1 bg-green-500/30 border border-green-400 text-green-200 rounded-full text-sm font-medium">
+                              {dancer.name}
+                            </span>
+                          ))}
+                          {availableDancers.length > 10 && (
+                            <span className="px-3 py-1 bg-gray-500/30 border border-gray-400 text-gray-200 rounded-full text-sm font-medium">
+                              +{availableDancers.length - 10} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-purple-300 font-bold text-lg">EODSA ID: {eodsaId}</p>
+                      <p className="text-gray-300">{contestant?.type === 'studio' ? `${contestant.studioName} (Studio-Linked)` : 'Private Dancer'}</p>
+                      
+                      <div className="mt-3">
+                        <p className="text-sm text-gray-300">Registered Dancers</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {dancers.map((dancer, index) => (
+                            <span key={index} className="px-3 py-1 bg-purple-500/30 border border-purple-400 text-purple-200 rounded-full text-sm font-medium">
+                              {dancer.firstName} {dancer.lastName}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -280,7 +387,7 @@ function EventDashboardContent() {
                   return (
                     <Link
                       key={region}
-                      href={`/event-dashboard/${region}?eodsaId=${eodsaId}`}
+                      href={`/event-dashboard/${region}?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
                       className="group bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl p-6 border-2 border-purple-700 hover:border-purple-900 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
                     >
                       <div className="text-center">
