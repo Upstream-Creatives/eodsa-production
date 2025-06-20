@@ -5,6 +5,7 @@ import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AGE_CATEGORIES, MASTERY_LEVELS, ITEM_STYLES, TIME_LIMITS, calculateEODSAFee } from '@/lib/types';
 import { useAlert } from '@/components/ui/custom-alert';
+import { MultiSelectDancers } from '@/components/ui/multi-select-dancers';
 
 interface Event {
   id: string;
@@ -59,6 +60,7 @@ export default function PerformanceTypeEntryPage() {
   const performanceType = params?.performanceType as string;
   const eodsaId = searchParams?.get('eodsaId') || '';
   const autoAssigned = searchParams?.get('autoAssigned') === 'true';
+  const preSelectedEventId = searchParams?.get('eventId') || '';
   
   // Check if this performance type allows empty participant start
   const allowEmptyStart = ['duet', 'trio', 'group'].includes(performanceType?.toLowerCase());
@@ -68,6 +70,7 @@ export default function PerformanceTypeEntryPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showParticipantSearch, setShowParticipantSearch] = useState(false);
+  const [selectedDancersForMultiSelect, setSelectedDancersForMultiSelect] = useState<any[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [formData, setFormData] = useState<EventEntryForm>({
@@ -120,6 +123,20 @@ export default function PerformanceTypeEntryPage() {
       }
     }
   }, [formData.eventId, events]);
+
+  // Handle pre-selected event from regional page
+  useEffect(() => {
+    if (preSelectedEventId && events.length > 0 && !formData.eventId) {
+      const preSelected = events.find(e => e.id === preSelectedEventId);
+      if (preSelected) {
+        setFormData(prev => ({
+          ...prev,
+          eventId: preSelectedEventId
+        }));
+        setStep(2); // Skip event selection step
+      }
+    }
+  }, [preSelectedEventId, events, formData.eventId]);
 
   useEffect(() => {
     if (formData.eventId && formData.mastery && formData.participantIds.length > 0) {
@@ -309,6 +326,33 @@ export default function PerformanceTypeEntryPage() {
     }
   };
 
+  // Search function for multi-select component
+  const searchDancersForMultiSelect = async (query: string): Promise<any[]> => {
+    if (!query || query.length < 2) {
+      return [];
+    }
+    
+    try {
+      const response = await fetch(`/api/dancers/search?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.dancers.map((dancer: any) => ({
+          id: dancer.id,
+          name: dancer.name,
+          age: dancer.age,
+          eodsaId: dancer.eodsaId,
+          studioName: dancer.studioName || 'Private',
+          nationalId: dancer.nationalId
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Search error:', error);
+      return [];
+    }
+  };
+
   // Add participant from search results
   const addParticipantFromSearch = (dancer: any) => {
     // Add the dancer to the contestant's dancers list if not already there
@@ -341,6 +385,43 @@ export default function PerformanceTypeEntryPage() {
     setSearchResults([]);
     
     showAlert(`Added ${dancer.name} to participants`, 'success');
+  };
+
+  // Handle dancer selection change from multi-select component
+  const handleDancerSelectionChange = (dancers: any[]) => {
+    setSelectedDancersForMultiSelect(dancers);
+    
+    // Update form participant IDs
+    setFormData(prev => ({
+      ...prev,
+      participantIds: dancers.map(d => d.id)
+    }));
+
+    // Update contestant dancers list
+    setContestant(prev => {
+      if (!prev) return prev;
+      
+      // Merge existing dancers with newly selected ones
+      const updatedDancers = [...prev.dancers];
+      
+      dancers.forEach(newDancer => {
+        const exists = updatedDancers.find(d => d.id === newDancer.id);
+        if (!exists) {
+          updatedDancers.push({
+            id: newDancer.id,
+            name: newDancer.name,
+            age: newDancer.age,
+            style: newDancer.studioName || 'Private',
+            nationalId: newDancer.nationalId
+          });
+        }
+      });
+      
+      return {
+        ...prev,
+        dancers: updatedDancers
+      };
+    });
   };
 
   const getParticipantLimits = () => {
@@ -822,113 +903,68 @@ export default function PerformanceTypeEntryPage() {
                   </div>
                 )}
                 
-                {/* Participant Selection */}
+                {/* Participant Selection - Enhanced Multi-Select */}
                 {contestant && (
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-white mb-4">Select Participants</h3>
                     
-                    {/* Show participant search for group/duet/trio entries */}
-                    {showParticipantSearch && (
-                      <div className="mb-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
-                        <h4 className="text-blue-300 font-semibold mb-3">🔍 Search & Add Participants</h4>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => {
-                              setSearchQuery(e.target.value);
-                              searchParticipants(e.target.value);
-                            }}
-                            placeholder="Search by name, EODSA ID, or National ID..."
-                            className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400"
-                          />
-                          {isSearching && (
-                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Search Results */}
-                        {searchResults.length > 0 && (
-                          <div className="mt-4 max-h-40 overflow-y-auto">
-                            <p className="text-blue-300 text-sm mb-2">Found {searchResults.length} dancers:</p>
-                            {searchResults.map((dancer) => (
-                              <div
-                                key={dancer.id}
-                                onClick={() => addParticipantFromSearch(dancer)}
-                                className="p-3 bg-gray-700/50 hover:bg-gray-600/50 rounded-lg mb-2 cursor-pointer transition-all"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <p className="font-medium text-white">{dancer.name}</p>
-                                    <p className="text-sm text-gray-400">
-                                      {dancer.eodsaId} • Age: {dancer.age} • {dancer.studioName || 'Private'}
-                                    </p>
-                                  </div>
-                                  <button className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-                                    Add
-                                  </button>
+                    <MultiSelectDancers
+                      selectedDancers={selectedDancersForMultiSelect}
+                      onSelectionChange={handleDancerSelectionChange}
+                      onSearch={searchDancersForMultiSelect}
+                      placeholder={`Search and select dancers for your ${performanceType.toLowerCase()}...`}
+                      maxSelections={getParticipantLimits().max}
+                      minSelections={getParticipantLimits().min}
+                      className="mb-4"
+                    />
+                    
+                    {/* Show existing dancers from contestant if any */}
+                    {contestant.dancers.length > 0 && selectedDancersForMultiSelect.length === 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-white font-medium mb-2">Available Dancers from Your Account</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {contestant.dancers.map((dancer) => (
+                            <div
+                              key={dancer.id}
+                              onClick={() => {
+                                const dancerForMultiSelect = {
+                                  id: dancer.id,
+                                  name: dancer.name,
+                                  age: dancer.age,
+                                  eodsaId: contestant.eodsaId,
+                                  studioName: dancer.style,
+                                  nationalId: dancer.nationalId
+                                };
+                                handleDancerSelectionChange([...selectedDancersForMultiSelect, dancerForMultiSelect]);
+                              }}
+                              className="border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 border-gray-600 hover:border-purple-400 bg-gray-700/50"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-gray-600 text-gray-300">
+                                  {dancer.name.charAt(0)}
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-white">{dancer.name}</p>
+                                  <p className="text-sm text-gray-400">Age: {dancer.age} | {dancer.style}</p>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
-                          <p className="text-gray-400 text-sm mt-2">No dancers found matching "{searchQuery}"</p>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Selected Participants Display */}
-                    {contestant.dancers.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {contestant.dancers.map((dancer) => (
-                          <div
-                            key={dancer.id}
-                            onClick={() => handleParticipantToggle(dancer.id)}
-                            className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 ${
-                              formData.participantIds.includes(dancer.id)
-                                ? 'border-purple-400 bg-purple-900/30'
-                                : 'border-gray-600 hover:border-purple-400 bg-gray-700/50'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                                formData.participantIds.includes(dancer.id)
-                                  ? 'bg-purple-600 text-white'
-                                  : 'bg-gray-600 text-gray-300'
-                              }`}>
-                                {dancer.name.charAt(0)}
-                              </div>
-                              <div>
-                                <p className="font-semibold text-white">{dancer.name}</p>
-                                <p className="text-sm text-gray-400">Age: {dancer.age} | Style: {dancer.style}</p>
-                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                     
-                    {/* Instructions for empty participant list */}
-                    {contestant.dancers.length === 0 && showParticipantSearch && (
-                      <div className="text-center py-8 text-gray-400">
-                        <div className="text-4xl mb-4">👥</div>
-                        <p className="text-lg font-medium">No participants selected yet</p>
-                        <p className="text-sm">Use the search above to find and add dancers to your {performanceType.toLowerCase()}</p>
-                      </div>
-                    )}
-                    
-                    <p className="text-sm text-gray-400 mt-2">
-                      Selected: {formData.participantIds.length} / {getParticipantLimits().max}
-                      {getParticipantLimits().min > 1 && (
-                        <span className="ml-2 text-yellow-400">
-                          (Minimum: {getParticipantLimits().min})
+                    {/* Selection Status */}
+                    <div className="mt-2 text-sm text-gray-400 flex justify-between items-center">
+                      <span>
+                        Selected: {formData.participantIds.length} of {getParticipantLimits().max} dancers
+                      </span>
+                      {getParticipantLimits().min > 1 && formData.participantIds.length < getParticipantLimits().min && (
+                        <span className="text-yellow-400">
+                          Need {getParticipantLimits().min - formData.participantIds.length} more
                         </span>
                       )}
-                    </p>
+                    </div>
                   </div>
                 )}
 

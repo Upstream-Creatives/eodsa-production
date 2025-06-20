@@ -2943,7 +2943,6 @@ export const unifiedDb = {
       id: row.id,
       name: row.name,
       email: row.email,
-      password: row.password, // Include password for admin access per client requirement
       registrationNumber: row.registration_number,
       approved: row.approved_by !== null,
       approvedBy: row.approved_by,
