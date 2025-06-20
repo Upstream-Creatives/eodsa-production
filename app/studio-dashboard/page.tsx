@@ -118,9 +118,16 @@ export default function StudioDashboardPage() {
   const [isEditingEntry, setIsEditingEntry] = useState(false);
   
   // Dancer list view state
-  const [dancerViewMode, setDancerViewMode] = useState<'list' | 'dropdown'>('list');
   const [selectedDancerForActions, setSelectedDancerForActions] = useState<AcceptedDancer | null>(null);
   const [dancerSearchQuery, setDancerSearchQuery] = useState('');
+  
+  // Pagination and filtering state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [sortBy, setSortBy] = useState<'name' | 'age' | 'joinedAt' | 'eodsaId'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [ageFilter, setAgeFilter] = useState<'all' | 'under18' | '18plus'>('all');
+  const [recentFilter, setRecentFilter] = useState<boolean>(false);
   
   const router = useRouter();
 
@@ -506,58 +513,111 @@ export default function StudioDashboardPage() {
 
   // Calculate studio metrics
   const getStudioStats = () => {
-    const totalDancers = acceptedDancers.length;
-    const totalEntries = competitionEntries.length;
-    const avgAge = totalDancers > 0 
-      ? Math.round(acceptedDancers.reduce((sum, dancer) => sum + dancer.age, 0) / totalDancers)
-      : 0;
-    const recentJoins = acceptedDancers.filter(dancer => {
-      const joinDate = new Date(dancer.joinedAt);
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      return joinDate > thirtyDaysAgo;
-    }).length;
-
-    return { totalDancers, totalEntries, avgAge, recentJoins };
+    return {
+      totalDancers: acceptedDancers.length,
+      totalEntries: competitionEntries.length,
+      avgAge: acceptedDancers.length > 0 
+        ? Math.round(acceptedDancers.reduce((sum, dancer) => sum + dancer.age, 0) / acceptedDancers.length)
+        : 0,
+      recentJoins: acceptedDancers.filter(dancer => {
+        const joinDate = new Date(dancer.joinedAt);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return joinDate >= thirtyDaysAgo;
+      }).length
+    };
   };
 
-  // Get unique events count
   const getUniqueEventsCount = () => {
     const uniqueEvents = new Set(competitionEntries.map(entry => entry.eventId));
     return uniqueEvents.size;
   };
 
-  // Auto-switch to dropdown view for large studios (20+ dancers)
+  // Reset pagination when search/filters change
   useEffect(() => {
-    if (acceptedDancers.length >= 20 && dancerViewMode === 'list') {
-      setDancerViewMode('dropdown');
-    }
-  }, [acceptedDancers.length, dancerViewMode]);
+    resetPagination();
+  }, [dancerSearchQuery, ageFilter, recentFilter, sortBy, sortOrder]);
 
-  // Filter dancers based on search query
-  const getFilteredDancers = () => {
-    if (!dancerSearchQuery.trim()) {
-      return acceptedDancers;
+  const getFilteredAndSortedDancers = () => {
+    let filtered = acceptedDancers;
+    
+    // Apply search filter
+    if (dancerSearchQuery.trim()) {
+      const query = dancerSearchQuery.toLowerCase();
+      filtered = filtered.filter(dancer => 
+        dancer.name.toLowerCase().includes(query) ||
+        dancer.eodsaId.toLowerCase().includes(query) ||
+        dancer.nationalId.toLowerCase().includes(query) ||
+        dancer.email?.toLowerCase().includes(query)
+      );
     }
     
-    const query = dancerSearchQuery.toLowerCase();
-    return acceptedDancers.filter(dancer => 
-      dancer.name.toLowerCase().includes(query) ||
-      dancer.eodsaId.toLowerCase().includes(query) ||
-      dancer.nationalId.toLowerCase().includes(query) ||
-      dancer.email?.toLowerCase().includes(query)
-    );
+    // Apply age filter
+    if (ageFilter !== 'all') {
+      filtered = filtered.filter(dancer => {
+        if (ageFilter === 'under18') return dancer.age < 18;
+        if (ageFilter === '18plus') return dancer.age >= 18;
+        return true;
+      });
+    }
+    
+    // Apply recent filter (joined in last 30 days)
+    if (recentFilter) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      filtered = filtered.filter(dancer => 
+        new Date(dancer.joinedAt) >= thirtyDaysAgo
+      );
+    }
+    
+    // Sort the results
+    filtered.sort((a, b) => {
+      let aVal: any, bVal: any;
+      
+      switch (sortBy) {
+        case 'name':
+          aVal = a.name.toLowerCase();
+          bVal = b.name.toLowerCase();
+          break;
+        case 'age':
+          aVal = a.age;
+          bVal = b.age;
+          break;
+        case 'joinedAt':
+          aVal = new Date(a.joinedAt);
+          bVal = new Date(b.joinedAt);
+          break;
+        case 'eodsaId':
+          aVal = a.eodsaId;
+          bVal = b.eodsaId;
+          break;
+        default:
+          aVal = a.name.toLowerCase();
+          bVal = b.name.toLowerCase();
+      }
+      
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return filtered;
   };
 
-  // Convert dancers to dropdown options
-  const getDancerOptions = () => {
-    return acceptedDancers.map(dancer => ({
-      id: dancer.id,
-      value: dancer.id,
-      label: dancer.name,
-      subtitle: `${dancer.eodsaId} • Age ${dancer.age}`,
-      metadata: dancer
-    }));
+  const getPaginatedDancers = () => {
+    const filtered = getFilteredAndSortedDancers();
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return {
+      dancers: filtered.slice(startIndex, endIndex),
+      totalCount: filtered.length,
+      totalPages: Math.ceil(filtered.length / itemsPerPage)
+    };
+  };
+
+  // Reset pagination when filters change
+  const resetPagination = () => {
+    setCurrentPage(1);
   };
 
   const stats = getStudioStats();
@@ -730,60 +790,27 @@ export default function StudioDashboardPage() {
         {activeTab === 'dancers' && (
           <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
             <div className="p-6 border-b border-gray-700">
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start mb-6">
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-xl font-bold text-white">My Dancers</h3>
-                      <p className="text-gray-400 text-sm mt-1">
-                        Dancers who are part of your studio ({acceptedDancers.length} total)
+                      <p className="text-gray-400 text-sm">
+                        Manage your studio dancers ({getPaginatedDancers().totalCount} found, {acceptedDancers.length} total)
                       </p>
                     </div>
-                    
-                    {/* View Mode Toggle */}
-                    {acceptedDancers.length > 0 && (
-                      <div className="flex items-center space-x-3">
-                        <span className="text-sm text-gray-400">View:</span>
-                        <div className="flex bg-gray-700 rounded-lg p-1">
-                          <button
-                            onClick={() => setDancerViewMode('list')}
-                            className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                              dancerViewMode === 'list'
-                                ? 'bg-purple-600 text-white'
-                                : 'text-gray-300 hover:text-white'
-                            }`}
-                          >
-                            📋 List
-                          </button>
-                          <button
-                            onClick={() => setDancerViewMode('dropdown')}
-                            className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                              dancerViewMode === 'dropdown'
-                                ? 'bg-purple-600 text-white'
-                                : 'text-gray-300 hover:text-white'
-                            }`}
-                          >
-                            🔍 Search
-                          </button>
-                        </div>
-                        {acceptedDancers.length >= 20 && (
-                          <span className="text-xs text-yellow-400 bg-yellow-900/20 px-2 py-1 rounded">
-                            Large Studio
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                   
-                  {/* Search Bar for List View */}
-                  {dancerViewMode === 'list' && acceptedDancers.length > 5 && (
-                    <div className="mb-4">
+                  {/* Enhanced Search and Filters */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+                    {/* Search Input */}
+                    <div className="lg:col-span-4">
                       <div className="relative">
                         <input
                           type="text"
                           value={dancerSearchQuery}
                           onChange={(e) => setDancerSearchQuery(e.target.value)}
-                          placeholder="Search dancers by name, EODSA ID, or National ID..."
+                          placeholder="Search by name, EODSA ID, National ID, or email..."
                           className="w-full px-4 py-2 pl-10 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         />
                         <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -791,7 +818,81 @@ export default function StudioDashboardPage() {
                         </svg>
                       </div>
                     </div>
-                  )}
+                    
+                    {/* Age Filter */}
+                    <div className="lg:col-span-2">
+                      <select
+                        value={ageFilter}
+                        onChange={(e) => setAgeFilter(e.target.value as 'all' | 'under18' | '18plus')}
+                        className="w-full px-3 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      >
+                        <option value="all">All Ages</option>
+                        <option value="under18">Under 18</option>
+                        <option value="18plus">18+</option>
+                      </select>
+                    </div>
+                    
+                    {/* Recent Filter */}
+                    <div className="lg:col-span-2">
+                      <label className="flex items-center space-x-2 text-white">
+                        <input
+                          type="checkbox"
+                          checked={recentFilter}
+                          onChange={(e) => setRecentFilter(e.target.checked)}
+                          className="rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm">Recent (30d)</span>
+                      </label>
+                    </div>
+                    
+                    {/* Sort By */}
+                    <div className="lg:col-span-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as 'name' | 'age' | 'joinedAt' | 'eodsaId')}
+                        className="w-full px-3 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      >
+                        <option value="name">Sort by Name</option>
+                        <option value="age">Sort by Age</option>
+                        <option value="joinedAt">Sort by Join Date</option>
+                        <option value="eodsaId">Sort by EODSA ID</option>
+                      </select>
+                    </div>
+                    
+                    {/* Sort Order */}
+                    <div className="lg:col-span-2">
+                      <button
+                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        className="w-full px-3 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white hover:bg-gray-600 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 flex items-center justify-center space-x-1"
+                      >
+                        <span className="text-sm">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-sm">{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Items Per Page */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-400">Show:</span>
+                      <select
+                        value={itemsPerPage}
+                        onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                        className="px-2 py-1 border border-gray-600 bg-gray-700 rounded text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <span className="text-sm text-gray-400">per page</span>
+                    </div>
+                    
+                    <div className="text-sm text-gray-400">
+                      Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, getPaginatedDancers().totalCount)} of {getPaginatedDancers().totalCount}
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -826,206 +927,163 @@ export default function StudioDashboardPage() {
                   </svg>
                 </div>
                 <p className="text-gray-400 mb-2">No dancers in your studio yet</p>
-                <p className="text-gray-500 text-sm">Accept applications to build your dance team</p>
+                <p className="text-gray-500 text-sm">Start by registering new dancers or adding existing ones by EODSA ID</p>
               </div>
-            ) : dancerViewMode === 'dropdown' ? (
-              /* Dropdown/Search View */
-              <div className="p-6">
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    Select Dancer for Actions ({acceptedDancers.length} dancers available)
-                  </label>
-                  
-                  {/* Simple Dropdown with Search */}
-                  <div className="relative">
-                    <select
-                      value={selectedDancerForActions?.id || ''}
-                      onChange={(e) => {
-                        const selectedId = e.target.value;
-                        const dancer = acceptedDancers.find(d => d.id === selectedId);
-                        setSelectedDancerForActions(dancer || null);
-                      }}
-                      className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    >
-                      <option value="">Select a dancer...</option>
-                      {acceptedDancers
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((dancer) => (
-                          <option key={dancer.id} value={dancer.id}>
-                            {dancer.name} ({dancer.eodsaId}) - Age {dancer.age}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+            ) : getPaginatedDancers().totalCount === 0 ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-
-                {/* Selected Dancer Details & Actions */}
-                {selectedDancerForActions && (
-                  <div className="bg-gray-700/50 border border-gray-600 rounded-xl p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center mb-3">
-                          <h4 className="text-xl font-semibold text-white mr-3">{selectedDancerForActions.name}</h4>
-                          <span className="px-3 py-1 bg-purple-900/30 text-purple-300 rounded-full text-sm font-medium">
-                            Age {selectedDancerForActions.age}
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-6">
-                          <div>
-                            <span className="text-gray-400">EODSA ID:</span>
-                            <span className="text-white ml-2 font-mono">{selectedDancerForActions.eodsaId}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400">National ID:</span>
-                            <span className="text-white ml-2 font-mono">{selectedDancerForActions.nationalId}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400">Joined:</span>
-                            <span className="text-white ml-2">{new Date(selectedDancerForActions.joinedAt).toLocaleDateString()}</span>
-                          </div>
-                          {selectedDancerForActions.email && (
-                            <div>
-                              <span className="text-gray-400">Email:</span>
-                              <span className="text-white ml-2">{selectedDancerForActions.email}</span>
-                            </div>
-                          )}
-                          {selectedDancerForActions.phone && (
-                            <div>
-                              <span className="text-gray-400">Phone:</span>
-                              <span className="text-white ml-2">{selectedDancerForActions.phone}</span>
-                            </div>
-                          )}
-                          <div>
-                            <span className="text-gray-400">Date of Birth:</span>
-                            <span className="text-white ml-2">{new Date(selectedDancerForActions.dateOfBirth).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={() => handleEditDancer(selectedDancerForActions)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        <span>Edit Details</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDancer(selectedDancerForActions)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        <span>Remove from Studio</span>
-                      </button>
-                      <Link
-                        href={`/event-dashboard?eodsaId=${selectedDancerForActions.eodsaId}`}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        <span>Enter Competitions</span>
-                      </Link>
-                    </div>
-                  </div>
-                )}
+                <p className="text-gray-400 mb-2">No dancers match your search criteria</p>
+                <p className="text-gray-500 text-sm">Try adjusting your search terms or filters</p>
               </div>
             ) : (
-              /* List View */
-              <div className="divide-y divide-gray-700">
-                {getFilteredDancers().map((dancer) => (
-                  <div key={dancer.id} className="p-6 hover:bg-gray-700/30 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center mb-3">
-                          <h4 className="text-lg font-semibold text-white mr-3">{dancer.name}</h4>
-                          <span className="px-3 py-1 bg-purple-900/30 text-purple-300 rounded-full text-sm font-medium">
-                            Age {dancer.age}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-400">EODSA ID:</span>
-                            <span className="text-white ml-2 font-mono">{dancer.eodsaId}</span>
+              /* Enhanced List View with Pagination */
+              <>
+                <div className="divide-y divide-gray-700">
+                  {getPaginatedDancers().dancers.map((dancer) => (
+                    <div key={dancer.id} className="p-6 hover:bg-gray-700/30 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-3">
+                            <h4 className="text-lg font-semibold text-white mr-3">{dancer.name}</h4>
+                            <span className="px-3 py-1 bg-purple-900/30 text-purple-300 rounded-full text-sm font-medium">
+                              Age {dancer.age}
+                            </span>
                           </div>
-                          <div>
-                            <span className="text-gray-400">National ID:</span>
-                            <span className="text-white ml-2 font-mono">{dancer.nationalId}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400">Joined:</span>
-                            <span className="text-white ml-2">{new Date(dancer.joinedAt).toLocaleDateString()}</span>
-                          </div>
-                          {dancer.email && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                             <div>
-                              <span className="text-gray-400">Email:</span>
-                              <span className="text-white ml-2">{dancer.email}</span>
+                              <span className="text-gray-400">EODSA ID:</span>
+                              <span className="text-white ml-2 font-mono">{dancer.eodsaId}</span>
                             </div>
-                          )}
-                          {dancer.phone && (
                             <div>
-                              <span className="text-gray-400">Phone:</span>
-                              <span className="text-white ml-2">{dancer.phone}</span>
+                              <span className="text-gray-400">National ID:</span>
+                              <span className="text-white ml-2 font-mono">{dancer.nationalId}</span>
                             </div>
-                          )}
-                          <div>
-                            <span className="text-gray-400">Date of Birth:</span>
-                            <span className="text-white ml-2">{new Date(dancer.dateOfBirth).toLocaleDateString()}</span>
+                            <div>
+                              <span className="text-gray-400">Joined:</span>
+                              <span className="text-white ml-2">{new Date(dancer.joinedAt).toLocaleDateString()}</span>
+                            </div>
+                            {dancer.email && (
+                              <div>
+                                <span className="text-gray-400">Email:</span>
+                                <span className="text-white ml-2">{dancer.email}</span>
+                              </div>
+                            )}
+                            {dancer.phone && (
+                              <div>
+                                <span className="text-gray-400">Phone:</span>
+                                <span className="text-white ml-2">{dancer.phone}</span>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-gray-400">Date of Birth:</span>
+                              <span className="text-white ml-2">{new Date(dancer.dateOfBirth).toLocaleDateString()}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2 ml-4">
-                        <button
-                          onClick={() => handleEditDancer(dancer)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteDancer(dancer)}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                        >
-                          Remove
-                        </button>
-                        <Link
-                          href={`/event-dashboard?eodsaId=${dancer.eodsaId}`}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                        >
-                          Enter Competitions
-                        </Link>
+                        <div className="flex items-center space-x-2 ml-4">
+                          <button
+                            onClick={() => handleEditDancer(dancer)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDancer(dancer)}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                          >
+                            Remove
+                          </button>
+                          <Link
+                            href={`/event-dashboard?eodsaId=${dancer.eodsaId}`}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                          >
+                            Enter Competitions
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 
-                {/* No Results Message */}
-                {getFilteredDancers().length === 0 && dancerSearchQuery && (
-                  <div className="p-8 text-center">
-                    <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
+                {/* Pagination Controls */}
+                {getPaginatedDancers().totalPages > 1 && (
+                  <div className="p-6 border-t border-gray-700 bg-gray-800/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-400">
+                          Page {currentPage} of {getPaginatedDancers().totalPages}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                          className="px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          First
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Previous
+                        </button>
+                        
+                        {/* Page Numbers */}
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: Math.min(5, getPaginatedDancers().totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (getPaginatedDancers().totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= getPaginatedDancers().totalPages - 2) {
+                              pageNum = getPaginatedDancers().totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                                  currentPage === pageNum
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        <button
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          disabled={currentPage === getPaginatedDancers().totalPages}
+                          className="px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Next
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage(getPaginatedDancers().totalPages)}
+                          disabled={currentPage === getPaginatedDancers().totalPages}
+                          className="px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Last
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-gray-400 mb-2">No dancers found</p>
-                    <p className="text-gray-500 text-sm mb-4">
-                      No dancers match your search query "{dancerSearchQuery}"
-                    </p>
-                    <button
-                      onClick={() => setDancerSearchQuery('')}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                    >
-                      Clear Search
-                    </button>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         )}
@@ -1052,36 +1110,15 @@ export default function StudioDashboardPage() {
             </div>
 
             {competitionEntries.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
                 <p className="text-gray-400 mb-2">No competition entries yet</p>
-              <p className="text-gray-500 text-sm mb-6">
-                  Your dancers haven't entered any competitions yet. Use the buttons below to get started.
-              </p>
-              
-              <div className="max-w-md mx-auto space-y-3">
-                <h4 className="text-white font-medium">Quick Entry Access:</h4>
-                {acceptedDancers.slice(0, 3).map((dancer) => (
-                  <Link
-                    key={dancer.id}
-                    href={`/event-dashboard?eodsaId=${dancer.eodsaId}`}
-                    className="block p-3 bg-gray-700/50 border border-gray-600 rounded-lg hover:bg-gray-600/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-white font-medium">{dancer.name}</span>
-                      <span className="text-gray-400 text-sm font-mono">{dancer.eodsaId}</span>
-                    </div>
-                  </Link>
-                ))}
-                {acceptedDancers.length > 3 && (
-                  <p className="text-gray-500 text-sm">+ {acceptedDancers.length - 3} more dancers</p>
-                )}
+                <p className="text-gray-500 text-sm">Start entering your dancers into competitions to see entries here</p>
               </div>
-            </div>
             ) : (
               <div className="divide-y divide-gray-700">
                 {competitionEntries.map((entry) => (
@@ -1089,49 +1126,40 @@ export default function StudioDashboardPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center mb-3">
-                          <h4 className="text-lg font-semibold text-white mr-3">{entry.itemName}</h4>
-                          <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                          <h4 className="text-lg font-semibold text-white mr-3">{entry.eventName}</h4>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                             entry.approved 
                               ? 'bg-green-900/30 text-green-300' 
                               : 'bg-yellow-900/30 text-yellow-300'
                           }`}>
-                            {entry.approved ? 'Approved' : 'Pending Approval'}
+                            {entry.approved ? 'Approved' : 'Pending'}
                           </span>
                           {entry.itemNumber && (
-                            <span className="ml-2 px-3 py-1 bg-purple-900/30 text-purple-300 text-sm font-medium rounded-full">
-                              Item #{entry.itemNumber}
+                            <span className="ml-2 px-2 py-1 bg-purple-900/30 text-purple-300 rounded text-xs">
+                              #{entry.itemNumber}
                             </span>
                           )}
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                           <div>
-                            <span className="text-gray-400">Event:</span>
-                            <span className="text-white ml-2">{entry.eventName}</span>
+                            <span className="text-gray-400">Contestant:</span>
+                            <span className="text-white ml-2">{entry.contestantName}</span>
                           </div>
                           <div>
-                            <span className="text-gray-400">Date:</span>
-                            <span className="text-white ml-2">{new Date(entry.eventDate).toLocaleDateString()}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400">Region:</span>
-                            <span className="text-white ml-2">{entry.region}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400">Performance Type:</span>
-                            <span className="text-white ml-2">{entry.performanceType}</span>
+                            <span className="text-gray-400">Item:</span>
+                            <span className="text-white ml-2">{entry.itemName}</span>
                           </div>
                           <div>
                             <span className="text-gray-400">Style:</span>
                             <span className="text-white ml-2">{entry.itemStyle}</span>
                           </div>
                           <div>
-                            <span className="text-gray-400">Mastery:</span>
-                            <span className="text-white ml-2">{entry.mastery}</span>
-                          </div>
-                          <div>
                             <span className="text-gray-400">Choreographer:</span>
                             <span className="text-white ml-2">{entry.choreographer}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Mastery:</span>
+                            <span className="text-white ml-2">{entry.mastery}</span>
                           </div>
                           <div>
                             <span className="text-gray-400">Duration:</span>
@@ -1139,571 +1167,397 @@ export default function StudioDashboardPage() {
                           </div>
                           <div>
                             <span className="text-gray-400">Fee:</span>
-                            <span className="text-white ml-2">R{entry.calculatedFee.toFixed(2)}</span>
+                            <span className="text-white ml-2">R{entry.calculatedFee}</span>
                           </div>
-                        </div>
-                        
-                        <div className="mb-3">
-                          <span className="text-gray-400">Participants:</span>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {entry.participantNames.map((name, index) => (
-                              <span key={index} className="px-2 py-1 bg-purple-900/30 text-purple-300 text-sm rounded-full">
-                                {name}
-                              </span>
-                            ))}
+                          <div>
+                            <span className="text-gray-400">Status:</span>
+                            <span className="text-white ml-2">{entry.paymentStatus}</span>
                           </div>
-                        </div>
-                        
-                        <div className="text-xs text-gray-500">
-                          Submitted: {new Date(entry.submittedAt).toLocaleDateString('en-ZA', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          <div>
+                            <span className="text-gray-400">Submitted:</span>
+                            <span className="text-white ml-2">{new Date(entry.submittedAt).toLocaleDateString()}</span>
+                          </div>
                         </div>
                       </div>
-                      
                       <div className="flex items-center space-x-2 ml-4">
-                <button
+                        <button
                           onClick={() => handleEditEntry(entry)}
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                >
+                        >
                           Edit
-                </button>
-                <button
+                        </button>
+                        <button
                           onClick={() => handleDeleteEntry(entry)}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
                         >
-                          Withdraw
-                </button>
-              </div>
-            </div>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
+      </div>
 
-        {/* Add Dancer Modal */}
-        {showAddDancerModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-md border border-gray-700">
-              <h3 className="text-xl font-bold text-white mb-4">Add Dancer by EODSA ID</h3>
-              <p className="text-gray-300 mb-4">Enter the EODSA ID of a registered dancer to add them directly to your studio:</p>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  EODSA ID (e.g., E123456)
-                </label>
+      {/* Add Dancer Modal */}
+      {showAddDancerModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-white mb-4">Add Dancer by EODSA ID</h3>
+            <p className="text-gray-300 mb-4">Enter the EODSA ID of a dancer to add them to your studio.</p>
+            
+            <input
+              type="text"
+              value={addDancerEodsaId}
+              onChange={(e) => setAddDancerEodsaId(e.target.value.toUpperCase())}
+              placeholder="e.g., EODSA00123"
+              className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 mb-4"
+            />
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={handleAddDancer}
+                disabled={addingDancer || !addDancerEodsaId.trim()}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {addingDancer ? 'Adding...' : 'Add Dancer'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddDancerModal(false);
+                  setAddDancerEodsaId('');
+                  setError('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Register Dancer Modal */}
+      {showRegisterDancerModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-white mb-4">Register New Dancer</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Full Name *</label>
                 <input
                   type="text"
-                  value={addDancerEodsaId}
-                  onChange={(e) => setAddDancerEodsaId(e.target.value.toUpperCase())}
-                  className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400 font-mono"
-                  placeholder="E123456"
-                  maxLength={7}
-                  pattern="E\d{6}"
+                  value={registerDancerData.name}
+                  onChange={(e) => setRegisterDancerData({...registerDancerData, name: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  Format: E followed by 6 digits
-                </p>
               </div>
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleAddDancer}
-                  disabled={!addDancerEodsaId.trim() || addingDancer}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {addingDancer ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Adding...
-                    </>
-                  ) : (
-                    'Add Dancer'
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddDancerModal(false);
-                    setAddDancerEodsaId('');
-                    setError('');
-                  }}
-                  disabled={addingDancer}
-                  className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Register New Dancer Modal */}
-        {showRegisterDancerModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-2xl border border-gray-700 max-h-screen overflow-y-auto">
-              <h3 className="text-xl font-bold text-white mb-4">Register New Dancer</h3>
-              <p className="text-gray-300 mb-6">Register a new dancer directly to your studio:</p>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={registerDancerData.name}
-                    onChange={(e) => setRegisterDancerData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                    placeholder="Enter dancer's full name"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Date of Birth *
-                  </label>
-                  <input
-                    type="date"
-                    value={registerDancerData.dateOfBirth}
-                    onChange={(e) => setRegisterDancerData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    National ID *
-                  </label>
-                  <input
-                    type="text"
-                    value={registerDancerData.nationalId}
-                    onChange={(e) => {
-                      const numericValue = e.target.value.replace(/\D/g, '').slice(0, 13);
-                      setRegisterDancerData(prev => ({ ...prev, nationalId: numericValue }));
-                    }}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400 font-mono"
-                    placeholder="13 digit ID number"
-                    pattern="[0-9]{13}"
-                    maxLength={13}
-                    inputMode="numeric"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Date of Birth *</label>
+                <input
+                  type="date"
+                  value={registerDancerData.dateOfBirth}
+                  onChange={(e) => setRegisterDancerData({...registerDancerData, dateOfBirth: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">National ID *</label>
+                <input
+                  type="text"
+                  value={registerDancerData.nationalId}
+                  onChange={(e) => setRegisterDancerData({...registerDancerData, nationalId: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Email {new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() >= 18 && '*'}</label>
+                <input
+                  type="email"
+                  value={registerDancerData.email}
+                  onChange={(e) => setRegisterDancerData({...registerDancerData, email: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Phone {new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() >= 18 && '*'}</label>
+                <input
+                  type="tel"
+                  value={registerDancerData.phone}
+                  onChange={(e) => setRegisterDancerData({...registerDancerData, phone: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              
+              {registerDancerData.dateOfBirth && new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() < 18 && (
+                <>
+                  <div className="border-t border-gray-700 pt-4">
+                    <h4 className="text-lg font-semibold text-white mb-2">Guardian Information (Required for minors)</h4>
+                  </div>
+                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Email {(() => {
-                        const age = registerDancerData.dateOfBirth ? 
-                          new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() : 
-                          null;
-                        return age !== null && age >= 18 ? '*' : '(Optional for minors)';
-                      })()}
-                    </label>
+                    <label className="block text-gray-300 text-sm font-medium mb-1">Guardian Name *</label>
+                    <input
+                      type="text"
+                      value={registerDancerData.guardianName}
+                      onChange={(e) => setRegisterDancerData({...registerDancerData, guardianName: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-300 text-sm font-medium mb-1">Guardian Email *</label>
                     <input
                       type="email"
-                      value={registerDancerData.email}
-                      onChange={(e) => setRegisterDancerData(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                      placeholder="dancer@example.com"
-                      required={(() => {
-                        const age = registerDancerData.dateOfBirth ? 
-                          new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() : 
-                          null;
-                        return age !== null && age >= 18;
-                      })()}
+                      value={registerDancerData.guardianEmail}
+                      onChange={(e) => setRegisterDancerData({...registerDancerData, guardianEmail: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      required
                     />
                   </div>
-
+                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Phone {(() => {
-                        const age = registerDancerData.dateOfBirth ? 
-                          new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() : 
-                          null;
-                        return age !== null && age >= 18 ? '*' : '(Optional for minors)';
-                      })()}
-                    </label>
+                    <label className="block text-gray-300 text-sm font-medium mb-1">Guardian Phone *</label>
                     <input
                       type="tel"
-                      value={registerDancerData.phone}
-                      onChange={(e) => setRegisterDancerData(prev => ({ ...prev, phone: e.target.value }))}
-                                                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                              placeholder="012 345 6789"
-                      required={(() => {
-                        const age = registerDancerData.dateOfBirth ? 
-                          new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() : 
-                          null;
-                        return age !== null && age >= 18;
-                      })()}
+                      value={registerDancerData.guardianPhone}
+                      onChange={(e) => setRegisterDancerData({...registerDancerData, guardianPhone: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      required
                     />
                   </div>
-                </div>
-
-                {/* Guardian Information - Auto-show for minors */}
-                {(() => {
-                  const age = registerDancerData.dateOfBirth ? 
-                    new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() : 
-                    null;
-                  
-                  if (age !== null && age < 18) {
-                    return (
-                      <>
-                        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4 mt-4">
-                          <h4 className="text-yellow-300 font-semibold mb-2">Guardian Information Required</h4>
-                          <p className="text-yellow-200 text-sm">This dancer is under 18 years old. Guardian information is required.</p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Guardian Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={registerDancerData.guardianName}
-                            onChange={(e) => setRegisterDancerData(prev => ({ ...prev, guardianName: e.target.value }))}
-                            className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                            placeholder="Guardian's full name"
-                            required={age < 18}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Guardian Email *
-                            </label>
-                            <input
-                              type="email"
-                              value={registerDancerData.guardianEmail}
-                              onChange={(e) => setRegisterDancerData(prev => ({ ...prev, guardianEmail: e.target.value }))}
-                              className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                              placeholder="guardian@example.com"
-                              required={age < 18}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Guardian Phone *
-                            </label>
-                            <input
-                              type="tel"
-                              value={registerDancerData.guardianPhone}
-                              onChange={(e) => setRegisterDancerData(prev => ({ ...prev, guardianPhone: e.target.value }))}
-                              className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                              placeholder="012 345 6789"
-                              required={age < 18}
-                            />
-                          </div>
-                        </div>
-                      </>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
-
-              {/* reCAPTCHA */}
-              <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Security Verification *
-                </label>
-                <div className="flex justify-center">
-                  <RecaptchaV2
-                    onVerify={(token) => setRecaptchaToken(token)}
-                    onExpire={() => setRecaptchaToken('')}
-                    onError={() => setRecaptchaToken('')}
-                  />
-                </div>
-                {!recaptchaToken && (
-                  <p className="text-xs text-gray-400 mt-2 text-center">
-                    Please complete the security verification above
-                  </p>
-                )}
-              </div>
-
-              <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={handleRegisterDancer}
-                  disabled={!registerDancerData.name.trim() || !registerDancerData.dateOfBirth || !registerDancerData.nationalId.trim() || !recaptchaToken || isRegisteringDancer}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:from-emerald-600 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isRegisteringDancer ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Registering...
-                    </>
-                  ) : (
-                    'Register Dancer'
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowRegisterDancerModal(false);
-                    setRegisterDancerData({
-                      name: '',
-                      dateOfBirth: '',
-                      nationalId: '',
-                      email: '',
-                      phone: '',
-                      guardianName: '',
-                      guardianEmail: '',
-                      guardianPhone: ''
-                    });
-                    setError('');
-                    setRecaptchaToken('');
-                  }}
-                  disabled={isRegisteringDancer}
-                  className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Dancer Modal */}
-        {showEditDancerModal && editingDancer && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-lg border border-gray-700">
-              <h3 className="text-xl font-bold text-white mb-4">Edit Dancer: {editingDancer.name}</h3>
-              <p className="text-gray-300 mb-6">Update dancer information below:</p>
+                </>
+              )}
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={editDancerData.name}
-                    onChange={(e) => setEditDancerData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Date of Birth *
-                  </label>
-                  <input
-                    type="date"
-                    value={editDancerData.dateOfBirth}
-                    onChange={(e) => setEditDancerData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    National ID *
-                  </label>
-                  <input
-                    type="text"
-                    value={editDancerData.nationalId}
-                    onChange={(e) => {
-                      // Only allow numeric input and limit to 13 digits
-                      const numericValue = e.target.value.replace(/\D/g, '').slice(0, 13);
-                      setEditDancerData(prev => ({ ...prev, nationalId: numericValue }));
-                    }}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400 font-mono"
-                    placeholder="13 digit ID number"
-                    pattern="[0-9]{13}"
-                    maxLength={13}
-                    inputMode="numeric"
-                    title="Please enter exactly 13 digits"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Email (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={editDancerData.email}
-                    onChange={(e) => setEditDancerData(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400"
-                    placeholder="dancer@example.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Phone (Optional)
-                  </label>
-                  <input
-                    type="tel"
-                    value={editDancerData.phone}
-                    onChange={(e) => setEditDancerData(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400"
-                    placeholder="012 345 6789"
-                  />
-                </div>
-              </div>
-
-              <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={handleUpdateDancer}
-                  disabled={!editDancerData.name.trim() || !editDancerData.dateOfBirth || !editDancerData.nationalId.trim() || isEditingDancer}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isEditingDancer ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Dancer'
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowEditDancerModal(false);
-                    setEditingDancer(null);
-                    setError('');
-                  }}
-                  disabled={isEditingDancer}
-                  className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
+              <div className="pt-4">
+                <RecaptchaV2 onVerify={(token) => setRecaptchaToken(token)} />
               </div>
             </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleRegisterDancer}
+                disabled={isRegisteringDancer}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isRegisteringDancer ? 'Registering...' : 'Register Dancer'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowRegisterDancerModal(false);
+                  setRegisterDancerData({
+                    name: '',
+                    dateOfBirth: '',
+                    nationalId: '',
+                    email: '',
+                    phone: '',
+                    guardianName: '',
+                    guardianEmail: '',
+                    guardianPhone: ''
+                  });
+                  setError('');
+                  setRecaptchaToken('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Edit Entry Modal */}
-        {showEditEntryModal && editingEntry && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-lg border border-gray-700">
-              <h3 className="text-xl font-bold text-white mb-4">Edit Entry: {editingEntry.itemName}</h3>
-              <p className="text-gray-300 mb-6">Update entry details below:</p>
+      {/* Edit Dancer Modal */}
+      {showEditDancerModal && editingDancer && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6">
+            <h3 className="text-xl font-bold text-white mb-4">Edit Dancer Information</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={editDancerData.name}
+                  onChange={(e) => setEditDancerData({...editDancerData, name: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Item Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={editEntryData.itemName}
-                    onChange={(e) => setEditEntryData(prev => ({ ...prev, itemName: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400"
-                    placeholder="e.g., Swan Lake Variation"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Choreographer *
-                  </label>
-                  <input
-                    type="text"
-                    value={editEntryData.choreographer}
-                    onChange={(e) => setEditEntryData(prev => ({ ...prev, choreographer: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400"
-                    placeholder="e.g., Ms. Johnson"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Mastery Level *
-                  </label>
-                  <select
-                    value={editEntryData.mastery}
-                    onChange={(e) => setEditEntryData(prev => ({ ...prev, mastery: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white"
-                    required
-                  >
-                    <option value="">Select Mastery Level</option>
-                    {MASTERY_LEVELS.map(level => (
-                      <option key={level} value={level}>{level}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Item Style *
-                  </label>
-                  <select
-                    value={editEntryData.itemStyle}
-                    onChange={(e) => setEditEntryData(prev => ({ ...prev, itemStyle: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white"
-                    required
-                  >
-                    <option value="">Select Style</option>
-                    {ITEM_STYLES.map(style => (
-                      <option key={style} value={style}>{style}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Estimated Duration (minutes) *
-                    <span className="text-purple-400 ml-2 text-xs">
-                      (Max: Solo-2min, Duet/Trio-3min, Group-3:30)
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0.5}
-                    max={3.5}
-                    step={0.5}
-                    value={editEntryData.estimatedDuration}
-                    onChange={(e) => setEditEntryData(prev => ({ ...prev, estimatedDuration: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white"
-                    required
-                  />
-                </div>
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Date of Birth *</label>
+                <input
+                  type="date"
+                  value={editDancerData.dateOfBirth}
+                  onChange={(e) => setEditDancerData({...editDancerData, dateOfBirth: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
               </div>
-
-              <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowEditEntryModal(false);
-                    setEditingEntry(null);
-                  }}
-                  className="flex-1 px-6 py-3 border border-gray-600 text-gray-300 rounded-xl hover:bg-gray-700 transition-all font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateEntry}
-                  disabled={isEditingEntry || !editEntryData.itemName || !editEntryData.choreographer || !editEntryData.mastery || !editEntryData.itemStyle || !editEntryData.estimatedDuration}
-                  className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-                >
-                  {isEditingEntry ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Updating...</span>
-                    </div>
-                  ) : (
-                    'Update Entry'
-                  )}
-                </button>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">National ID *</label>
+                <input
+                  type="text"
+                  value={editDancerData.nationalId}
+                  onChange={(e) => setEditDancerData({...editDancerData, nationalId: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editDancerData.email || ''}
+                  onChange={(e) => setEditDancerData({...editDancerData, email: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={editDancerData.phone || ''}
+                  onChange={(e) => setEditDancerData({...editDancerData, phone: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
               </div>
             </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleUpdateDancer}
+                disabled={isEditingDancer}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isEditingDancer ? 'Updating...' : 'Update Dancer'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditDancerModal(false);
+                  setEditingDancer(null);
+                  setError('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Edit Entry Modal */}
+      {showEditEntryModal && editingEntry && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6">
+            <h3 className="text-xl font-bold text-white mb-4">Edit Competition Entry</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Item Name *</label>
+                <input
+                  type="text"
+                  value={editEntryData.itemName}
+                  onChange={(e) => setEditEntryData({...editEntryData, itemName: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Choreographer *</label>
+                <input
+                  type="text"
+                  value={editEntryData.choreographer}
+                  onChange={(e) => setEditEntryData({...editEntryData, choreographer: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Mastery Level *</label>
+                <select
+                  value={editEntryData.mastery}
+                  onChange={(e) => setEditEntryData({...editEntryData, mastery: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                >
+                  <option value="">Select mastery level</option>
+                  {MASTERY_LEVELS.map(level => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Item Style *</label>
+                <select
+                  value={editEntryData.itemStyle}
+                  onChange={(e) => setEditEntryData({...editEntryData, itemStyle: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                >
+                  <option value="">Select item style</option>
+                  {ITEM_STYLES.map(style => (
+                    <option key={style} value={style}>{style}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Estimated Duration (minutes) *</label>
+                <input
+                  type="number"
+                  value={editEntryData.estimatedDuration}
+                  onChange={(e) => setEditEntryData({...editEntryData, estimatedDuration: parseInt(e.target.value) || 0})}
+                  min="1"
+                  max="30"
+                  className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleUpdateEntry}
+                disabled={isEditingEntry}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isEditingEntry ? 'Updating...' : 'Update Entry'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditEntryModal(false);
+                  setEditingEntry(null);
+                  setError('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
