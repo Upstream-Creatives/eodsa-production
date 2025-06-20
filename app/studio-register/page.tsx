@@ -252,7 +252,7 @@ export default function StudioRegisterPage() {
                     value={formData.phone}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400"
-                    placeholder="e.g., 011-123-4567"
+                    placeholder="011 123 4567"
                     required
                   />
                 </div>

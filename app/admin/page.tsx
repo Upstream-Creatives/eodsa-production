@@ -66,6 +66,7 @@ interface Studio {
   id: string;
   name: string;
   email: string;
+  password: string;
   registrationNumber: string;
   approved: boolean;
   approvedBy?: string;
@@ -156,13 +157,15 @@ export default function AdminDashboard() {
   const [testEmail, setTestEmail] = useState('');
   const [isTestingEmail, setIsTestingEmail] = useState(false);
 
-  // Dancer search and filter state
+  // Dancer search state
   const [dancerSearchTerm, setDancerSearchTerm] = useState('');
-  const [dancerStatusFilter, setDancerStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 
-  // Studio search and filter state
+  // Studio search state
   const [studioSearchTerm, setStudioSearchTerm] = useState('');
-  const [studioStatusFilter, setStudioStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  
+  // Password modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedStudioPassword, setSelectedStudioPassword] = useState({ name: '', password: '' });
 
 
 
@@ -871,10 +874,83 @@ export default function AdminDashboard() {
               <div className="w-2 h-2 bg-pink-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
             </div>
           </div>
+              </div>
+
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <span className="text-white text-lg">🔐</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">Studio Password</h2>
+                </div>
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-2xl">×</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedStudioPassword.name}</h3>
+                <p className="text-sm text-gray-600">Click the password below to copy it</p>
+              </div>
+              
+              <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                <div
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedStudioPassword.password);
+                    // Show a brief success indication
+                    const button = document.getElementById('copy-feedback');
+                    if (button) {
+                      button.textContent = 'Copied!';
+                      setTimeout(() => {
+                        button.textContent = 'Click to copy';
+                      }, 2000);
+                    }
+                  }}
+                  className="cursor-pointer hover:bg-gray-100 rounded-lg p-3 transition-colors"
+                >
+                  <div className="text-sm font-mono text-gray-900 break-all bg-white p-3 rounded border">
+                    {selectedStudioPassword.password}
+                  </div>
+                  <div id="copy-feedback" className="text-xs text-gray-500 mt-2 text-center">
+                    Click to copy
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedStudioPassword.password);
+                    setShowPasswordModal(false);
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                >
+                  Copy & Close
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -1285,7 +1361,7 @@ export default function AdminDashboard() {
                     <div className="w-8 h-8 bg-gradient-to-br from-rose-500 to-pink-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">💃</span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Individual Dancer Registrations</h2>
+                    <h2 className="text-xl font-bold text-gray-900">Registered Dancers</h2>
                     <div className="px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-sm font-medium">
                       {dancers.filter(d => {
                         const matchesSearch = !dancerSearchTerm || 
@@ -1293,16 +1369,12 @@ export default function AdminDashboard() {
                           d.nationalId.includes(dancerSearchTerm) ||
                           d.eodsaId.toLowerCase().includes(dancerSearchTerm.toLowerCase()) ||
                           (d.email && d.email.toLowerCase().includes(dancerSearchTerm.toLowerCase()));
-                        const matchesFilter = dancerStatusFilter === 'all' ||
-                          (dancerStatusFilter === 'pending' && !d.approved && !d.rejectionReason) ||
-                          (dancerStatusFilter === 'approved' && d.approved) ||
-                          (dancerStatusFilter === 'rejected' && d.rejectionReason);
-                        return matchesSearch && matchesFilter;
+                        return matchesSearch;
                       }).length} of {dancers.length} dancers
                     </div>
                   </div>
                   
-                  {/* Search and Filter Controls */}
+                  {/* Search Controls */}
                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="relative">
                       <input
@@ -1316,17 +1388,6 @@ export default function AdminDashboard() {
                         <span className="text-gray-400">🔍</span>
                       </div>
                     </div>
-                    
-                    <select
-                      value={dancerStatusFilter}
-                      onChange={(e) => setDancerStatusFilter(e.target.value as any)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm text-gray-900"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="pending">⏳ Pending</option>
-                      <option value="approved">✅ Approved</option>
-                      <option value="rejected">❌ Rejected</option>
-                    </select>
                   </div>
                 </div>
               </div>
@@ -1340,11 +1401,7 @@ export default function AdminDashboard() {
                       d.nationalId.includes(dancerSearchTerm) ||
                       d.eodsaId.toLowerCase().includes(dancerSearchTerm.toLowerCase()) ||
                       (d.email && d.email.toLowerCase().includes(dancerSearchTerm.toLowerCase()));
-                    const matchesFilter = dancerStatusFilter === 'all' ||
-                      (dancerStatusFilter === 'pending' && !d.approved && !d.rejectionReason) ||
-                      (dancerStatusFilter === 'approved' && d.approved) ||
-                      (dancerStatusFilter === 'rejected' && d.rejectionReason);
-                    return matchesSearch && matchesFilter;
+                    return matchesSearch;
                   })
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Sort by newest first
 
@@ -1366,12 +1423,11 @@ export default function AdminDashboard() {
                       <button
                         onClick={() => {
                           setDancerSearchTerm('');
-                          setDancerStatusFilter('all');
                         }}
                         className="inline-flex items-center space-x-2 px-4 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors"
                       >
                         <span>🔄</span>
-                        <span>Clear Filters</span>
+                        <span>Clear Search</span>
                       </button>
                     )}
                   </div>
@@ -1384,8 +1440,7 @@ export default function AdminDashboard() {
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Age</th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Guardian</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Registration Date</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white/50 divide-y divide-gray-200">
@@ -1419,54 +1474,14 @@ export default function AdminDashboard() {
                               )}
                             </td>
                             <td className="px-6 py-4">
-                              {dancer.approved ? (
-                                <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    ✅ Approved
-                                  </span>
-                                  {dancer.approvedAt && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {new Date(dancer.approvedAt).toLocaleDateString()}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : dancer.rejectionReason ? (
-                                <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    ❌ Rejected
-                                  </span>
-                                  <div className="text-xs text-gray-500 mt-1" title={dancer.rejectionReason}>
-                                    {dancer.rejectionReason.length > 30 
-                                      ? dancer.rejectionReason.substring(0, 30) + '...' 
-                                      : dancer.rejectionReason}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                  ⏳ Pending
-                                </span>
-                              )}
+                              <div className="text-sm font-medium text-gray-900">
+                                {new Date(dancer.createdAt).toLocaleDateString()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(dancer.createdAt).toLocaleTimeString()}
+                              </div>
                             </td>
-                            <td className="px-6 py-4">
-                              {!dancer.approved && !dancer.rejectionReason ? (
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleApproveDancer(dancer.id)}
-                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                                  >
-                                    ✅ Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectDancer(dancer.id)}
-                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                                  >
-                                    <span className="text-white">✖️</span> Reject
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400">No actions</span>
-                              )}
-                            </td>
+
                           </tr>
                         ))}
                       </tbody>
@@ -1489,23 +1504,19 @@ export default function AdminDashboard() {
                     <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🏢</span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Studio Registrations</h2>
+                    <h2 className="text-xl font-bold text-gray-900">Registered Studios</h2>
                     <div className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
                       {studios.filter(s => {
                         const matchesSearch = !studioSearchTerm || 
                           s.name.toLowerCase().includes(studioSearchTerm.toLowerCase()) ||
                           s.email.toLowerCase().includes(studioSearchTerm.toLowerCase()) ||
                           s.registrationNumber.toLowerCase().includes(studioSearchTerm.toLowerCase());
-                        const matchesFilter = studioStatusFilter === 'all' ||
-                          (studioStatusFilter === 'pending' && !s.approved && !s.rejectionReason) ||
-                          (studioStatusFilter === 'approved' && s.approved) ||
-                          (studioStatusFilter === 'rejected' && s.rejectionReason);
-                        return matchesSearch && matchesFilter;
+                        return matchesSearch;
                       }).length} of {studios.length} studios
                     </div>
                   </div>
                   
-                  {/* Search and Filter Controls */}
+                  {/* Search Controls */}
                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="relative">
                       <input
@@ -1519,17 +1530,19 @@ export default function AdminDashboard() {
                         <span className="text-gray-400">🔍</span>
                       </div>
                     </div>
-                    
-                    <select
-                      value={studioStatusFilter}
-                      onChange={(e) => setStudioStatusFilter(e.target.value as any)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm text-gray-900"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="pending">⏳ Pending</option>
-                      <option value="approved">✅ Approved</option>
-                      <option value="rejected">❌ Rejected</option>
-                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Password Security Warning */}
+              <div className="mx-6 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="flex items-start space-x-3">
+                  <span className="text-amber-500 text-lg">🔐</span>
+                  <div>
+                    <h3 className="font-semibold text-amber-900 mb-1">Password Recovery Access</h3>
+                    <p className="text-amber-800 text-sm">
+                      Studio passwords are visible for admin password recovery assistance. Click any password to copy it to clipboard.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1542,11 +1555,7 @@ export default function AdminDashboard() {
                       s.name.toLowerCase().includes(studioSearchTerm.toLowerCase()) ||
                       s.email.toLowerCase().includes(studioSearchTerm.toLowerCase()) ||
                       s.registrationNumber.toLowerCase().includes(studioSearchTerm.toLowerCase());
-                    const matchesFilter = studioStatusFilter === 'all' ||
-                      (studioStatusFilter === 'pending' && !s.approved && !s.rejectionReason) ||
-                      (studioStatusFilter === 'approved' && s.approved) ||
-                      (studioStatusFilter === 'rejected' && s.rejectionReason);
-                    return matchesSearch && matchesFilter;
+                    return matchesSearch;
                   })
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Sort by newest first
 
@@ -1568,12 +1577,11 @@ export default function AdminDashboard() {
                       <button
                         onClick={() => {
                           setStudioSearchTerm('');
-                          setStudioStatusFilter('all');
                         }}
                         className="inline-flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
                       >
                         <span>🔄</span>
-                        <span>Clear Filters</span>
+                        <span>Clear Search</span>
                       </button>
                     )}
                   </div>
@@ -1582,11 +1590,9 @@ export default function AdminDashboard() {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50/80">
                         <tr>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Studio</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Studio Details</th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Registration</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Password</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white/50 divide-y divide-gray-200">
@@ -1595,65 +1601,25 @@ export default function AdminDashboard() {
                             <td className="px-6 py-4">
                               <div>
                                 <div className="text-sm font-bold text-gray-900">{studio.name}</div>
-                                <div className="text-xs text-gray-500">Reg: {studio.registrationNumber}</div>
-                                <div className="text-xs text-gray-500">Registered: {new Date(studio.createdAt).toLocaleDateString()}</div>
+                                <div className="text-xs text-gray-500">Registration #: {studio.registrationNumber}</div>
+                                <div className="text-xs text-gray-500">Registered: {new Date(studio.createdAt).toLocaleDateString()} at {new Date(studio.createdAt).toLocaleTimeString()}</div>
                               </div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm font-medium text-gray-900">{studio.email}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{studio.registrationNumber}</div>
-                              <div className="text-xs text-gray-500">{new Date(studio.createdAt).toLocaleDateString()}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                              {studio.approved ? (
-                                <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    ✅ Approved
-                                  </span>
-                                  {studio.approvedAt && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {new Date(studio.approvedAt).toLocaleDateString()}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : studio.rejectionReason ? (
-                                <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    ❌ Rejected
-                                  </span>
-                                  <div className="text-xs text-gray-500 mt-1" title={studio.rejectionReason}>
-                                    {studio.rejectionReason.length > 30 
-                                      ? studio.rejectionReason.substring(0, 30) + '...' 
-                                      : studio.rejectionReason}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                  ⏳ Pending
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              {!studio.approved && !studio.rejectionReason ? (
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleApproveStudio(studio.id)}
-                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                                  >
-                                    ✅ Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectStudio(studio.id)}
-                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                                  >
-                                    <span className="text-white">✖️</span> Reject
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400">No actions</span>
-                              )}
+                              <button
+                                onClick={() => {
+                                  console.log('Viewing password for:', studio.name, studio.password);
+                                  setSelectedStudioPassword({ name: studio.name, password: studio.password });
+                                  setShowPasswordModal(true);
+                                }}
+                                className="inline-flex items-center space-x-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                              >
+                                <span>🔐</span>
+                                <span>View Password</span>
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -2353,6 +2319,79 @@ export default function AdminDashboard() {
                   className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <span className="text-white text-lg">🔐</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">Studio Password</h2>
+                </div>
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-2xl">×</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedStudioPassword.name}</h3>
+                <p className="text-sm text-gray-600">Click the password below to copy it</p>
+              </div>
+              
+              <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                <div
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedStudioPassword.password);
+                    // Show a brief success indication
+                    const button = document.getElementById('copy-feedback');
+                    if (button) {
+                      button.textContent = 'Copied!';
+                      setTimeout(() => {
+                        button.textContent = 'Click to copy';
+                      }, 2000);
+                    }
+                  }}
+                  className="cursor-pointer hover:bg-gray-100 rounded-lg p-3 transition-colors"
+                >
+                  <div className="text-sm font-mono text-gray-900 break-all bg-white p-3 rounded border">
+                    {selectedStudioPassword.password}
+                  </div>
+                  <div id="copy-feedback" className="text-xs text-gray-500 mt-2 text-center">
+                    Click to copy
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedStudioPassword.password);
+                    setShowPasswordModal(false);
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                >
+                  Copy & Close
                 </button>
               </div>
             </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { RecaptchaV2 } from '@/components/RecaptchaV2';
 import { MASTERY_LEVELS, ITEM_STYLES } from '@/lib/types';
 
 // Studio session interface
@@ -90,6 +91,7 @@ export default function StudioDashboardPage() {
   });
   const [isRegisteringDancer, setIsRegisteringDancer] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string>('');
   
   // Edit dancer state
   const [showEditDancerModal, setShowEditDancerModal] = useState(false);
@@ -218,6 +220,12 @@ export default function StudioDashboardPage() {
       return;
     }
 
+    // Validate reCAPTCHA
+    if (!recaptchaToken) {
+      setError('Please complete the security verification (reCAPTCHA)');
+      return;
+    }
+
     // Calculate age to check requirements
     const age = new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear();
     
@@ -256,7 +264,8 @@ export default function StudioDashboardPage() {
           guardianName: registerDancerData.guardianName || null,
           guardianEmail: registerDancerData.guardianEmail || null,
           guardianPhone: registerDancerData.guardianPhone || null,
-          studioId: studioSession.id // Register directly to studio
+          studioId: studioSession.id, // Register directly to studio
+          recaptchaToken: recaptchaToken
         }),
       });
 
@@ -290,6 +299,7 @@ export default function StudioDashboardPage() {
             guardianEmail: '',
             guardianPhone: ''
           });
+          setRecaptchaToken('');
           setSuccessMessage(`Dancer ${registerDancerData.name} has been successfully registered with EODSA ID ${registerData.eodsaId} and added to your studio!`);
           // Reload data to reflect changes
           loadData(studioSession.id);
@@ -301,6 +311,10 @@ export default function StudioDashboardPage() {
         }
       } else {
         setError(registerData.error || 'Failed to register dancer');
+        // Handle reCAPTCHA specific errors
+        if (registerData.recaptchaFailed) {
+          setRecaptchaToken(''); // Reset reCAPTCHA on failure
+        }
       }
     } catch (error) {
       console.error('Register dancer error:', error);
@@ -1333,8 +1347,8 @@ export default function StudioDashboardPage() {
                       type="tel"
                       value={registerDancerData.phone}
                       onChange={(e) => setRegisterDancerData(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                      placeholder="+27 123 456 7890"
+                                                    className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
+                              placeholder="012 345 6789"
                       required={(() => {
                         const age = registerDancerData.dateOfBirth ? 
                           new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() : 
@@ -1397,7 +1411,7 @@ export default function StudioDashboardPage() {
                               value={registerDancerData.guardianPhone}
                               onChange={(e) => setRegisterDancerData(prev => ({ ...prev, guardianPhone: e.target.value }))}
                               className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-white placeholder-gray-400"
-                              placeholder="+27 123 456 7890"
+                              placeholder="012 345 6789"
                               required={age < 18}
                             />
                           </div>
@@ -1409,10 +1423,29 @@ export default function StudioDashboardPage() {
                 })()}
               </div>
 
+              {/* reCAPTCHA */}
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Security Verification *
+                </label>
+                <div className="flex justify-center">
+                  <RecaptchaV2
+                    onVerify={(token) => setRecaptchaToken(token)}
+                    onExpire={() => setRecaptchaToken('')}
+                    onError={() => setRecaptchaToken('')}
+                  />
+                </div>
+                {!recaptchaToken && (
+                  <p className="text-xs text-gray-400 mt-2 text-center">
+                    Please complete the security verification above
+                  </p>
+                )}
+              </div>
+
               <div className="flex space-x-3 mt-6">
                 <button
                   onClick={handleRegisterDancer}
-                  disabled={!registerDancerData.name.trim() || !registerDancerData.dateOfBirth || !registerDancerData.nationalId.trim() || isRegisteringDancer}
+                  disabled={!registerDancerData.name.trim() || !registerDancerData.dateOfBirth || !registerDancerData.nationalId.trim() || !recaptchaToken || isRegisteringDancer}
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:from-emerald-600 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isRegisteringDancer ? (
@@ -1438,6 +1471,7 @@ export default function StudioDashboardPage() {
                       guardianPhone: ''
                     });
                     setError('');
+                    setRecaptchaToken('');
                   }}
                   disabled={isRegisteringDancer}
                   className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
@@ -1527,7 +1561,7 @@ export default function StudioDashboardPage() {
                     value={editDancerData.phone}
                     onChange={(e) => setEditDancerData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white placeholder-gray-400"
-                    placeholder="+27 123 456 7890"
+                    placeholder="012 345 6789"
                   />
                 </div>
               </div>

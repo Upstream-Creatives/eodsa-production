@@ -9,22 +9,10 @@ export async function POST(request: NextRequest) {
     
     const { name, email, password, contactPerson, address, phone, recaptchaToken } = await request.json();
     
-    // Get client IP for rate limiting
-    const clientIP = getClientIP(request);
+    // Rate limiting removed for bulk registrations
     
-    // Check rate limit (3 registrations per IP per hour)
-    const rateLimitCheck = checkRateLimit(clientIP);
-    if (!rateLimitCheck.allowed) {
-      const resetTime = new Date(rateLimitCheck.resetTime!);
-      return NextResponse.json(
-        { 
-          error: `Rate limit exceeded. You can only register 3 accounts per hour. Try again after ${resetTime.toLocaleTimeString()}.`,
-          rateLimited: true,
-          resetTime: rateLimitCheck.resetTime
-        },
-        { status: 429 }
-      );
-    }
+    // Get client IP for reCAPTCHA verification
+    const clientIP = getClientIP(request);
     
     // Verify reCAPTCHA token
     if (!recaptchaToken) {
@@ -62,14 +50,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
+    // Store password in plaintext per client requirement for password recovery
     // Create studio - now auto-approved
     const studio = await studioDb.createStudio({
       name,
       email,
-      password: hashedPassword,
+      password: password,
       contactPerson,
       address: address || '',
       phone: phone || ''

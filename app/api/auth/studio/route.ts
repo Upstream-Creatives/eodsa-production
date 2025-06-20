@@ -26,8 +26,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, studio.password);
+    // Verify password (plaintext comparison per client requirement)
+    const isValidPassword = password === studio.password;
     if (!isValidPassword) {
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },

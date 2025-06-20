@@ -32,15 +32,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash the new password
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
+    // Store password in plaintext per client requirement for password recovery
     // Update the user's password
     await unifiedDb.updatePassword(
       tokenData.userType, 
       tokenData.userId, 
-      hashedPassword
+      newPassword
     );
 
     // Mark the token as used
