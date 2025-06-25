@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PERFORMANCE_TYPES, EODSA_FEES } from '@/lib/types';
+import CountdownTimer from '@/app/components/CountdownTimer';
 
 interface Event {
   id: string;
@@ -184,12 +185,17 @@ export default function RegionalEventsPage() {
   };
 
   const getParticipantRequirements = (performanceType: string) => {
+    const typeInfo = PERFORMANCE_TYPES[performanceType as keyof typeof PERFORMANCE_TYPES];
+    if (typeInfo) {
+      return { description: typeInfo.description };
+    }
+    // Fallback for safety, though should not be reached with valid data
     switch (performanceType) {
-      case 'Solo': return { min: 1, max: 1, description: 'Individual performance' };
-      case 'Duet': return { min: 2, max: 2, description: 'Two dancers together' };
-      case 'Trio': return { min: 3, max: 3, description: 'Three dancers together' };
-      case 'Group': return { min: 4, max: 30, description: '4+ dancers together' };
-      default: return { min: 1, max: 1, description: 'Performance' };
+      case 'Solo': return { description: 'Individual performance' };
+      case 'Duet': return { description: 'Two dancers together' };
+      case 'Trio': return { description: 'Three dancers together' };
+      case 'Group': return { description: '4+ dancers together' };
+      default: return { description: 'Performance' };
     }
   };
 
@@ -286,119 +292,100 @@ export default function RegionalEventsPage() {
           )}
         </div>
 
-        {events.length === 0 ? (
-          <div className="bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-12 text-center">
-            <div className="text-6xl mb-6">🏆</div>
-            <h2 className="text-2xl font-bold text-white mb-4">No Events Available</h2>
-            <p className="text-gray-300 mb-6">
-              There are currently no open events in {region}. Please check back later.
-            </p>
-            <Link 
-              href={`/event-dashboard?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
-              className="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
-            >
-              Browse Other Regions
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Events grouped by performance type */}
-            {Object.entries(groupedEvents).map(([performanceType, typeEvents]) => (
-              <div key={performanceType} className="bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 overflow-hidden">
-                <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 p-6 border-b border-gray-700/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="text-3xl">
-                        {performanceType === 'Solo' && '🎭'}
-                        {performanceType === 'Duet' && '👥'}
-                        {performanceType === 'Trio' && '👥👤'}
-                        {performanceType === 'Group' && '👥👥'}
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-bold text-white">{performanceType} Events</h2>
-                        <p className="text-gray-300">
-                          {getParticipantRequirements(performanceType).description}
-                        </p>
+        <div className="space-y-12">
+          {Object.entries(groupedEvents).length > 0 ? (
+            Object.entries(groupedEvents).map(([performanceType, eventsOfType]) => {
+              const performanceInfo = PERFORMANCE_TYPES[performanceType as keyof typeof PERFORMANCE_TYPES];
+              const { description } = getParticipantRequirements(performanceType);
+
+              if (!performanceInfo) return null; // Skip if type is not in our definition
+
+              return (
+                <div key={performanceType} className="bg-gray-800/40 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden border border-gray-700/50">
+                  <div className="p-6 bg-gray-900/50 flex justify-between items-center">
+                    <div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+                          <img src={performanceInfo.icon} alt={`${performanceInfo.name} icon`} className="w-8 h-8" />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold text-white">{performanceInfo.name} Events</h2>
+                          <p className="text-gray-400">{performanceInfo.description}</p>
+                        </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-gray-400">Available Events</div>
-                      <div className="text-2xl font-bold text-purple-400">{typeEvents.length}</div>
+                      <p className="text-sm text-gray-400">Available Events</p>
+                      <p className="text-2xl font-bold text-purple-400">{eventsOfType.length}</p>
                     </div>
                   </div>
-                </div>
-                
-                <div className="p-6">
-                  <div className="grid gap-4">
-                    {typeEvents.map((event) => (
-                      <div 
-                        key={event.id}
-                        className="bg-gray-700/50 rounded-2xl p-6 border border-gray-600/30 hover:border-purple-500/50 transition-all duration-300 hover:bg-gray-700/70"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="text-xl font-bold text-white mb-2">{event.name}</h3>
-                            <p className="text-gray-300 mb-4">{event.description}</p>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                              <div>
-                                <div className="text-xs text-gray-400 uppercase tracking-wide">Date</div>
-                                <div className="text-sm text-white font-medium">
-                                  {new Date(event.eventDate).toLocaleDateString()}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-400 uppercase tracking-wide">Venue</div>
-                                <div className="text-sm text-white font-medium">{event.venue}</div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-400 uppercase tracking-wide">Age Category</div>
-                                <div className="text-sm text-white font-medium">{event.ageCategory}</div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-400 uppercase tracking-wide">Entry Fee</div>
-                                <div className="text-sm text-purple-400 font-bold">R{getStartingFee(event.performanceType)}</div>
-                              </div>
+
+                  <div className="p-4 space-y-4">
+                    {eventsOfType.map(event => (
+                      <div key={event.id} className="bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col md:flex-row hover:bg-gray-700/80 transition-all duration-300 border border-gray-700/50">
+                        <div className="p-6 md:w-2/3">
+                          <h3 className="text-xl font-bold text-white mb-2">{event.name}</h3>
+                          <p className="text-gray-400 text-sm mb-4">{event.description}</p>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-500 uppercase font-semibold text-xs">Date</p>
+                              <p className="text-gray-200">{new Date(event.eventDate).toLocaleDateString()}</p>
                             </div>
-                            
-                            <div className="flex items-center space-x-4 mb-4">
-                              <div className="flex items-center space-x-2">
-                                <div className={`w-3 h-3 rounded-full ${
-                                  event.status === 'registration_open' ? 'bg-green-500' :
-                                  event.status === 'upcoming' ? 'bg-yellow-500' : 'bg-gray-500'
-                                }`}></div>
-                                <span className="text-sm text-gray-300 capitalize">
-                                  {event.status.replace('_', ' ')}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-400">
-                                Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}
-                              </div>
+                            <div>
+                              <p className="text-gray-500 uppercase font-semibold text-xs">Venue</p>
+                              <p className="text-gray-200">{event.venue}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 uppercase font-semibold text-xs">Age Category</p>
+                              <p className="text-gray-200">{event.ageCategory}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 uppercase font-semibold text-xs">Entry Fee</p>
+                              <p className="text-lg font-bold text-white">R{getStartingFee(event.performanceType)}</p>
+                              <p className="text-xs text-gray-400">Starting from</p>
                             </div>
                           </div>
                           
-                          <div className="ml-6">
-                            <button
-                              onClick={() => router.push(`/event-dashboard/${region}/${performanceType.toLowerCase()}?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}&eventId=${event.id}`)}
-                              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold flex items-center space-x-2"
-                            >
-                              <span>Enter Competition</span>
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                              </svg>
-                            </button>
+                          <div className="mt-4 border-t border-gray-700 pt-4">
+                            <div className="flex items-center text-green-400">
+                              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                              <span className="text-sm">Registration Open</span>
+                            </div>
+                            <p className="text-sm text-gray-400 mt-1">
+                              Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}
+                            </p>
+                            <div className="mt-2">
+                              <CountdownTimer deadline={event.registrationDeadline} />
+                            </div>
                           </div>
+
+                        </div>
+                        <div className="md:w-1/3 bg-gray-800/50 p-6 flex flex-col justify-center items-center">
+                           <button
+                              onClick={() => router.push(`/event-dashboard/${region}/${performanceType.toLowerCase()}?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}&eventId=${event.id}`)}
+                              className="w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
+                           >
+                             <span>Enter Competition</span>
+                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                             </svg>
+                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-
+              )
+            })
+          ) : (
+            <div className="text-center py-16 bg-gray-800/50 rounded-2xl">
+              <h3 className="text-xl font-semibold text-white">No Events Found</h3>
+              <p className="text-gray-400 mt-2">There are currently no open events for the {region} region.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
-} 
+}

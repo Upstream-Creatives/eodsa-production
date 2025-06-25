@@ -198,7 +198,33 @@ export const REGIONS = [
   'Mpumalanga'
 ];
 
-export const PERFORMANCE_TYPES = ['Solo', 'Duet', 'Trio', 'Group', 'All'] as const;
+export const PERFORMANCE_TYPES = {
+  Solo: {
+    name: 'Solo',
+    description: 'Individual performance',
+    icon: '/icons/solo.svg', // Example path
+  },
+  Duet: {
+    name: 'Duet',
+    description: 'Two dancers together',
+    icon: '/icons/duet.svg',
+  },
+  Trio: {
+    name: 'Trio',
+    description: 'Three dancers together',
+    icon: '/icons/trio.svg',
+  },
+  Group: {
+    name: 'Group',
+    description: '4+ dancers together',
+    icon: '/icons/group.svg',
+  },
+  All: {
+    name: 'All',
+    description: 'All performance types',
+    icon: '/icons/all.svg',
+  }
+} as const;
 
 // UPDATED: Dance styles to match approved list
 export const DANCE_STYLES = [
