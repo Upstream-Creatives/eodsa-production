@@ -626,6 +626,195 @@ export const db = {
   },
 
   // Rankings and Tabulation
+  async calculateNationalsRankings(eventIds?: string[]) {
+    const sqlClient = getSql();
+    
+    try {
+      console.log('Calculating nationals rankings with eventIds:', eventIds);
+      
+      let result: any[] = [];
+
+      // Handle event filtering
+      if (eventIds && eventIds.length > 0) {
+        console.log('Filtering by specific nationals events:', eventIds);
+        
+        // For single event (most common case)
+        if (eventIds.length === 1) {
+          const eventId = eventIds[0];
+          result = await sqlClient`
+            SELECT 
+              nee.id as performance_id,
+              ne.id as event_id,
+              ne.name as event_name,
+              'Nationals' as region,
+              nee.age_category,
+              nee.performance_type,
+              nee.item_name as title,
+              nee.item_style,
+              nee.participant_ids,
+              c.name as contestant_name,
+              c.type as contestant_type,
+              c.studio_name,
+              AVG(ns.technical_score + ns.musical_score + ns.performance_score + ns.styling_score + ns.overall_impression_score) as total_score,
+              AVG((ns.technical_score + ns.musical_score + ns.performance_score + ns.styling_score + ns.overall_impression_score) / 5) as average_score,
+              COUNT(ns.id) as judge_count,
+              nee.choreographer,
+              nee.mastery,
+              nee.item_number
+            FROM nationals_event_entries nee
+            JOIN nationals_events ne ON nee.nationals_event_id = ne.id
+            JOIN contestants c ON nee.contestant_id = c.id
+            LEFT JOIN nationals_scores ns ON nee.id = ns.performance_id
+            WHERE ne.id = ${eventId} AND nee.approved = true
+            GROUP BY nee.id, ne.id, ne.name, nee.age_category, nee.performance_type, nee.item_name, nee.item_style, nee.participant_ids, c.name, c.type, c.studio_name, nee.choreographer, nee.mastery, nee.item_number
+            HAVING COUNT(ns.id) > 0
+            ORDER BY total_score DESC
+          ` as any[];
+        } else {
+          // For multiple events, query each separately and combine
+          const allResults = [];
+          for (const eventId of eventIds) {
+            const eventResult = await sqlClient`
+              SELECT 
+                nee.id as performance_id,
+                ne.id as event_id,
+                ne.name as event_name,
+                'Nationals' as region,
+                nee.age_category,
+                nee.performance_type,
+                nee.item_name as title,
+                nee.item_style,
+                nee.participant_ids,
+                c.name as contestant_name,
+                c.type as contestant_type,
+                c.studio_name,
+                AVG(ns.technical_score + ns.musical_score + ns.performance_score + ns.styling_score + ns.overall_impression_score) as total_score,
+                AVG((ns.technical_score + ns.musical_score + ns.performance_score + ns.styling_score + ns.overall_impression_score) / 5) as average_score,
+                COUNT(ns.id) as judge_count,
+                nee.choreographer,
+                nee.mastery,
+                nee.item_number
+              FROM nationals_event_entries nee
+              JOIN nationals_events ne ON nee.nationals_event_id = ne.id
+              JOIN contestants c ON nee.contestant_id = c.id
+              LEFT JOIN nationals_scores ns ON nee.id = ns.performance_id
+              WHERE ne.id = ${eventId} AND nee.approved = true
+              GROUP BY nee.id, ne.id, ne.name, nee.age_category, nee.performance_type, nee.item_name, nee.item_style, nee.participant_ids, c.name, c.type, c.studio_name, nee.choreographer, nee.mastery, nee.item_number
+              HAVING COUNT(ns.id) > 0
+              ORDER BY total_score DESC
+            ` as any[];
+            allResults.push(...eventResult);
+          }
+          result = allResults;
+        }
+      } else {
+        // No event filtering - get all nationals rankings
+        result = await sqlClient`
+          SELECT 
+            nee.id as performance_id,
+            ne.id as event_id,
+            ne.name as event_name,
+            'Nationals' as region,
+            nee.age_category,
+            nee.performance_type,
+            nee.item_name as title,
+            nee.item_style,
+            nee.participant_ids,
+            c.name as contestant_name,
+            c.type as contestant_type,
+            c.studio_name,
+            AVG(ns.technical_score + ns.musical_score + ns.performance_score + ns.styling_score + ns.overall_impression_score) as total_score,
+            AVG((ns.technical_score + ns.musical_score + ns.performance_score + ns.styling_score + ns.overall_impression_score) / 5) as average_score,
+            COUNT(ns.id) as judge_count,
+            nee.choreographer,
+            nee.mastery,
+            nee.item_number
+          FROM nationals_event_entries nee
+          JOIN nationals_events ne ON nee.nationals_event_id = ne.id
+          JOIN contestants c ON nee.contestant_id = c.id
+          LEFT JOIN nationals_scores ns ON nee.id = ns.performance_id
+          WHERE nee.approved = true
+          GROUP BY nee.id, ne.id, ne.name, nee.age_category, nee.performance_type, nee.item_name, nee.item_style, nee.participant_ids, c.name, c.type, c.studio_name, nee.choreographer, nee.mastery, nee.item_number
+          HAVING COUNT(ns.id) > 0
+          ORDER BY total_score DESC
+        ` as any[];
+      }
+      
+      console.log('Nationals Rankings SQL Result:', result);
+      console.log('Nationals Result length:', result.length);
+      
+      // Ensure result is an array
+      if (!Array.isArray(result)) {
+        console.warn('Nationals rankings query did not return an array:', result);
+        return [];
+      }
+
+      // If no results, return empty array
+      if (result.length === 0) {
+        console.log('No nationals rankings found for the given criteria');
+        return [];
+      }
+
+      // Calculate rankings within each category
+      const formattedResult = result.map((row: any, index: number) => {
+        const participantNames = row.participant_ids ? JSON.parse(row.participant_ids) : [];
+        const totalScore = parseFloat(row.total_score) || 0;
+        const averageScore = parseFloat(row.average_score) || 0;
+        const judgeCount = parseInt(row.judge_count) || 0;
+        const maxPossibleScore = judgeCount * 100; // Each judge can give max 100 points
+        const percentage = maxPossibleScore > 0 ? (totalScore / maxPossibleScore) * 100 : 0;
+        
+        let rankingLevel = 'Bronze';
+        if (percentage >= 90) rankingLevel = 'Pro Gold';
+        else if (percentage >= 80) rankingLevel = 'Gold';
+        else if (percentage >= 75) rankingLevel = 'Silver Plus';
+        else if (percentage >= 70) rankingLevel = 'Silver';
+        
+        return {
+          performanceId: row.performance_id,
+          eventId: row.event_id,
+          eventName: row.event_name,
+          region: row.region,
+          ageCategory: row.age_category,
+          performanceType: row.performance_type,
+          title: row.title,
+          itemStyle: row.item_style,
+          contestantName: participantNames.length > 0 ? participantNames.join(', ') : row.contestant_name,
+          participantNames: participantNames,
+          studioName: row.studio_name,
+          totalScore: totalScore,
+          averageScore: averageScore,
+          rank: index + 1, // Simple ranking based on total score order
+          judgeCount: judgeCount,
+          percentage: Math.round(percentage),
+          rankingLevel: rankingLevel,
+          choreographer: row.choreographer,
+          mastery: row.mastery,
+          itemNumber: row.item_number
+        };
+      });
+
+      // Sort by total score descending and assign proper ranks
+      formattedResult.sort((a, b) => b.totalScore - a.totalScore);
+      
+      // Assign ranks considering ties
+      let currentRank = 1;
+      for (let i = 0; i < formattedResult.length; i++) {
+        if (i > 0 && formattedResult[i].totalScore < formattedResult[i-1].totalScore) {
+          currentRank = i + 1;
+        }
+        formattedResult[i].rank = currentRank;
+      }
+
+      console.log('Formatted nationals rankings result:', formattedResult);
+      return formattedResult;
+      
+    } catch (error) {
+      console.error('Error in calculateNationalsRankings:', error);
+      return [];
+    }
+  },
+
   async calculateRankings(region?: string, ageCategory?: string, performanceType?: string, eventIds?: string[]) {
     const sqlClient = getSql();
     
@@ -2279,17 +2468,144 @@ export const db = {
 
   async updateNationalsEventStatuses() {
     const sqlClient = getSql();
-    const now = new Date().toISOString();
+    const now = new Date();
     
     await sqlClient`
       UPDATE nationals_events 
-      SET status = CASE 
-        WHEN registration_deadline > ${now} THEN 'registration_open'
-        WHEN event_date > ${now} THEN 'registration_closed'
-        ELSE 'completed'
-      END
-      WHERE status != 'completed'
+      SET status = 'registration_closed' 
+      WHERE status = 'registration_open' 
+      AND registration_deadline <= ${now.toISOString()}
     `;
+    
+    await sqlClient`
+      UPDATE nationals_events 
+      SET status = 'in_progress' 
+      WHERE status = 'registration_closed' 
+      AND event_date <= ${now.toISOString()}
+    `;
+  },
+
+  // Nationals scoring methods
+  async createNationalsScore(score: {
+    entryId: string;
+    judgeId: string;
+    technicalScore: number;
+    musicalScore: number;
+    performanceScore: number;
+    stylingScore: number;
+    overallImpressionScore: number;
+    comments?: string;
+  }) {
+    const sqlClient = getSql();
+    const id = generateEODSAId();
+    
+    await sqlClient`
+      INSERT INTO nationals_scores (
+        id, performance_id, judge_id, 
+        technical_score, musical_score, performance_score, 
+        styling_score, overall_impression_score, comments, 
+        submitted_at
+      ) VALUES (
+        ${id}, ${score.entryId}, ${score.judgeId},
+        ${score.technicalScore}, ${score.musicalScore}, ${score.performanceScore},
+        ${score.stylingScore}, ${score.overallImpressionScore}, ${score.comments || ''},
+        ${new Date().toISOString()}
+      )
+    `;
+    
+    console.log(`✅ Nationals score created for entry ${score.entryId} by judge ${score.judgeId}`);
+    return { id };
+  },
+
+  async getNationalsScoreByJudgeAndPerformance(judgeId: string, entryId: string) {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT * FROM nationals_scores 
+      WHERE judge_id = ${judgeId} AND performance_id = ${entryId}
+    ` as any[];
+    
+    if (result.length === 0) return null;
+    
+    const score = result[0];
+    return {
+      id: score.id,
+      entryId: score.performance_id,
+      judgeId: score.judge_id,
+      technicalScore: score.technical_score,
+      musicalScore: score.musical_score,
+      performanceScore: score.performance_score,
+      stylingScore: score.styling_score,
+      overallImpressionScore: score.overall_impression_score,
+      comments: score.comments,
+      submittedAt: score.submitted_at
+    };
+  },
+
+  async updateNationalsScore(id: string, updates: {
+    technicalScore?: number;
+    musicalScore?: number;
+    performanceScore?: number;
+    stylingScore?: number;
+    overallImpressionScore?: number;
+    comments?: string;
+  }) {
+    const sqlClient = getSql();
+    
+    await sqlClient`
+      UPDATE nationals_scores 
+      SET 
+        technical_score = ${updates.technicalScore || 0},
+        musical_score = ${updates.musicalScore || 0},
+        performance_score = ${updates.performanceScore || 0},
+        styling_score = ${updates.stylingScore || 0},
+        overall_impression_score = ${updates.overallImpressionScore || 0},
+        comments = ${updates.comments || ''}
+      WHERE id = ${id}
+    `;
+    
+    console.log(`✅ Nationals score ${id} updated`);
+  },
+
+  async getNationalsScoresByEntry(entryId: string) {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT ns.*, j.name as judge_name 
+      FROM nationals_scores ns
+      JOIN judges j ON ns.judge_id = j.id
+      WHERE ns.performance_id = ${entryId}
+    ` as any[];
+    
+    return result.map((score: any) => ({
+      id: score.id,
+      entryId: score.performance_id,
+      judgeId: score.judge_id,
+      judgeName: score.judge_name,
+      technicalScore: score.technical_score,
+      musicalScore: score.musical_score,
+      performanceScore: score.performance_score,
+      stylingScore: score.styling_score,
+      overallImpressionScore: score.overall_impression_score,
+      comments: score.comments,
+      submittedAt: score.submitted_at
+    }));
+  },
+
+  // Clean studios method - removes dancers without registrations
+  async cleanStudios() {
+    const sqlClient = getSql();
+    
+    console.log('🧹 Cleaning studios...');
+    
+    // Delete all data in dependency order (most dependent first)
+    await sqlClient`DELETE FROM studio_applications`;
+    await sqlClient`DELETE FROM dancers`;
+    await sqlClient`DELETE FROM contestants`;
+    await sqlClient`DELETE FROM studios`;
+    
+    // Keep only admin users, remove regular studios
+    await sqlClient`DELETE FROM studios WHERE is_admin = false`;
+    
+    console.log('✅ Studios cleaned successfully - Admin user and fee schedule preserved');
   }
 };
 
@@ -3805,6 +4121,85 @@ export const unifiedDb = {
   // Remove judge assignment from nationals event
   async removeNationalsJudgeAssignment(assignmentId: string) {
     return await db.removeNationalsJudgeAssignment(assignmentId);
+  },
+
+  // 🏆 NATIONALS SCORING FUNCTIONS
+
+  // Create nationals score
+  async createNationalsScore(score: {
+    entryId: string;
+    judgeId: string;
+    technicalScore: number;
+    musicalScore: number;
+    performanceScore: number;
+    stylingScore: number;
+    overallImpressionScore: number;
+    comments?: string;
+  }) {
+    return await db.createNationalsScore(score);
+  },
+
+  // Get nationals score by judge and performance
+  async getNationalsScoreByJudgeAndPerformance(judgeId: string, entryId: string) {
+    return await db.getNationalsScoreByJudgeAndPerformance(judgeId, entryId);
+  },
+
+  // Update nationals score
+  async updateNationalsScore(id: string, updates: {
+    technicalScore?: number;
+    musicalScore?: number;
+    performanceScore?: number;
+    stylingScore?: number;
+    overallImpressionScore?: number;
+    comments?: string;
+  }) {
+    return await db.updateNationalsScore(id, updates);
+  },
+
+  // Get all nationals scores for an entry
+  async getNationalsScoresByEntry(entryId: string) {
+    return await db.getNationalsScoresByEntry(entryId);
+  },
+
+  // Get nationals events with scores for rankings
+  async getNationalsEventsWithScores() {
+    const sqlClient = getSql();
+    
+    try {
+      const result = await sqlClient`
+        SELECT 
+          ne.id,
+          ne.name,
+          ne.event_date,
+          ne.venue,
+          ne.status,
+          COUNT(DISTINCT nee.id) as entry_count,
+          COUNT(DISTINCT ns.id) as score_count
+        FROM nationals_events ne
+        LEFT JOIN nationals_event_entries nee ON ne.id = nee.nationals_event_id AND nee.approved = true
+        LEFT JOIN nationals_scores ns ON nee.id = ns.performance_id
+        GROUP BY ne.id, ne.name, ne.event_date, ne.venue, ne.status
+        ORDER BY ne.event_date DESC
+      ` as any[];
+      
+      return result.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        eventDate: row.event_date,
+        venue: row.venue,
+        status: row.status,
+        entryCount: parseInt(row.entry_count) || 0,
+        scoreCount: parseInt(row.score_count) || 0
+      }));
+    } catch (error) {
+      console.error('Error fetching nationals events with scores:', error);
+      return [];
+    }
+  },
+
+  // Calculate nationals rankings
+  async calculateNationalsRankings(eventIds?: string[]) {
+    return await db.calculateNationalsRankings(eventIds);
   }
 };
 

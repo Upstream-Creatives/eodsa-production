@@ -44,6 +44,9 @@ export default function AdminRankingsPage() {
   const [error, setError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
+  // Tab system
+  const [activeTab, setActiveTab] = useState<'regional' | 'nationals'>('regional');
+  
   // Filters
   const [selectedRegion, setSelectedRegion] = useState('');
   const [selectedAgeCategory, setSelectedAgeCategory] = useState('');
@@ -82,7 +85,16 @@ export default function AdminRankingsPage() {
     if (isAuthenticated && !isLoading) {
       loadRankings();
     }
-  }, [selectedRegion, selectedAgeCategory, selectedPerformanceType]);
+  }, [selectedRegion, selectedAgeCategory, selectedPerformanceType, activeTab]);
+
+  // Clear filters when switching tabs
+  useEffect(() => {
+    if (activeTab === 'nationals') {
+      setSelectedRegion('');
+      setSelectedAgeCategory('');
+      setSelectedPerformanceType('');
+    }
+  }, [activeTab]);
 
   const loadInitialData = async () => {
     setIsLoading(true);
@@ -107,9 +119,13 @@ export default function AdminRankingsPage() {
     try {
       // Build query parameters
       const params = new URLSearchParams();
-      if (selectedRegion) params.append('region', selectedRegion);
-      if (selectedAgeCategory) params.append('ageCategory', selectedAgeCategory);
-      if (selectedPerformanceType) params.append('performanceType', selectedPerformanceType);
+      params.append('type', activeTab); // Add type parameter for regional/nationals
+      
+      if (activeTab === 'regional') {
+        if (selectedRegion) params.append('region', selectedRegion);
+        if (selectedAgeCategory) params.append('ageCategory', selectedAgeCategory);
+        if (selectedPerformanceType) params.append('performanceType', selectedPerformanceType);
+      }
       
       const url = `/api/rankings?${params.toString()}`;
       console.log('Loading rankings from:', url);
@@ -336,6 +352,38 @@ export default function AdminRankingsPage() {
               </div>
             </div>
           )}
+
+          {/* Tab System */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-center space-x-1 bg-gray-100 p-1 rounded-2xl">
+              <button
+                onClick={() => setActiveTab('regional')}
+                className={`flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                  activeTab === 'regional'
+                    ? 'bg-white text-indigo-600 shadow-lg'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span>🌍</span>
+                  <span>Regional Rankings</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('nationals')}
+                className={`flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                  activeTab === 'nationals'
+                    ? 'bg-white text-yellow-600 shadow-lg'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span>🏆</span>
+                  <span>Nationals Rankings</span>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -480,83 +528,101 @@ export default function AdminRankingsPage() {
               onClick={() => setViewMode('top5_age')}
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top5_age'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              🥇 Top 5 by Age Category
+              Top 5 by Age
             </button>
             <button
               onClick={() => setViewMode('top5_style')}
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top5_style'
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-lg'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              🎭 Top 5 by Style
+              Top 5 by Style
             </button>
           </div>
 
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-sm">🔍</span>
+          {/* Regional Filters - Only show for regional tab */}
+          {activeTab === 'regional' && (
+            <>
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm">🔍</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Filter Regional Rankings</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Region</label>
+                  <select
+                    value={selectedRegion}
+                    onChange={(e) => setSelectedRegion(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
+                  >
+                    <option value="">All Regions</option>
+                    {REGIONS.map(region => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Age Category</label>
+                  <select
+                    value={selectedAgeCategory}
+                    onChange={(e) => setSelectedAgeCategory(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
+                  >
+                    <option value="">All Ages</option>
+                    {AGE_CATEGORIES.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Type</label>
+                  <select
+                    value={selectedPerformanceType}
+                    onChange={(e) => setSelectedPerformanceType(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
+                  >
+                    <option value="">All Types</option>
+                    {Object.keys(PERFORMANCE_TYPES).map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="flex items-end">
+                  <button
+                    onClick={clearFilters}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-gray-500 to-gray-700 text-white rounded-xl hover:from-gray-600 hover:to-gray-800 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Nationals Info - Show for nationals tab */}
+          {activeTab === 'nationals' && (
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg flex items-center justify-center">
+                <span className="text-white text-sm">🏆</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Nationals Rankings</h2>
+                <p className="text-sm text-gray-600">Showing all nationals competition results</p>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Filter Rankings</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Region</label>
-              <select
-                value={selectedRegion}
-                onChange={(e) => setSelectedRegion(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
-              >
-                <option value="">All Regions</option>
-                {REGIONS.map(region => (
-                  <option key={region} value={region}>{region}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Age Category</label>
-              <select
-                value={selectedAgeCategory}
-                onChange={(e) => setSelectedAgeCategory(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
-              >
-                <option value="">All Ages</option>
-                {AGE_CATEGORIES.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Type</label>
-              <select
-                value={selectedPerformanceType}
-                onChange={(e) => setSelectedPerformanceType(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
-              >
-                <option value="">All Types</option>
-                {Object.keys(PERFORMANCE_TYPES).map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="flex items-end">
-              <button
-                onClick={clearFilters}
-                className="w-full px-4 py-3 bg-gradient-to-r from-gray-500 to-gray-700 text-white rounded-xl hover:from-gray-600 hover:to-gray-800 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
-              >
-                Clear Filters
-              </button>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Enhanced Rankings Display */}

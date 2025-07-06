@@ -21,6 +21,23 @@ interface Assignment {
   };
 }
 
+interface NationalsAssignment {
+  id: string;
+  judgeId: string;
+  nationalsEventId: string;
+  assignedBy: string;
+  assignedAt: string;
+  judgeName: string;
+  judgeEmail: string;
+  event: {
+    id: string;
+    name: string;
+    description: string;
+    eventDate: string;
+    venue: string;
+  };
+}
+
 interface Performance {
   id: string;
   eventId: string;
@@ -34,6 +51,24 @@ interface Performance {
   itemStyle?: string;
   mastery?: string;
   itemNumber?: number;
+}
+
+interface NationalsPerformance {
+  id: string;
+  nationalsEventId: string;
+  entryId: string;
+  itemName: string;
+  contestantName: string;
+  participantNames: string[];
+  choreographer: string;
+  mastery: string;
+  itemStyle: string;
+  performanceType: string;
+  ageCategory: string;
+  itemNumber?: number;
+  duration: number;
+  soloCount?: number;
+  status: string;
 }
 
 interface Score {
@@ -52,16 +87,28 @@ interface PerformanceWithScore extends Performance {
   scoringStatus?: any;
 }
 
+interface NationalsPerformanceWithScore extends NationalsPerformance {
+  hasScore?: boolean;
+  judgeScore?: any;
+  isFullyScored?: boolean;
+  scoringStatus?: any;
+}
+
 export default function JudgeDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [nationalsAssignments, setNationalsAssignments] = useState<NationalsAssignment[]>([]);
   const [performances, setPerformances] = useState<PerformanceWithScore[]>([]);
+  const [nationalsPerformances, setNationalsPerformances] = useState<NationalsPerformanceWithScore[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [selectedPerformance, setSelectedPerformance] = useState<PerformanceWithScore | null>(null);
+  const [selectedNationalsPerformance, setSelectedNationalsPerformance] = useState<NationalsPerformanceWithScore | null>(null);
   const [filteredPerformances, setFilteredPerformances] = useState<PerformanceWithScore[]>([]);
+  const [filteredNationalsPerformances, setFilteredNationalsPerformances] = useState<NationalsPerformanceWithScore[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [judgeName, setJudgeName] = useState('');
   const [judgeId, setJudgeId] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'scoring'>('list');
+  const [activeTab, setActiveTab] = useState<'regional' | 'nationals'>('regional');
   const [currentScore, setCurrentScore] = useState<Score>({
     technique: 0,
     musicality: 0,
@@ -80,6 +127,40 @@ export default function JudgeDashboard() {
   const [itemNumberSearch, setItemNumberSearch] = useState('');
   const router = useRouter();
   const { showAlert } = useAlert();
+
+  const filterAndLoadNationalsPerformances = () => {
+    // Start with ALL nationals performances
+    let filtered = [...nationalsPerformances];
+    
+    // Apply status filter
+    if (filterStatus === 'scored') {
+      filtered = filtered.filter(p => p.isFullyScored); // Only show fully scored performances
+    } else if (filterStatus === 'not_scored') {
+      filtered = filtered.filter(p => !p.hasScore); // Show performances this judge hasn't scored
+    }
+
+    // Apply search term filter (name, title)
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.itemName.toLowerCase().includes(lowerSearchTerm) ||
+        p.contestantName.toLowerCase().includes(lowerSearchTerm) ||
+        (p.participantNames && p.participantNames.some(name => name.toLowerCase().includes(lowerSearchTerm)))
+      );
+    }
+
+    // Apply item number search
+    if (itemNumberSearch) {
+      const itemNum = parseInt(itemNumberSearch);
+      if (!isNaN(itemNum)) {
+        filtered = filtered.filter(p => p.itemNumber === itemNum);
+      }
+    }
+
+    // Already sorted by item number in loadJudgeData - maintain program order
+    setFilteredNationalsPerformances(filtered);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
 
   useEffect(() => {
     const session = localStorage.getItem('judgeSession');
@@ -102,18 +183,19 @@ export default function JudgeDashboard() {
   useEffect(() => {
     // Filter performances when any filter changes
     filterAndLoadPerformances();
-  }, [performances, filterStatus, searchTerm, itemNumberSearch]);
+    filterAndLoadNationalsPerformances();
+  }, [performances, nationalsPerformances, filterStatus, searchTerm, itemNumberSearch]);
 
   const loadJudgeData = async (judgeId: string) => {
     setIsLoading(true);
     try {
-      // Load judge assignments
+      // Load regional judge assignments
       const assignmentsResponse = await fetch(`/api/judges/${judgeId}/assignments`);
       if (assignmentsResponse.ok) {
         const assignmentsData = await assignmentsResponse.json();
         setAssignments(assignmentsData.assignments || []);
         
-        // Load ALL performances for all assigned events - MERGED LIST (Gabriel's requirement)
+        // Load ALL performances for all assigned regional events
         const allPerformances: PerformanceWithScore[] = [];
         for (const assignment of assignmentsData.assignments || []) {
           const performancesResponse = await fetch(`/api/events/${assignment.eventId}/performances`);
@@ -141,7 +223,7 @@ export default function JudgeDashboard() {
           }
         }
         
-        // Sort by item number for program order (Gabriel's requirement)
+        // Sort by item number for program order
         allPerformances.sort((a, b) => {
           if (a.itemNumber && b.itemNumber) {
             return a.itemNumber - b.itemNumber;
@@ -155,7 +237,54 @@ export default function JudgeDashboard() {
         });
         
         setPerformances(allPerformances);
-        setFilteredPerformances(allPerformances); // Show all by default
+        setFilteredPerformances(allPerformances);
+      }
+
+      // Load nationals judge assignments
+      const nationalsAssignmentsResponse = await fetch(`/api/nationals/judges/${judgeId}/assignments`);
+      if (nationalsAssignmentsResponse.ok) {
+        const nationalsAssignmentsData = await nationalsAssignmentsResponse.json();
+        setNationalsAssignments(nationalsAssignmentsData.assignments || []);
+        
+        // Load ALL nationals performances for all assigned nationals events
+        const allNationalsPerformances: NationalsPerformanceWithScore[] = [];
+        for (const assignment of nationalsAssignmentsData.assignments || []) {
+          const performancesResponse = await fetch(`/api/nationals/performances?eventId=${assignment.nationalsEventId}`);
+          if (performancesResponse.ok) {
+            const performancesData = await performancesResponse.json();
+            
+            // Check score status for each nationals performance
+            for (const performance of performancesData.performances || []) {
+              // Check if this judge has scored this performance
+              const scoreResponse = await fetch(`/api/nationals/scores/${performance.id}/${judgeId}`);
+              const scoreData = await scoreResponse.json();
+              
+              allNationalsPerformances.push({
+                ...performance,
+                hasScore: scoreData.success && scoreData.score, // Judge's individual score status
+                judgeScore: scoreData.score,
+                isFullyScored: false, // TODO: Implement full scoring status for nationals
+                scoringStatus: null
+              });
+            }
+          }
+        }
+        
+        // Sort by item number for program order
+        allNationalsPerformances.sort((a, b) => {
+          if (a.itemNumber && b.itemNumber) {
+            return a.itemNumber - b.itemNumber;
+          } else if (a.itemNumber && !b.itemNumber) {
+            return -1;
+          } else if (!a.itemNumber && b.itemNumber) {
+            return 1;
+          } else {
+            return a.itemName.localeCompare(b.itemName);
+          }
+        });
+        
+        setNationalsPerformances(allNationalsPerformances);
+        setFilteredNationalsPerformances(allNationalsPerformances);
       }
     } catch (error) {
       console.error('Error loading judge data:', error);
@@ -200,11 +329,20 @@ export default function JudgeDashboard() {
   };
 
   const loadPerformanceByItemNumber = (itemNumber: number) => {
-    const performance = performances.find(p => p.itemNumber === itemNumber);
-    if (performance) {
-      handleStartScoring(performance);
+    if (activeTab === 'nationals') {
+      const performance = nationalsPerformances.find(p => p.itemNumber === itemNumber);
+      if (performance) {
+        handleStartNationalsScoring(performance);
+      } else {
+        showAlert(`No nationals performance found with item number ${itemNumber}`, 'warning');
+      }
     } else {
-      showAlert(`No performance found with item number ${itemNumber}`, 'warning');
+      const performance = performances.find(p => p.itemNumber === itemNumber);
+      if (performance) {
+        handleStartScoring(performance);
+      } else {
+        showAlert(`No regional performance found with item number ${itemNumber}`, 'warning');
+      }
     }
   };
 
@@ -219,6 +357,34 @@ export default function JudgeDashboard() {
 
   const handleStartScoring = (performance: PerformanceWithScore) => {
     setSelectedPerformance(performance);
+    setSelectedNationalsPerformance(null);
+    setViewMode('scoring');
+    
+    // Pre-populate with existing score if available
+    if (performance.judgeScore) {
+      setCurrentScore({
+        technique: performance.judgeScore.technicalScore || 0,
+        musicality: performance.judgeScore.musicalScore || 0,
+        performance: performance.judgeScore.performanceScore || 0,
+        styling: performance.judgeScore.stylingScore || 0,
+        overallImpression: performance.judgeScore.overallImpressionScore || 0,
+        comments: performance.judgeScore.comments || ''
+      });
+    } else {
+      setCurrentScore({
+        technique: 0,
+        musicality: 0,
+        performance: 0,
+        styling: 0,
+        overallImpression: 0,
+        comments: ''
+      });
+    }
+  };
+
+  const handleStartNationalsScoring = (performance: NationalsPerformanceWithScore) => {
+    setSelectedNationalsPerformance(performance);
+    setSelectedPerformance(null);
     setViewMode('scoring');
     
     // Pre-populate with existing score if available
@@ -248,19 +414,26 @@ export default function JudgeDashboard() {
   };
 
   const handleSubmitScore = async () => {
-    if (!selectedPerformance) return;
+    if (!selectedPerformance && !selectedNationalsPerformance) return;
     
     setIsSubmittingScore(true);
     setErrorMessage('');
     
     try {
-      const response = await fetch('/api/scores', {
+      const isNationals = !!selectedNationalsPerformance;
+      const performance = isNationals ? selectedNationalsPerformance! : selectedPerformance!;
+      const apiEndpoint = isNationals ? '/api/nationals/scores' : '/api/scores';
+      const performanceTitle = isNationals ? 
+        (selectedNationalsPerformance as NationalsPerformanceWithScore).itemName : 
+        (selectedPerformance as PerformanceWithScore).title;
+      
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          performanceId: selectedPerformance.id,
+          performanceId: performance.id,
           judgeId: judgeId,
           technique: currentScore.technique,
           musicality: currentScore.musicality,
@@ -274,9 +447,10 @@ export default function JudgeDashboard() {
       const result = await response.json();
       
       if (response.ok) {
-        setSuccessMessage(`Score ${selectedPerformance.hasScore ? 'updated' : 'submitted'} successfully for "${selectedPerformance.title}"`);
+        setSuccessMessage(`${isNationals ? 'Nationals' : 'Regional'} score ${performance.hasScore ? 'updated' : 'submitted'} successfully for "${performanceTitle}"`);
         setViewMode('list');
         setSelectedPerformance(null);
+        setSelectedNationalsPerformance(null);
         
         // Refresh performances to update score status
         await loadJudgeData(judgeId);
@@ -306,9 +480,15 @@ export default function JudgeDashboard() {
   const totalPages = Math.ceil(filteredPerformances.length / performancesPerPage);
 
   const getCompletionStats = () => {
-    const scored = performances.filter(p => p.hasScore).length;
-    const total = performances.length;
-    return { scored, total, percentage: total > 0 ? Math.round((scored / total) * 100) : 0 };
+    if (activeTab === 'nationals') {
+      const scored = nationalsPerformances.filter(p => p.hasScore).length;
+      const total = nationalsPerformances.length;
+      return { scored, total, percentage: total > 0 ? Math.round((scored / total) * 100) : 0 };
+    } else {
+      const scored = performances.filter(p => p.hasScore).length;
+      const total = performances.length;
+      return { scored, total, percentage: total > 0 ? Math.round((scored / total) * 100) : 0 };
+    }
   };
 
   if (isLoading) {
@@ -325,7 +505,9 @@ export default function JudgeDashboard() {
     );
   }
 
-  if (viewMode === 'scoring' && selectedPerformance) {
+  if (viewMode === 'scoring' && (selectedPerformance || selectedNationalsPerformance)) {
+    const isNationals = !!selectedNationalsPerformance;
+    const currentPerformanceData = isNationals ? selectedNationalsPerformance! : selectedPerformance!;
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
         {/* Scoring Header */}
@@ -341,17 +523,26 @@ export default function JudgeDashboard() {
                 </button>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
-                    {selectedPerformance.hasScore ? 'Update Score' : 'Score Performance'}
+                    {currentPerformanceData.hasScore ? 'Update Score' : 'Score Performance'}
                   </h1>
-                  <p className="text-gray-700 font-medium">{selectedPerformance.title}</p>
+                  <p className="text-gray-700 font-medium">
+                    {isNationals ? 
+                      (currentPerformanceData as NationalsPerformanceWithScore).itemName :
+                      (currentPerformanceData as PerformanceWithScore).title}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-700 font-medium">Judge: {judgeName}</p>
-                <p className="text-sm text-gray-700 font-medium">Duration: {selectedPerformance.duration} min</p>
-                {selectedPerformance.hasScore && (
+                <p className="text-sm text-gray-700 font-medium">Duration: {currentPerformanceData.duration} min</p>
+                {currentPerformanceData.hasScore && (
                   <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full mt-1">
                     Previously Scored
+                  </span>
+                )}
+                {isNationals && (
+                  <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full mt-1">
+                    🏆 NATIONALS
                   </span>
                 )}
               </div>
@@ -370,28 +561,44 @@ export default function JudgeDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-gray-700 font-medium">Contestant:</span>
-                    <p className="font-bold text-gray-900">{selectedPerformance.contestantName || 'Loading...'}</p>
+                    <p className="font-bold text-gray-900">{currentPerformanceData.contestantName || 'Loading...'}</p>
                   </div>
                   <div>
                     <span className="text-gray-700 font-medium">Participants:</span>
-                    <p className="font-bold text-gray-900">{selectedPerformance.participantNames?.join(', ') || 'Loading...'}</p>
+                    <p className="font-bold text-gray-900">{currentPerformanceData.participantNames?.join(', ') || 'Loading...'}</p>
                   </div>
                   <div>
                     <span className="text-gray-700 font-medium">Style:</span>
-                    <p className="font-bold text-gray-900">{selectedPerformance.itemStyle || 'Not specified'}</p>
+                    <p className="font-bold text-gray-900">{currentPerformanceData.itemStyle || 'Not specified'}</p>
                   </div>
                   <div>
                     <span className="text-gray-700 font-medium">Mastery:</span>
-                    <p className="font-bold text-gray-900">{selectedPerformance.mastery || 'Not specified'}</p>
+                    <p className="font-bold text-gray-900">{currentPerformanceData.mastery || 'Not specified'}</p>
                   </div>
                   <div>
                     <span className="text-gray-700 font-medium">Duration:</span>
-                    <p className="font-bold text-gray-900">{selectedPerformance.duration} minutes</p>
+                    <p className="font-bold text-gray-900">{currentPerformanceData.duration} minutes</p>
                   </div>
                   <div>
                     <span className="text-gray-700 font-medium">Choreographer:</span>
-                    <p className="font-bold text-gray-900">{selectedPerformance.choreographer || 'Not specified'}</p>
+                    <p className="font-bold text-gray-900">
+                      {isNationals ? 
+                        (currentPerformanceData as NationalsPerformanceWithScore).choreographer :
+                        (currentPerformanceData as PerformanceWithScore).choreographer || 'Not specified'}
+                    </p>
                   </div>
+                  {isNationals && (
+                    <>
+                      <div>
+                        <span className="text-gray-700 font-medium">Performance Type:</span>
+                        <p className="font-bold text-gray-900">{(currentPerformanceData as NationalsPerformanceWithScore).performanceType}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-700 font-medium">Age Category:</span>
+                        <p className="font-bold text-gray-900">{(currentPerformanceData as NationalsPerformanceWithScore).ageCategory}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -532,10 +739,10 @@ export default function JudgeDashboard() {
                     {isSubmittingScore ? (
                       <div className="flex items-center justify-center space-x-2">
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>{selectedPerformance.hasScore ? 'Updating Score...' : 'Submitting Score...'}</span>
+                        <span>{currentPerformanceData.hasScore ? 'Updating Score...' : 'Submitting Score...'}</span>
                       </div>
                     ) : (
-                      selectedPerformance.hasScore ? 'Update Score' : 'Submit Score'
+                      currentPerformanceData.hasScore ? 'Update Score' : 'Submit Score'
                     )}
                   </button>
                 </div>
@@ -586,7 +793,36 @@ export default function JudgeDashboard() {
           </div>
         )}
 
-        {/* Regional Assignment Overview */}
+        {/* Tab Navigation */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl mb-8 border border-purple-100">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('regional')}
+              className={`flex-1 px-6 py-4 text-center font-semibold rounded-tl-2xl transition-all ${
+                activeTab === 'regional'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white'
+                  : 'text-gray-700 hover:bg-purple-50'
+              }`}
+            >
+              🏆 Regional Events ({assignments.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('nationals')}
+              className={`flex-1 px-6 py-4 text-center font-semibold rounded-tr-2xl transition-all ${
+                activeTab === 'nationals'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white'
+                  : 'text-gray-700 hover:bg-purple-50'
+              }`}
+            >
+              🏅 Nationals Events ({nationalsAssignments.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Regional Tab Content */}
+        {activeTab === 'regional' && (
+          <>
+            {/* Regional Assignment Overview */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-purple-100">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
@@ -865,6 +1101,211 @@ export default function JudgeDashboard() {
             )}
           </div>
         </div>
+        )}
+          </>
+        )}
+
+        {/* Nationals Tab Content */}
+        {activeTab === 'nationals' && (
+          <>
+            {/* Nationals Assignment Overview */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-purple-100">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white">🏅</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Your Nationals Assignments</h2>
+              </div>
+
+              {nationalsAssignments.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {nationalsAssignments.map((assignment) => (
+                    <div key={assignment.nationalsEventId} className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-4">
+                      <h3 className="font-bold text-gray-900 mb-2">{assignment.event.name}</h3>
+                      <p className="text-sm text-gray-700 mb-1">📅 {new Date(assignment.event.eventDate).toLocaleDateString()}</p>
+                      <p className="text-sm text-gray-700">📍 {assignment.event.venue}</p>
+                      <div className="mt-2">
+                        <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                          🏆 NATIONALS
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-amber-800 font-medium">No nationals assignments yet.</p>
+                  <p className="text-amber-700 text-sm">Please contact an administrator to get assigned to nationals events.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Nationals Performances to Judge */}
+            {nationalsAssignments.length > 0 && (
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-100">
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 px-6 py-4 border-b border-yellow-100">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg flex items-center justify-center">
+                        <span className="text-white">🏅</span>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-gray-900">Nationals Competition Program</h2>
+                        <p className="text-sm text-gray-700 font-medium">
+                          Progress: {filteredNationalsPerformances.filter(p => p.hasScore).length}/{filteredNationalsPerformances.length} completed • Item-ordered program
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  {/* Filter and Search Controls for Nationals */}
+                  <div className="flex flex-col lg:flex-row gap-4 mb-6">
+                    {/* Filter Options */}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setFilterStatus('all')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          filterStatus === 'all' 
+                            ? 'bg-purple-600 text-white' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        All ({filteredNationalsPerformances.length})
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('not_scored')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          filterStatus === 'not_scored' 
+                            ? 'bg-orange-600 text-white' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Not Scored ({filteredNationalsPerformances.filter(p => !p.hasScore).length})
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('scored')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          filterStatus === 'scored' 
+                            ? 'bg-green-600 text-white' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Scored ({filteredNationalsPerformances.filter(p => p.hasScore).length})
+                      </button>
+                    </div>
+
+                    {/* Search Inputs */}
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                      <div className="flex-1 md:w-48">
+                        <input 
+                          type="text"
+                          placeholder="Search by name, item..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full px-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm font-medium text-gray-900 bg-white"
+                        />
+                      </div>
+                      <div className="flex-1 md:w-32">
+                        <input 
+                          type="number"
+                          placeholder="Item #"
+                          value={itemNumberSearch}
+                          onChange={(e) => setItemNumberSearch(e.target.value)}
+                          onKeyPress={handleItemNumberSearchKeyPress}
+                          className="w-full px-4 py-2 border-2 border-yellow-400 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm font-bold text-gray-900 bg-white"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const itemNum = parseInt(itemNumberSearch);
+                          if (!isNaN(itemNum)) {
+                            loadPerformanceByItemNumber(itemNum);
+                          }
+                        }}
+                        disabled={!itemNumberSearch || isNaN(parseInt(itemNumberSearch))}
+                        className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg hover:from-yellow-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                      >
+                        Load
+                      </button>
+                    </div>
+                  </div>
+
+                  {filteredNationalsPerformances.length > 0 ? (
+                    <div className="grid gap-4 mb-6">
+                      {filteredNationalsPerformances.map((performance) => (
+                        <div key={performance.id} className={`bg-gradient-to-r rounded-xl p-6 border-2 hover:shadow-lg transition-all ${
+                          performance.hasScore 
+                            ? 'from-green-50 to-emerald-50 border-green-200' 
+                            : 'from-white to-yellow-50 border-yellow-200'
+                        }`}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-3">
+                                {performance.itemNumber && (
+                                  <span className="px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-600 text-white text-sm font-bold rounded-full">
+                                    #{performance.itemNumber}
+                                  </span>
+                                )}
+                                <h3 className="text-lg font-bold text-gray-900">{performance.itemName}</h3>
+                                <div className="flex space-x-2">
+                                  <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800">
+                                    🏆 NATIONALS
+                                  </span>
+                                  {performance.hasScore && (
+                                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800">
+                                      SCORED
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600 mb-4">
+                                <div><strong>Contestant:</strong> {performance.contestantName}</div>
+                                <div><strong>Duration:</strong> {performance.duration} minutes</div>
+                                <div><strong>Style:</strong> {performance.itemStyle}</div>
+                                <div><strong>Mastery:</strong> {performance.mastery}</div>
+                                <div><strong>Performance Type:</strong> {performance.performanceType}</div>
+                                <div><strong>Age Category:</strong> {performance.ageCategory}</div>
+                              </div>
+                              <div className="mb-3">
+                                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-medium">
+                                  🏅 {nationalsAssignments.find(a => a.nationalsEventId === performance.nationalsEventId)?.event.name || 'Nationals Event'}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                <strong>Choreographer:</strong> {performance.choreographer}
+                              </div>
+                            </div>
+                            <div className="ml-6">
+                              <button
+                                onClick={() => handleStartNationalsScoring(performance)}
+                                className={`px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 ${
+                                  performance.hasScore
+                                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700'
+                                    : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white hover:from-yellow-600 hover:to-orange-700'
+                                }`}
+                              >
+                                {performance.hasScore ? 'Update Score' : 'Start Scoring'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span className="text-3xl">🏅</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">No Nationals Performances Yet</h3>
+                      <p className="text-gray-600">Nationals performances will appear here once entries are approved and ready for judging.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

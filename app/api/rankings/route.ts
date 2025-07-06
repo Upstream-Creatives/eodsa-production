@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initializeDatabase } from '@/lib/database';
+import { db, unifiedDb, initializeDatabase } from '@/lib/database';
 
 // Initialize database on first request
 let dbInitialized = false;
@@ -20,11 +20,17 @@ export async function GET(request: NextRequest) {
     const ageCategory = searchParams.get('ageCategory') || undefined;
     const performanceType = searchParams.get('performanceType') || undefined;
     const eventIds = searchParams.get('eventIds');
+    const type = searchParams.get('type') || 'regional'; // 'regional' or 'nationals'
     
     // If specific event IDs are requested, pass them to the calculation
     const selectedEventIds = eventIds ? eventIds.split(',') : undefined;
     
-    const rankings = await db.calculateRankings(region, ageCategory, performanceType, selectedEventIds);
+    let rankings;
+    if (type === 'nationals') {
+      rankings = await unifiedDb.calculateNationalsRankings(selectedEventIds);
+    } else {
+      rankings = await db.calculateRankings(region, ageCategory, performanceType, selectedEventIds);
+    }
     
     return NextResponse.json(rankings);
   } catch (error) {
@@ -41,14 +47,22 @@ export async function POST(request: NextRequest) {
   try {
     await ensureDbInitialized();
     
-    const { action } = await request.json();
+    const { action, type } = await request.json();
     
     if (action === 'getEventsWithScores') {
-      const eventsWithScores = await db.getEventsWithScores();
-      return NextResponse.json({
-        success: true,
-        events: eventsWithScores
-      });
+      if (type === 'nationals') {
+        const eventsWithScores = await unifiedDb.getNationalsEventsWithScores();
+        return NextResponse.json({
+          success: true,
+          events: eventsWithScores
+        });
+      } else {
+        const eventsWithScores = await db.getEventsWithScores();
+        return NextResponse.json({
+          success: true,
+          events: eventsWithScores
+        });
+      }
     }
     
     return NextResponse.json(
