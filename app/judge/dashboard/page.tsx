@@ -414,10 +414,18 @@ export default function JudgeDashboard() {
             {/* Performance Details */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
+                <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     {selectedPerformance.title}
                   </h3>
+                  
+                  {/* Solo indicator for multiple solos */}
+                  {selectedPerformance.title.includes('(Solo ') && (
+                    <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 mb-3">
+                      🎵 Multiple Solo Performance
+                    </div>
+                  )}
+                  
                   <div className="space-y-2 text-sm text-gray-600">
                     <p><span className="font-medium">Contestant:</span> {selectedPerformance.contestantName}</p>
                     <p><span className="font-medium">Participants:</span> {selectedPerformance.participantNames.join(', ')}</p>
@@ -425,8 +433,8 @@ export default function JudgeDashboard() {
                       <p><span className="font-medium">Choreographer:</span> {selectedPerformance.choreographer}</p>
                     )}
                   </div>
-                      </div>
-                      <div>
+                </div>
+                <div>
                   <div className="text-sm text-gray-600 space-y-2">
                     {selectedPerformance.itemNumber && (
                       <p><span className="font-medium">Item #:</span> {selectedPerformance.itemNumber}</p>
@@ -438,6 +446,18 @@ export default function JudgeDashboard() {
                       <p><span className="font-medium">Mastery:</span> {selectedPerformance.mastery}</p>
                     )}
                     <p><span className="font-medium">Duration:</span> {selectedPerformance.duration} minutes</p>
+                    
+                    {/* Solo number extraction for multiple solos */}
+                    {selectedPerformance.title.includes('(Solo ') && (
+                      <div className="mt-3 p-2 bg-purple-50 rounded-lg">
+                        <p className="font-medium text-purple-800">
+                          {selectedPerformance.title.match(/\(Solo (\d+)\)/)?.[0] || 'Solo Performance'}
+                        </p>
+                        <p className="text-xs text-purple-600 mt-1">
+                          This is part of a multiple solo entry
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -695,49 +715,97 @@ export default function JudgeDashboard() {
               {filteredPerformances.length > 0 ? (
                 <>
                   <div className="grid grid-cols-1 gap-6">
-                    {currentPerformances.map((performance) => (
-                      <div key={performance.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold">
-                              {performance.itemNumber || '?'}
+                    {currentPerformances.map((performance) => {
+                      // Check if this is part of a multiple solo performance
+                      const isMultipleSolo = performance.title.includes('(Solo ');
+                      const soloMatch = performance.title.match(/\(Solo (\d+)\)/);
+                      const soloNumber = soloMatch ? soloMatch[1] : null;
+                      
+                      // Count how many solos this contestant has in total
+                      const sameContestantSolos = filteredPerformances.filter(p => 
+                        p.contestantName === performance.contestantName && 
+                        p.title.includes('(Solo ')
+                      ).length;
+                      
+                      return (
+                        <div 
+                          key={performance.id} 
+                          className={`border rounded-xl p-6 hover:shadow-lg transition-shadow ${
+                            isMultipleSolo 
+                              ? 'border-purple-200 bg-gradient-to-r from-purple-50/50 to-pink-50/50' 
+                              : 'border-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-4">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${
+                                isMultipleSolo 
+                                  ? 'bg-gradient-to-br from-purple-500 to-pink-600' 
+                                  : 'bg-gradient-to-br from-purple-500 to-pink-600'
+                              }`}>
+                                {performance.itemNumber || '?'}
                               </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-lg font-semibold text-gray-900">
+                                    {isMultipleSolo 
+                                      ? performance.title.replace(/ \(Solo \d+\)/, '') 
+                                      : performance.title
+                                    }
+                                  </h3>
+                                  {isMultipleSolo && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                      Solo {soloNumber}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600">{performance.contestantName}</p>
+                                {isMultipleSolo && sameContestantSolos > 1 && (
+                                  <p className="text-xs text-purple-600 font-medium">
+                                    Part of {sameContestantSolos} solo performance set
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              {performance.hasScore ? (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                  ✓ Scored
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                                  ⏳ Pending
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handleStartScoring(performance)}
+                                className={`px-4 py-2 text-white rounded-lg font-medium transition-all duration-200 ${
+                                  isMultipleSolo
+                                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
+                                    : 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
+                                }`}
+                              >
+                                {performance.hasScore ? 'Update Score' : 'Score Performance'}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
                             <div>
-                              <h3 className="text-lg font-semibold text-gray-900">{performance.title}</h3>
-                              <p className="text-sm text-gray-600">{performance.contestantName}</p>
+                              <span className="font-medium">Participants:</span> {performance.participantNames.join(', ')}
                             </div>
+                            <div>
+                              <span className="font-medium">Duration:</span> {performance.duration} minutes
                             </div>
-                          <div className="flex items-center space-x-4">
-                            {performance.hasScore ? (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                ✓ Scored
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                                ⏳ Pending
-                              </span>
-                            )}
-                            <button
-                              onClick={() => handleStartScoring(performance)}
-                              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-200 font-medium"
-                            >
-                              {performance.hasScore ? 'Update Score' : 'Score Performance'}
-                            </button>
+                            <div>
+                              <span className="font-medium">Status:</span> {performance.isFullyScored ? 'Fully Scored' : 'In Progress'}
+                              {isMultipleSolo && (
+                                <span className="ml-2 text-purple-600">• Multi-Solo</span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                          <div>
-                            <span className="font-medium">Participants:</span> {performance.participantNames.join(', ')}
-                          </div>
-                          <div>
-                            <span className="font-medium">Duration:</span> {performance.duration} minutes
-                          </div>
-                          <div>
-                            <span className="font-medium">Status:</span> {performance.isFullyScored ? 'Fully Scored' : 'In Progress'}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Pagination */}

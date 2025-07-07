@@ -56,6 +56,15 @@ interface EventEntryForm {
   mastery: string;
   itemStyle: string;
   estimatedDuration: string;
+  // Multiple solos support for nationals
+  soloCount: number;
+  solos: Array<{
+    itemName: string;
+    choreographer: string;
+    mastery: string;
+    itemStyle: string;
+    estimatedDuration: string;
+  }>;
 }
 
 interface FeeBreakdown {
@@ -100,7 +109,15 @@ export default function PerformanceTypeEntryPage() {
     choreographer: '',
     mastery: '',
     itemStyle: '',
-    estimatedDuration: ''
+    estimatedDuration: '',
+    soloCount: performanceType?.toLowerCase() === 'solo' ? 1 : 0,
+    solos: performanceType?.toLowerCase() === 'solo' ? [{
+      itemName: '',
+      choreographer: '',
+      mastery: '',
+      itemStyle: '',
+      estimatedDuration: ''
+    }] : []
   });
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -198,64 +215,93 @@ export default function PerformanceTypeEntryPage() {
 
   useEffect(() => {
     if (formData.eventId && formData.mastery && formData.participantIds.length > 0) {
-      // Use smart fee calculation with dancer registration status
       calculateSmartFee();
     }
-  }, [formData.eventId, formData.mastery, formData.participantIds.length, performanceType]);
+  }, [formData.eventId, formData.mastery, formData.participantIds, formData.soloCount]);
+
+  // Initialize solo count for existing solo events
+  useEffect(() => {
+    if (performanceType?.toLowerCase() === 'solo' && formData.soloCount === 0) {
+      updateSoloCount(1);
+    }
+  }, [performanceType]);
 
   const calculateSmartFee = async () => {
-    if (!formData.mastery || formData.participantIds.length === 0) return;
+    if (!formData.eventId || !formData.mastery || formData.participantIds.length === 0) {
+      setFeeBreakdown(null);
+      return;
+    }
 
     try {
-      // Get dancer registration status for smart fee calculation
-      const response = await fetch('/api/dancers/registration-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dancerIds: formData.participantIds })
-      });
+      const capitalizedPerformanceType = getCapitalizedPerformanceType(performanceType);
+      
+      // For solo performances, use nationals fee calculation with solo count
+      if (capitalizedPerformanceType === 'Solo' && region?.toLowerCase() === 'nationals') {
+        const response = await fetch('/api/nationals/calculate-fee', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            performanceType: 'Solo',
+            soloCount: formData.soloCount || 1,
+            participantCount: formData.participantIds.length,
+            participantIds: formData.participantIds
+          }),
+        });
 
-      if (response.ok) {
-        const { dancers } = await response.json();
-        
-        // Use EODSA fee calculation with dancer data for smart registration fee handling
-      const feeBreakdownResult = calculateEODSAFee(
-        formData.mastery,
-        getCapitalizedPerformanceType(performanceType),
-        formData.participantIds.length,
-        {
-            soloCount: 1,
-            includeRegistration: true,
-            participantDancers: dancers
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setFeeBreakdown({
+              registrationFee: data.feeBreakdown.registrationFee,
+              performanceFee: data.feeBreakdown.performanceFee,
+              totalFee: data.feeBreakdown.totalFee,
+              breakdown: `${formData.soloCount} Solo${formData.soloCount > 1 ? 's' : ''}`,
+              registrationBreakdown: `Registration (${data.feeBreakdown.participantsNeedingRegistration} dancer${data.feeBreakdown.participantsNeedingRegistration > 1 ? 's' : ''})`
+            });
           }
-        );
-        
-        setFeeBreakdown(feeBreakdownResult);
-        console.log('💰 Smart Fee Calculation:', feeBreakdownResult);
+        } else {
+          // Fallback to EODSA calculation
+          const feeBreakdownResult = calculateEODSAFee(
+            formData.mastery,
+            capitalizedPerformanceType,
+            formData.participantIds.length,
+            {
+              soloCount: formData.soloCount || 1,
+              includeRegistration: true
+            }
+          );
+
+          setFeeBreakdown(feeBreakdownResult);
+        }
       } else {
-        // Fallback to simple calculation if API fails
+        // Use EODSA fee calculation for non-solo or non-nationals events
         const feeBreakdownResult = calculateEODSAFee(
           formData.mastery,
-          getCapitalizedPerformanceType(performanceType),
+          capitalizedPerformanceType,
           formData.participantIds.length,
           {
             soloCount: 1,
-          includeRegistration: true
-        }
-      );
-      setFeeBreakdown(feeBreakdownResult);
-    }
+            includeRegistration: true
+          }
+        );
+
+        setFeeBreakdown(feeBreakdownResult);
+      }
     } catch (error) {
-      console.error('Fee calculation error:', error);
-      // Fallback to simple calculation
+      console.error('Error calculating fee:', error);
+      // Fallback to standard EODSA calculation
       const feeBreakdownResult = calculateEODSAFee(
         formData.mastery,
         getCapitalizedPerformanceType(performanceType),
         formData.participantIds.length,
         {
-          soloCount: 1,
+          soloCount: formData.soloCount || 1,
           includeRegistration: true
         }
       );
+
       setFeeBreakdown(feeBreakdownResult);
     }
   };
@@ -719,6 +765,66 @@ export default function PerformanceTypeEntryPage() {
     return maxDuration > 0 ? durationMinutes <= maxDuration : true;
   };
 
+  // Helper function to update solo count and manage solo array
+  const updateSoloCount = (count: number) => {
+    const currentSolos = [...formData.solos];
+    
+    if (count > currentSolos.length) {
+      // Add new empty solos
+      for (let i = currentSolos.length; i < count; i++) {
+        currentSolos.push({
+          itemName: '',
+          choreographer: '',
+          mastery: '',
+          itemStyle: '',
+          estimatedDuration: ''
+        });
+      }
+    } else if (count < currentSolos.length) {
+      // Remove excess solos
+      currentSolos.splice(count);
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      soloCount: count,
+      solos: currentSolos,
+      // Update main fields with first solo if exists
+      itemName: currentSolos[0]?.itemName || '',
+      choreographer: currentSolos[0]?.choreographer || '',
+      mastery: currentSolos[0]?.mastery || '',
+      itemStyle: currentSolos[0]?.itemStyle || '',
+      estimatedDuration: currentSolos[0]?.estimatedDuration || ''
+    }));
+  };
+
+  // Helper function to update a specific solo's field
+  const updateSoloField = (soloIndex: number, field: string, value: string) => {
+    const updatedSolos = [...formData.solos];
+    if (updatedSolos[soloIndex]) {
+      updatedSolos[soloIndex] = {
+        ...updatedSolos[soloIndex],
+        [field]: value
+      };
+      
+      const updatedFormData = {
+        ...formData,
+        solos: updatedSolos
+      };
+      
+      // Keep main fields in sync with first solo
+      if (soloIndex === 0) {
+        updatedFormData.itemName = updatedSolos[0].itemName;
+        updatedFormData.choreographer = updatedSolos[0].choreographer;
+        updatedFormData.mastery = updatedSolos[0].mastery;
+        updatedFormData.itemStyle = updatedSolos[0].itemStyle;
+        updatedFormData.estimatedDuration = updatedSolos[0].estimatedDuration;
+      }
+      
+      setFormData(updatedFormData);
+    }
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     
@@ -727,6 +833,22 @@ export default function PerformanceTypeEntryPage() {
       
       if (formData.participantIds.length < limits.min) {
         showAlert(`${performanceType} requires at least ${limits.min} participant(s)`, 'warning');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate multiple solos for nationals
+      if (performanceType?.toLowerCase() === 'solo' && region?.toLowerCase() === 'nationals') {
+        for (let i = 0; i < formData.solos.length; i++) {
+          const solo = formData.solos[i];
+          if (!solo.itemName || !solo.choreographer || !solo.mastery || !solo.itemStyle) {
+            showAlert(`Please fill in all required fields for Solo ${i + 1}`, 'warning');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      } else if (!formData.itemName || !formData.choreographer || !formData.mastery || !formData.itemStyle) {
+        showAlert('Please fill in all required fields', 'warning');
         setIsSubmitting(false);
         return;
       }
@@ -761,16 +883,42 @@ export default function PerformanceTypeEntryPage() {
         }
       }
 
-      // Calculate EODSA fee correctly
-      const feeBreakdownResult = calculateEODSAFee(
-        formData.mastery,
-        getCapitalizedPerformanceType(performanceType),
-        formData.participantIds.length,
-        {
-          soloCount: 1,
-          includeRegistration: true
+      // Calculate fee correctly
+      let totalFee = 0;
+      if (performanceType?.toLowerCase() === 'solo' && region?.toLowerCase() === 'nationals') {
+        // Use nationals fee calculation for solos
+        const feeResponse = await fetch('/api/nationals/calculate-fee', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            performanceType: 'Solo',
+            soloCount: formData.soloCount,
+            participantCount: formData.participantIds.length,
+            participantIds: formData.participantIds
+          }),
+        });
+
+        if (feeResponse.ok) {
+          const feeData = await feeResponse.json();
+          totalFee = feeData.feeBreakdown.totalFee;
+        } else {
+          totalFee = feeBreakdown?.totalFee || 0;
         }
-      );
+      } else {
+        // Use EODSA fee calculation for non-solo or non-nationals events
+        const feeBreakdownResult = calculateEODSAFee(
+          formData.mastery,
+          getCapitalizedPerformanceType(performanceType),
+          formData.participantIds.length,
+          {
+            soloCount: 1,
+            includeRegistration: true
+          }
+        );
+        totalFee = feeBreakdownResult.totalFee;
+      }
 
       // For group entries without initial EODSA ID, use the first participant's EODSA ID
       let finalEodsaId = eodsaId;
@@ -801,37 +949,86 @@ export default function PerformanceTypeEntryPage() {
         }
       }
 
-      const eventEntryData = {
-        eventId: formData.eventId,
-        contestantId: finalContestantId,
-        eodsaId: finalEodsaId,
-        participantIds: formData.participantIds,
-        calculatedFee: feeBreakdownResult.totalFee,
-        paymentStatus: 'pending',
-        paymentMethod: 'invoice', // Phase 1: Invoice-based payment
-        approved: false,
-        itemName: formData.itemName,
-        choreographer: formData.choreographer,
-        mastery: formData.mastery,
-        itemStyle: formData.itemStyle,
-        estimatedDuration: convertDurationToMinutes(formData.estimatedDuration)
-      };
+      // Prepare entry data - use nationals API for solo nationals, regular API for others
+      if (performanceType?.toLowerCase() === 'solo' && region?.toLowerCase() === 'nationals') {
+        // Submit to nationals API
+        const nationalsEntryData = {
+          nationalsEventId: formData.eventId,
+          contestantId: finalContestantId,
+          eodsaId: finalEodsaId,
+          participantIds: formData.participantIds,
+          calculatedFee: totalFee,
+          paymentStatus: 'pending',
+          paymentMethod: 'invoice',
+          approved: false,
+          qualifiedForNationals: true,
+          itemName: formData.solos[0]?.itemName || formData.itemName,
+          choreographer: formData.solos[0]?.choreographer || formData.choreographer,
+          mastery: formData.solos[0]?.mastery || formData.mastery,
+          itemStyle: formData.solos[0]?.itemStyle || formData.itemStyle,
+          estimatedDuration: convertDurationToMinutes(formData.solos[0]?.estimatedDuration || formData.estimatedDuration),
+          performanceType: 'Solo',
+          ageCategory: formData.ageCategory,
+          soloCount: formData.soloCount,
+          soloDetails: formData.solos.map((solo, index) => ({
+            soloNumber: index + 1,
+            itemName: solo.itemName,
+            choreographer: solo.choreographer,
+            mastery: solo.mastery,
+            itemStyle: solo.itemStyle,
+            estimatedDuration: convertDurationToMinutes(solo.estimatedDuration)
+          })),
+          additionalNotes: `Nationals entry with ${formData.soloCount} solo${formData.soloCount > 1 ? 's' : ''}`
+        };
 
-      const response = await fetch('/api/event-entries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(eventEntryData),
-      });
+        const response = await fetch('/api/nationals/entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(nationalsEntryData),
+        });
 
-      if (response.ok) {
-        // Entry successful - registration fees will be marked as paid by admin after verification
-        console.log('✅ Event entry submitted successfully - awaiting admin approval for payment processing');
-        setSubmitted(true);
+        if (response.ok) {
+          console.log('✅ Nationals entry submitted successfully');
+          setSubmitted(true);
+        } else {
+          const error = await response.json();
+          showAlert(`Nationals entry failed: ${error.error}`, 'error');
+        }
       } else {
-        const error = await response.json();
-        showAlert(`Entry failed: ${error.error}`, 'error');
+        // Submit to regular event-entries API
+        const eventEntryData = {
+          eventId: formData.eventId,
+          contestantId: finalContestantId,
+          eodsaId: finalEodsaId,
+          participantIds: formData.participantIds,
+          calculatedFee: totalFee,
+          paymentStatus: 'pending',
+          paymentMethod: 'invoice',
+          approved: false,
+          itemName: formData.itemName,
+          choreographer: formData.choreographer,
+          mastery: formData.mastery,
+          itemStyle: formData.itemStyle,
+          estimatedDuration: convertDurationToMinutes(formData.estimatedDuration)
+        };
+
+        const response = await fetch('/api/event-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(eventEntryData),
+        });
+
+        if (response.ok) {
+          console.log('✅ Event entry submitted successfully');
+          setSubmitted(true);
+        } else {
+          const error = await response.json();
+          showAlert(`Entry failed: ${error.error}`, 'error');
+        }
       }
     } catch (error) {
       console.error('Entry error:', error);
@@ -1239,141 +1436,269 @@ export default function PerformanceTypeEntryPage() {
 
                 {/* Performance Information */}
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Item Name *</label>
-                    <input
-                      type="text"
-                      name="itemName"
-                      value={formData.itemName}
-                      onChange={handleInputChange}
-                      placeholder="Name of your performance piece"
-                      className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Choreographer *</label>
-                    <input
-                      type="text"
-                      name="choreographer"
-                      value={formData.choreographer}
-                      onChange={handleInputChange}
-                      placeholder="Name of the choreographer"
-                      className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Mastery Level *</label>
-                      <select
-                        name="mastery"
-                        value={formData.mastery}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
-                        required
-                      >
-                        <option value="">Select mastery level</option>
-                        {MASTERY_LEVELS.map((level) => (
-                          <option key={level} value={level}>{level}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Item Style *</label>
-                      <select
-                        name="itemStyle"
-                        value={formData.itemStyle}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
-                        required
-                      >
-                        <option value="">Select item style</option>
-                        {ITEM_STYLES.map((style) => (
-                          <option key={style} value={style}>{style}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Estimated Duration (Optional) - MM:SS format
-                      <span className="text-xs text-gray-400 block mt-1">Leave blank if unknown. Min: 30 seconds if provided.</span>
-                    </label>
-                    
-                    {/* Time Limit Information */}
-                    <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mb-4">
-                      <div className="flex items-center mb-2">
-                        <svg className="w-5 h-5 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  {/* Solo Count Selector - Only for Solo performances in Nationals */}
+                  {performanceType?.toLowerCase() === 'solo' && region?.toLowerCase() === 'nationals' && (
+                    <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6">
+                      <div className="flex items-center mb-3">
+                        <svg className="w-5 h-5 text-purple-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l6-6v13M9 19a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2h2M9 19a2 2 0 002 2h2a2 2 0 002-2V9a2 2 0 00-2-2H9" />
                         </svg>
-                        <span className="text-yellow-300 font-semibold">EODSA Max Time Limits</span>
+                        <span className="text-purple-300 font-semibold">Number of Solos</span>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                        <div className="bg-yellow-900/30 p-2 rounded">
-                          <div className="text-yellow-200 font-medium">Solos</div>
-                          <div className="text-yellow-100 text-lg">2:00 mins</div>
-                        </div>
-                        <div className="bg-yellow-900/30 p-2 rounded">
-                          <div className="text-yellow-200 font-medium">Duos/Trios</div>
-                          <div className="text-yellow-100 text-lg">3:00 mins</div>
-                        </div>
-                        <div className="bg-yellow-900/30 p-2 rounded">
-                          <div className="text-yellow-200 font-medium">Groups</div>
-                          <div className="text-yellow-100 text-lg">3:30 mins</div>
-                        </div>
+                      
+                      <select
+                        value={formData.soloCount}
+                        onChange={(e) => updateSoloCount(parseInt(e.target.value))}
+                        className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(count => (
+                          <option key={count} value={count}>
+                            {count} Solo{count > 1 ? 's' : ''} 
+                            {count === 1 && ' - R400'}
+                            {count === 2 && ' - R750 (Package)'}
+                            {count === 3 && ' - R1000 (Package)'}
+                            {count === 4 && ' - R1200 (Package)'}
+                            {count === 5 && ' - R1200 (5th FREE!)'}
+                            {count > 5 && ` - R${1200 + (count - 5) * 100} (Additional)`}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      <div className="mt-3 text-sm text-purple-200">
+                        💡 <strong>Solo Package Pricing:</strong> 2 solos R750, 3 solos R1000, 4 solos R1200, 5th solo FREE, additional solos R100 each
                       </div>
-                                             <div className="mt-3 p-2 bg-yellow-900/40 rounded text-center">
-                         <span className="text-yellow-100 font-bold">
-                           Your {performanceType} limit: {getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`} minutes
-                         </span>
-                       </div>
                     </div>
+                  )}
 
-                    <input
-                      type="text"
-                      name="estimatedDuration"
-                      value={formData.estimatedDuration}
-                      onChange={handleInputChange}
-                      placeholder={`e.g., 2:30 (Min: 0:30, Max: ${getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`})`}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 text-white placeholder-gray-400 transition-all ${
-                        validateDuration(formData.estimatedDuration) 
-                          ? 'border-gray-600 bg-gray-700 focus:ring-purple-500 focus:border-purple-500' 
-                          : 'border-red-500 bg-red-900/30 focus:ring-red-500 focus:border-red-500'
-                      }`}
-                      pattern="[0-9]{1,2}:[0-5][0-9]"
-                      title="Enter duration in MM:SS format (e.g., 2:30) - Minimum 30 seconds"
-                    />
-                    
-                    {/* Validation Messages */}
-                    {!validateDuration(formData.estimatedDuration) && convertDurationToMinutes(formData.estimatedDuration) > 0 && (
-                      <div className="mt-3 p-3 bg-red-900/30 border border-red-500/40 rounded-lg">
-                        <p className="text-red-300 text-sm font-medium flex items-center">
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  {/* Solo Forms - Dynamic based on solo count */}
+                  {performanceType?.toLowerCase() === 'solo' && region?.toLowerCase() === 'nationals' ? (
+                    formData.solos.map((solo, index) => (
+                      <div key={index} className="bg-gray-800/50 border border-gray-600/50 rounded-xl p-6 mb-4">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                          <span className="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">
+                            {index + 1}
+                          </span>
+                          Solo {index + 1}
+                          {index === 4 && <span className="ml-2 text-green-400 text-sm font-medium">(FREE!)</span>}
+                          {index > 4 && <span className="ml-2 text-yellow-400 text-sm font-medium">(+R100)</span>}
+                        </h3>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Item Name *</label>
+                            <input
+                              type="text"
+                              value={solo.itemName}
+                              onChange={(e) => updateSoloField(index, 'itemName', e.target.value)}
+                              placeholder="Name of your performance piece"
+                              className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Choreographer *</label>
+                            <input
+                              type="text"
+                              value={solo.choreographer}
+                              onChange={(e) => updateSoloField(index, 'choreographer', e.target.value)}
+                              placeholder="Name of the choreographer"
+                              className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
+                              required
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-2">Mastery Level *</label>
+                              <select
+                                value={solo.mastery}
+                                onChange={(e) => updateSoloField(index, 'mastery', e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                                required
+                              >
+                                <option value="">Select mastery level</option>
+                                {MASTERY_LEVELS.map((level) => (
+                                  <option key={level} value={level}>{level}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-2">Item Style *</label>
+                              <select
+                                value={solo.itemStyle}
+                                onChange={(e) => updateSoloField(index, 'itemStyle', e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                                required
+                              >
+                                <option value="">Select item style</option>
+                                {ITEM_STYLES.map((style) => (
+                                  <option key={style} value={style}>{style}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Estimated Duration (Optional) - MM:SS format
+                              <span className="text-xs text-gray-400 block mt-1">Max: 2:00 minutes for solos</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={solo.estimatedDuration}
+                              onChange={(e) => updateSoloField(index, 'estimatedDuration', e.target.value)}
+                              placeholder="e.g., 1:45"
+                              className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    // Single performance form for non-solo or non-nationals
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Item Name *</label>
+                        <input
+                          type="text"
+                          name="itemName"
+                          value={formData.itemName}
+                          onChange={handleInputChange}
+                          placeholder="Name of your performance piece"
+                          className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Choreographer *</label>
+                        <input
+                          type="text"
+                          name="choreographer"
+                          value={formData.choreographer}
+                          onChange={handleInputChange}
+                          placeholder="Name of the choreographer"
+                          className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">Mastery Level *</label>
+                          <select
+                            name="mastery"
+                            value={formData.mastery}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                            required
+                          >
+                            <option value="">Select mastery level</option>
+                            {MASTERY_LEVELS.map((level) => (
+                              <option key={level} value={level}>{level}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">Item Style *</label>
+                          <select
+                            name="itemStyle"
+                            value={formData.itemStyle}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                            required
+                          >
+                            <option value="">Select item style</option>
+                            {ITEM_STYLES.map((style) => (
+                              <option key={style} value={style}>{style}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Duration field for non-solo performances */}
+                  {!(performanceType?.toLowerCase() === 'solo' && region?.toLowerCase() === 'nationals') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Estimated Duration (Optional) - MM:SS format
+                        <span className="text-xs text-gray-400 block mt-1">Leave blank if unknown. Min: 30 seconds if provided.</span>
+                      </label>
+                      
+                      {/* Time Limit Information */}
+                      <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mb-4">
+                        <div className="flex items-center mb-2">
+                          <svg className="w-5 h-5 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          {convertDurationToMinutes(formData.estimatedDuration) < 0.5 ? 'Duration too short!' : 'Duration too long!'}
-                        </p>
-                        <p className="text-red-200 text-sm mt-1">
-                          <strong>{performanceType} performances</strong> must be between <strong>0:30</strong> and <strong>{getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`} minutes</strong>.
-                          <br />Your current duration: <strong>{formData.estimatedDuration}</strong>
-                        </p>
+                          <span className="text-yellow-300 font-semibold">EODSA Max Time Limits</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                          <div className="bg-yellow-900/30 p-2 rounded">
+                            <div className="text-yellow-200 font-medium">Solos</div>
+                            <div className="text-yellow-100 text-lg">2:00 mins</div>
+                          </div>
+                          <div className="bg-yellow-900/30 p-2 rounded">
+                            <div className="text-yellow-200 font-medium">Duos/Trios</div>
+                            <div className="text-yellow-100 text-lg">3:00 mins</div>
+                          </div>
+                          <div className="bg-yellow-900/30 p-2 rounded">
+                            <div className="text-yellow-200 font-medium">Groups</div>
+                            <div className="text-yellow-100 text-lg">3:30 mins</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 p-2 bg-yellow-900/40 rounded text-center">
+                          <span className="text-yellow-100 font-bold">
+                            Your {performanceType} limit: {getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`} minutes
+                          </span>
+                        </div>
                       </div>
-                    )}
-                    
-                    {validateDuration(formData.estimatedDuration) && convertDurationToMinutes(formData.estimatedDuration) > 0 && (
-                      <p className="text-green-400 text-sm mt-2 flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                                                 Perfect! Duration is within the {getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`} minute limit
-                      </p>
-                    )}
-                  </div>
+
+                      <input
+                        type="text"
+                        name="estimatedDuration"
+                        value={formData.estimatedDuration}
+                        onChange={handleInputChange}
+                        placeholder={`e.g., 2:30 (Min: 0:30, Max: ${getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`})`}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 text-white placeholder-gray-400 transition-all ${
+                          validateDuration(formData.estimatedDuration) 
+                            ? 'border-gray-600 bg-gray-700 focus:ring-purple-500 focus:border-purple-500' 
+                            : 'border-red-500 bg-red-900/30 focus:ring-red-500 focus:border-red-500'
+                        }`}
+                        pattern="[0-9]{1,2}:[0-5][0-9]"
+                        title="Enter duration in MM:SS format (e.g., 2:30) - Minimum 30 seconds"
+                      />
+                      
+                      {/* Validation Messages */}
+                      {!validateDuration(formData.estimatedDuration) && convertDurationToMinutes(formData.estimatedDuration) > 0 && (
+                        <div className="mt-3 p-3 bg-red-900/30 border border-red-500/40 rounded-lg">
+                          <p className="text-red-300 text-sm font-medium flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {convertDurationToMinutes(formData.estimatedDuration) < 0.5 ? 'Duration too short!' : 'Duration too long!'}
+                          </p>
+                          <p className="text-red-200 text-sm mt-1">
+                            <strong>{performanceType} performances</strong> must be between <strong>0:30</strong> and <strong>{getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`} minutes</strong>.
+                            <br />Your current duration: <strong>{formData.estimatedDuration}</strong>
+                          </p>
+                        </div>
+                      )}
+                      
+                      {validateDuration(formData.estimatedDuration) && convertDurationToMinutes(formData.estimatedDuration) > 0 && (
+                        <p className="text-green-400 text-sm mt-2 flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Perfect! Duration is within the {getTimeLimit() === 3.5 ? '3:30' : `${getTimeLimit()}:00`} minute limit
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -3885,114 +3885,6 @@ export const unifiedDb = {
     }
   },
 
-  // 🏆 NATIONALS FUNCTIONS
-  
-  // Create nationals event
-  async createNationalsEvent(event: {
-    name: string;
-    description?: string;
-    eventDate: string;
-    eventEndDate?: string;
-    registrationDeadline: string;
-    venue: string;
-    maxParticipants?: number;
-    createdBy: string;
-  }) {
-    return await db.createNationalsEvent(event);
-  },
-
-  // Get all nationals events
-  async getAllNationalsEvents() {
-    return await db.getAllNationalsEvents();
-  },
-
-  // Get nationals event by ID
-  async getNationalsEventById(eventId: string) {
-    return await db.getNationalsEventById(eventId);
-  },
-
-  // Create nationals judge assignment
-  async createNationalsJudgeAssignment(assignment: {
-    judgeId: string;
-    nationalsEventId: string;
-    assignedBy: string;
-  }) {
-    return await db.createNationalsJudgeAssignment(assignment);
-  },
-
-  // Get nationals judge assignments
-  async getNationalsJudgeAssignments(judgeId: string) {
-    return await db.getNationalsJudgeAssignments(judgeId);
-  },
-
-  // Calculate nationals fee
-  async calculateNationalsFee(performanceType: string, soloCount: number = 1, participantCount: number = 1, participantIds: string[] = []) {
-    const sqlClient = getSql();
-    let registrationFee = 0;
-    let performanceFee = 0;
-    
-    // Check registration fee status for participants
-    if (participantIds.length > 0) {
-      // For groups, check each participant's registration status
-      for (const participantId of participantIds) {
-        try {
-          const registrationStatus = await this.getDancerRegistrationStatus(participantId);
-          if (!registrationStatus.registrationFeePaid) {
-            registrationFee += 300; // R300 per dancer who hasn't paid
-          }
-        } catch (error) {
-          // If dancer not found or error, assume they need to pay registration
-          registrationFee += 300;
-        }
-      }
-    } else {
-      // For single participant (solo), assume they need to pay if not specified
-      registrationFee = 300;
-    }
-    
-    // Calculate performance fees based on type
-    if (performanceType === 'Solo') {
-      // Solo fee structure - exactly as specified
-      switch (soloCount) {
-        case 1:
-          performanceFee = 400;
-          break;
-        case 2:
-          performanceFee = 750;
-          break;
-        case 3:
-          performanceFee = 1000;
-          break;
-        case 4:
-          performanceFee = 1200;
-          break;
-        case 5:
-          performanceFee = 1200; // 5th solo is FREE
-          break;
-        default:
-          // More than 5 solos: 1200 + (additional solos * 100)
-          performanceFee = 1200 + ((soloCount - 5) * 100);
-      }
-    } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      // Duos/trios - R280 per person
-      performanceFee = 280 * participantCount;
-    } else if (performanceType === 'Group') {
-      // Group pricing - determine pricing based on participant count
-      if (participantCount >= 10) {
-        performanceFee = 190 * participantCount; // Large group pricing (10+)
-      } else {
-        performanceFee = 220 * participantCount; // Small group pricing (4-9)
-      }
-    }
-    
-    return {
-      registrationFee,
-      performanceFee,
-      totalFee: registrationFee + performanceFee,
-      participantsNeedingRegistration: registrationFee / 300 // Number of participants who need to pay registration
-    };
-  },
-
   // Create nationals event entry
   async createNationalsEventEntry(entry: {
     nationalsEventId: string;
@@ -4019,17 +3911,67 @@ export const unifiedDb = {
     return await db.createNationalsEventEntry(entry);
   },
 
+  // Calculate nationals fee with solo packages
+  async calculateNationalsFee(
+    performanceType: string,
+    soloCount: number = 1,
+    participantCount: number = 1,
+    participantIds: string[] = []
+  ) {
+    const registrationFeePerDancer = 300; // R300 per dancer
+    let performanceFee = 0;
+    let participantsNeedingRegistration = participantCount;
+
+    // Calculate performance fee based on type and solo count
+    if (performanceType === 'Solo') {
+      // Solo package pricing: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE, additional R100
+      if (soloCount === 1) {
+        performanceFee = 400;
+      } else if (soloCount === 2) {
+        performanceFee = 750;
+      } else if (soloCount === 3) {
+        performanceFee = 1000;
+      } else if (soloCount === 4) {
+        performanceFee = 1200;
+      } else if (soloCount === 5) {
+        performanceFee = 1200; // 5th solo is FREE
+      } else if (soloCount > 5) {
+        performanceFee = 1200 + ((soloCount - 5) * 100); // Additional solos R100 each
+      }
+    } else if (performanceType === 'Duet' || performanceType === 'Trio') {
+      performanceFee = 280 * participantCount; // R280 per person
+    } else if (performanceType === 'Group') {
+      if (participantCount >= 4 && participantCount <= 9) {
+        performanceFee = 220 * participantCount; // Small groups R220 per person
+      } else if (participantCount >= 10) {
+        performanceFee = 190 * participantCount; // Large groups R190 per person
+      }
+    }
+
+    const registrationFee = registrationFeePerDancer * participantsNeedingRegistration;
+    const totalFee = registrationFee + performanceFee;
+
+    return {
+      registrationFee,
+      performanceFee,
+      totalFee,
+      participantsNeedingRegistration,
+      breakdown: {
+        performanceType,
+        soloCount: performanceType === 'Solo' ? soloCount : undefined,
+        participantCount,
+        registrationFeePerDancer,
+        performanceFeeStructure: performanceType === 'Solo' 
+          ? `Solo package (${soloCount} solo${soloCount > 1 ? 's' : ''})`
+          : `${performanceType} (${participantCount} participant${participantCount > 1 ? 's' : ''})`
+      }
+    };
+  },
+
   // Get all nationals event entries
   async getAllNationalsEventEntries() {
     return await db.getAllNationalsEventEntries();
   },
-
-  // Update nationals event statuses
-  async updateNationalsEventStatuses() {
-    return await db.updateNationalsEventStatuses();
-  },
-
-  // 🏆 ADDITIONAL NATIONALS HELPER FUNCTIONS
 
   // Get nationals judge assignments by event
   async getNationalsJudgeAssignmentsByEvent(eventId: string) {
@@ -4045,8 +3987,6 @@ export const unifiedDb = {
   async removeNationalsJudgeAssignment(assignmentId: string) {
     return await db.removeNationalsJudgeAssignment(assignmentId);
   },
-
-  // 🏆 NATIONALS SCORING FUNCTIONS
 
   // Create nationals score
   async createNationalsScore(score: {

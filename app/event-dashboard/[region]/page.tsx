@@ -77,9 +77,20 @@ export default function NationalsEventsPage() {
   useEffect(() => {
     if (events.length > 0) {
       const grouped = events.reduce((acc, event) => {
-        const type = event.performanceType;
-        if (!acc[type]) acc[type] = [];
-        acc[type].push(event);
+        // If event has performanceType 'All', create entries for each performance type
+        if (event.performanceType === 'All') {
+          const performanceTypes = ['Solo', 'Duet', 'Trio', 'Group'];
+          performanceTypes.forEach(type => {
+            if (!acc[type]) acc[type] = [];
+            // Create a copy of the event for each performance type
+            acc[type].push({ ...event, performanceType: type });
+          });
+        } else {
+          // Regular event with specific performance type
+          const type = event.performanceType;
+          if (!acc[type]) acc[type] = [];
+          acc[type].push(event);
+        }
         return acc;
       }, {} as {[key: string]: Event[]});
       setGroupedEvents(grouped);
@@ -200,15 +211,26 @@ export default function NationalsEventsPage() {
   };
 
   const getStartingFee = (performanceType: string) => {
-    // Use the new mastery-based fee structure - showing Water/Fire (higher) fees as starting point
+    // Use the Nationals fee structure
     if (performanceType === 'Solo') {
-      return EODSA_FEES.PERFORMANCE.WATER_FIRE.Solo; // R300 for competitive
+      return 400; // R400 for 1 solo (plus R300 registration)
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return EODSA_FEES.PERFORMANCE.WATER_FIRE.Duet; // R200 per person
+      return 280; // R280 per person (plus R300 registration each)
     } else if (performanceType === 'Group') {
-      return EODSA_FEES.PERFORMANCE.WATER_FIRE.SmallGroup; // R180 per person
+      return 220; // R220 per person for small groups (plus R300 registration each)
     }
     return 0; // Default case
+  };
+
+  const getFeeExplanation = (performanceType: string) => {
+    if (performanceType === 'Solo') {
+      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE. Plus R300 registration.';
+    } else if (performanceType === 'Duet' || performanceType === 'Trio') {
+      return 'R280 per person + R300 registration each';
+    } else if (performanceType === 'Group') {
+      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R300 registration each.';
+    }
+    return 'Per person + R300 registration each';
   };
 
   if (!region || (!eodsaId && !studioId)) {
@@ -231,158 +253,296 @@ export default function NationalsEventsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading nationals events...</p>
+          {/* Modern Loading Animation */}
+          <div className="relative w-20 h-20 mx-auto mb-8">
+            <div className="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 animate-spin"></div>
+            <div className="absolute inset-2 rounded-full border-4 border-transparent border-t-pink-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl">🎭</span>
+            </div>
+          </div>
+          
+          {/* Loading Text */}
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-white">Loading Nationals Events</h3>
+            <p className="text-slate-400 text-sm">Preparing your competition dashboard...</p>
+          </div>
+          
+          {/* Loading Steps Animation */}
+          <div className="mt-6 flex justify-center space-x-2">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                style={{ animationDelay: `${i * 0.2}s` }}
+              ></div>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Back Navigation */}
-        <div className="mb-6">
-          <Link 
-            href={isStudioMode ? `/studio-dashboard?studioId=${studioId}` : `/event-dashboard?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-700/50 text-gray-300 rounded-xl hover:bg-gray-700 transition-all duration-300 group"
-          >
-            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span>{isStudioMode ? 'Back to Studio Dashboard' : 'Back to Main Portal'}</span>
-          </Link>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+      {/* Mobile-optimized header with better spacing */}
+      <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-lg border-b border-slate-700/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          {/* Back Navigation */}
+          <div className="mb-4">
+            <Link 
+              href={isStudioMode ? `/studio-dashboard?studioId=${studioId}` : `/event-dashboard?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
+              className="inline-flex items-center space-x-2 px-3 py-2 bg-slate-800/80 text-slate-300 rounded-lg hover:bg-slate-700 transition-all duration-300 group text-sm"
+            >
+              <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="hidden sm:inline">{isStudioMode ? 'Back to Studio Dashboard' : 'Back to Main Portal'}</span>
+              <span className="sm:hidden">Back</span>
+            </Link>
+          </div>
 
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            EODSA Nationals Events
-          </h1>
-          {(contestant || studioInfo) && (
-            <div className="bg-gray-800/50 backdrop-blur rounded-2xl p-4 inline-block">
-              {isStudioMode ? (
-                <>
-                  <p className="text-gray-300">
-                    Studio: <span className="text-green-400 font-semibold">{studioInfo?.name}</span>
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    Registration #: {studioInfo?.registrationNumber} • {availableDancers.length} dancers available
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-gray-300">
-                    Welcome, <span className="text-purple-400 font-semibold">{contestant?.name}</span>
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    EODSA ID: {contestant?.eodsaId} • 
-                    {contestant?.type === 'studio' && contestant.studioName && 
-                      ` Studio: ${contestant.studioName}`
-                    }
-                    {contestant?.type === 'private' && ' Independent Dancer'}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
+          {/* Header */}
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                EODSA Nationals
+              </span>
+            </h1>
+            <p className="text-slate-400 text-sm sm:text-base mb-4">Choose your performance category and register</p>
+            
+            {/* User Info Card - Mobile Optimized */}
+            {(contestant || studioInfo) && (
+              <div className="bg-slate-800/60 backdrop-blur rounded-xl p-3 sm:p-4 inline-block max-w-full">
+                {isStudioMode ? (
+                  <div className="text-center sm:text-left">
+                    <p className="text-slate-300 text-sm sm:text-base">
+                      <span className="text-emerald-400 font-semibold">{studioInfo?.name}</span>
+                    </p>
+                    <p className="text-xs sm:text-sm text-slate-400">
+                      Reg: {studioInfo?.registrationNumber} • {availableDancers.length} dancers
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center sm:text-left">
+                    <p className="text-slate-300 text-sm sm:text-base">
+                      Welcome, <span className="text-purple-400 font-semibold">{contestant?.name}</span>
+                    </p>
+                    <p className="text-xs sm:text-sm text-slate-400">
+                      ID: {contestant?.eodsaId}
+                      {contestant?.type === 'studio' && contestant.studioName && 
+                        ` • ${contestant.studioName}`
+                      }
+                      {contestant?.type === 'private' && ' • Independent'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+      </div>
 
-        <div className="space-y-12">
-          {Object.entries(groupedEvents).length > 0 ? (
-            Object.entries(groupedEvents).map(([performanceType, eventsOfType]) => {
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {Object.entries(groupedEvents).length > 0 ? (
+          <div className="space-y-8 sm:space-y-12">
+            {Object.entries(groupedEvents).map(([performanceType, eventsOfType]) => {
               const performanceInfo = PERFORMANCE_TYPES[performanceType as keyof typeof PERFORMANCE_TYPES];
-              const { description } = getParticipantRequirements(performanceType);
-
-              if (!performanceInfo) return null; // Skip if type is not in our definition
+              if (!performanceInfo) return null;
 
               return (
-                <div key={performanceType} className="bg-gray-800/40 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden border border-gray-700/50">
-                  <div className="p-6 bg-gray-900/50 flex justify-between items-center">
-                    <div>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
-                          <img src={performanceInfo.icon} alt={`${performanceInfo.name} icon`} className="w-8 h-8" />
+                <div key={performanceType} className="group">
+                  {/* Section Header - Enhanced Design */}
+                  <div className="relative mb-6 sm:mb-8">
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 rounded-2xl blur-xl"></div>
+                    <div className="relative bg-slate-800/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 border border-slate-700/50 hover:border-purple-500/30 transition-all duration-500">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center space-x-3 sm:space-x-4">
+                          {/* Performance Type Icon */}
+                          <div className="relative">
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
+                              <div className="text-2xl sm:text-3xl">
+                                {performanceType === 'Solo' && '💃'}
+                                {performanceType === 'Duet' && '👯'}
+                                {performanceType === 'Trio' && '👥'}
+                                {performanceType === 'Group' && '🎭'}
+                              </div>
+                            </div>
+                            <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl sm:rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
+                          </div>
+                          
+                          <div>
+                            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
+                              {performanceInfo.name}
+                              <span className="text-purple-400 ml-2">Events</span>
+                            </h2>
+                            <p className="text-slate-400 text-sm sm:text-base">{performanceInfo.description}</p>
+                            
+                            {/* Mobile Fee Preview */}
+                            <div className="sm:hidden mt-2">
+                              <span className="inline-flex items-center px-2 py-1 bg-purple-500/20 text-purple-300 rounded-lg text-xs font-medium">
+                                From R{getStartingFee(performanceType)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h2 className="text-2xl font-bold text-white">{performanceInfo.name} Events</h2>
-                          <p className="text-gray-400">{performanceInfo.description}</p>
+                        
+                        {/* Desktop Stats */}
+                        <div className="hidden sm:flex items-center space-x-6">
+                          <div className="text-center">
+                            <p className="text-2xl lg:text-3xl font-bold text-purple-400">{eventsOfType.length}</p>
+                            <p className="text-xs lg:text-sm text-slate-400 uppercase tracking-wide">Available</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xl lg:text-2xl font-bold text-emerald-400">R{getStartingFee(performanceType)}</p>
+                            <p className="text-xs lg:text-sm text-slate-400 uppercase tracking-wide">From</p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-400">Available Events</p>
-                      <p className="text-2xl font-bold text-purple-400">{eventsOfType.length}</p>
-                    </div>
                   </div>
 
-                  <div className="p-4 space-y-4">
-                    {eventsOfType.map(event => (
-                      <div key={event.id} className="bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col md:flex-row hover:bg-gray-700/80 transition-all duration-300 border border-gray-700/50">
-                        <div className="p-6 md:w-2/3">
-                          <h3 className="text-xl font-bold text-white mb-2">{event.name}</h3>
-                          <p className="text-gray-400 text-sm mb-4">{event.description}</p>
+                  {/* Events Grid - Responsive */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                    {eventsOfType.map((event, index) => (
+                      <div
+                        key={event.id}
+                        className="group/card relative"
+                        style={{ animationDelay: `${index * 100}ms` }}
+                      >
+                        {/* Card Background Glow */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-purple-500/5 rounded-2xl blur-xl opacity-0 group-hover/card:opacity-100 transition-opacity duration-500"></div>
+                        
+                        {/* Main Card */}
+                        <div className="relative bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-700/50 hover:border-purple-500/30 transition-all duration-500 overflow-hidden group-hover/card:shadow-2xl group-hover/card:shadow-purple-500/10">
+                          {/* Event Header */}
+                          <div className="p-4 sm:p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <h3 className="text-lg sm:text-xl font-bold text-white mb-2 group-hover/card:text-purple-300 transition-colors">
+                                  {event.name}
+                                </h3>
+                                <p className="text-slate-400 text-sm leading-relaxed line-clamp-2">
+                                  {event.description}
+                                </p>
+                              </div>
+                              
+                              {/* Status Badge */}
+                              <div className="ml-3">
+                                <span className="inline-flex items-center px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg text-xs font-medium">
+                                  <div className="w-2 h-2 bg-emerald-400 rounded-full mr-1 animate-pulse"></div>
+                                  Open
+                                </span>
+                              </div>
+                            </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-500 uppercase font-semibold text-xs">Date</p>
-                              <p className="text-gray-200">{new Date(event.eventDate).toLocaleDateString()}</p>
+                            {/* Event Details Grid */}
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Date</p>
+                                  <p className="text-slate-200 text-sm font-medium">
+                                    {new Date(event.eventDate).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Age Group</p>
+                                  <p className="text-slate-200 text-sm font-medium">{event.ageCategory}</p>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Venue</p>
+                                  <p className="text-slate-200 text-sm font-medium line-clamp-1" title={event.venue}>
+                                    {event.venue}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Entry Fee</p>
+                                  <p className="text-emerald-400 text-lg font-bold">
+                                    R{getStartingFee(event.performanceType)}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-gray-500 uppercase font-semibold text-xs">Venue</p>
-                              <p className="text-gray-200">{event.venue}</p>
+
+                            {/* Fee Details - Expandable on Mobile */}
+                            <div className="mb-4 p-3 bg-slate-900/50 rounded-xl border border-slate-700/30">
+                              <p className="text-slate-300 text-xs leading-relaxed">
+                                {getFeeExplanation(event.performanceType)}
+                              </p>
                             </div>
-                            <div>
-                              <p className="text-gray-500 uppercase font-semibold text-xs">Age Category</p>
-                              <p className="text-gray-200">{event.ageCategory}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 uppercase font-semibold text-xs">Entry Fee</p>
-                              <p className="text-lg font-bold text-white">R{getStartingFee(event.performanceType)}</p>
-                              <p className="text-xs text-gray-400">Starting from</p>
+
+                            {/* Registration Deadline */}
+                            <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"></path>
+                                </svg>
+                                <span className="text-amber-300 text-sm font-medium">Registration Deadline</span>
+                              </div>
+                              <p className="text-amber-200 text-sm">
+                                {new Date(event.registrationDeadline).toLocaleDateString('en-US', {
+                                  weekday: 'long',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </p>
+                              <div className="mt-2">
+                                <CountdownTimer deadline={event.registrationDeadline} />
+                              </div>
                             </div>
                           </div>
-                          
-                          <div className="mt-4 border-t border-gray-700 pt-4">
-                            <div className="flex items-center text-green-400">
-                              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-                              <span className="text-sm">Registration Open</span>
-                            </div>
-                            <p className="text-sm text-gray-400 mt-1">
-                              Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}
-                            </p>
-                            <div className="mt-2">
-                              <CountdownTimer deadline={event.registrationDeadline} />
-                            </div>
-                          </div>
 
-                        </div>
-                        <div className="md:w-1/3 bg-gray-800/50 p-6 flex flex-col justify-center items-center">
-                           <button
+                          {/* Action Button */}
+                          <div className="p-4 sm:p-6 pt-0">
+                            <button
                               onClick={() => router.push(`/event-dashboard/${region}/${performanceType.toLowerCase()}?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}&eventId=${event.id}`)}
-                              className="w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
-                           >
-                             <span>Enter Competition</span>
-                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                             </svg>
-                           </button>
+                              className="w-full group/btn relative overflow-hidden px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl hover:shadow-purple-500/25"
+                            >
+                              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-700"></div>
+                              <div className="relative flex items-center justify-center space-x-2">
+                                <span className="text-sm sm:text-base">Enter Competition</span>
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                              </div>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )
-            })
-          ) : (
-            <div className="text-center py-16 bg-gray-800/50 rounded-2xl">
-              <h3 className="text-xl font-semibold text-white">No Events Found</h3>
-              <p className="text-gray-400 mt-2">There are currently no open events for the nationals competition.</p>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-16 sm:py-24">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 rounded-3xl blur-2xl"></div>
+              <div className="relative bg-slate-800/60 backdrop-blur-xl rounded-3xl p-8 sm:p-12 border border-slate-700/50">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center">
+                  <span className="text-3xl sm:text-4xl">🎭</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold text-white mb-4">No Events Available</h3>
+                <p className="text-slate-400 max-w-md mx-auto leading-relaxed">
+                  There are currently no open events for nationals competition. Check back soon or contact support for more information.
+                </p>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
