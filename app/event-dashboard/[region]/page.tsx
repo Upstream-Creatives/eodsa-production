@@ -200,13 +200,13 @@ export default function NationalsEventsPage() {
   };
 
   const getStartingFee = (performanceType: string) => {
-    // Use the new simplified fee structure
+    // Use the new mastery-based fee structure - showing Water/Fire (higher) fees as starting point
     if (performanceType === 'Solo') {
-      return EODSA_FEES.PERFORMANCE.Solo;
+      return EODSA_FEES.PERFORMANCE.WATER_FIRE.Solo; // R300 for competitive
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return EODSA_FEES.PERFORMANCE.Duet; // R280 per person
+      return EODSA_FEES.PERFORMANCE.WATER_FIRE.Duet; // R200 per person
     } else if (performanceType === 'Group') {
-      return EODSA_FEES.PERFORMANCE.SmallGroup; // R220 per person (default to small group)
+      return EODSA_FEES.PERFORMANCE.WATER_FIRE.SmallGroup; // R180 per person
     }
     return 0; // Default case
   };

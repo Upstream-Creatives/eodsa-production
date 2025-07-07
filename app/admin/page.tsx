@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { REGIONS, PERFORMANCE_TYPES, AGE_CATEGORIES } from '@/lib/types';
+import { REGIONS, PERFORMANCE_TYPES, AGE_CATEGORIES, EODSA_FEES } from '@/lib/types';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/simple-toast';
 import { useAlert } from '@/components/ui/custom-alert';
@@ -37,11 +37,11 @@ interface Judge {
 interface JudgeAssignment {
   id: string;
   judgeId: string;
-  region: string;
+  eventId: string;
   judgeName: string;
   judgeEmail: string;
-  regionName: string;
-  eventCount?: number;
+  eventName: string;
+  eventDate?: string;
 }
 
 interface Dancer {
@@ -111,44 +111,18 @@ export default function AdminDashboard() {
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
   
-  // Event creation state
+  // Event creation state - simplified to remove performance type, age category, and entry fee
   const [newEvent, setNewEvent] = useState({
     name: '',
     description: '',
     region: 'Nationals',
-    ageCategory: 'All',
-    performanceType: 'Solo',
     eventDate: '',
     eventEndDate: '',
     registrationDeadline: '',
-    venue: '',
-    maxParticipants: '',
-    entryFee: '0'
+    venue: ''
   });
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [createEventMessage, setCreateEventMessage] = useState('');
-
-  // Bulk event creation state
-  const [showBulkEventModal, setShowBulkEventModal] = useState(false);
-  const [bulkEventTemplate, setBulkEventTemplate] = useState({
-    baseName: '',
-    description: '',
-    region: 'Nationals',
-    ageCategory: '',
-    eventDate: '',
-    eventEndDate: '',
-    registrationDeadline: '',
-    venue: '',
-    selectedPerformanceTypes: [] as string[],
-    entryFees: {
-      Solo: '300',
-      Duet: '400',
-      Trio: '600',
-      Group: '720'
-    } as Record<string, string>
-  });
-  const [isCreatingBulkEvents, setIsCreatingBulkEvents] = useState(false);
-  const [bulkCreationProgress, setBulkCreationProgress] = useState({ current: 0, total: 0 });
 
   // Judge creation state
   const [newJudge, setNewJudge] = useState({
@@ -163,7 +137,7 @@ export default function AdminDashboard() {
   // Assignment state
   const [assignment, setAssignment] = useState({
     judgeId: '',
-    region: ''
+    eventId: ''
   });
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignmentMessage, setAssignmentMessage] = useState('');
@@ -189,8 +163,6 @@ export default function AdminDashboard() {
   // Studio search and filter state
   const [studioSearchTerm, setStudioSearchTerm] = useState('');
   const [studioStatusFilter, setStudioStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
-
-
 
   // Modal states
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
@@ -281,8 +253,11 @@ export default function AdminDashboard() {
         },
         body: JSON.stringify({
           ...newEvent,
-          maxParticipants: newEvent.maxParticipants ? parseInt(newEvent.maxParticipants) : null,
-          entryFee: parseFloat(newEvent.entryFee),
+          // Set defaults for simplified event creation
+          ageCategory: 'All',
+          performanceType: 'All',
+          entryFee: 0,
+          maxParticipants: null,
           createdBy: adminData.id,
           status: 'upcoming'
         }),
@@ -296,14 +271,10 @@ export default function AdminDashboard() {
           name: '',
           description: '',
           region: 'Nationals',
-          ageCategory: 'All',
-          performanceType: 'Solo',
           eventDate: '',
           eventEndDate: '',
           registrationDeadline: '',
-          venue: '',
-          maxParticipants: '',
-          entryFee: '0'
+          venue: ''
         });
         fetchData();
         setShowCreateEventModal(false);
@@ -316,108 +287,6 @@ export default function AdminDashboard() {
       setCreateEventMessage('Error creating event. Please check your connection and try again.');
     } finally {
       setIsCreatingEvent(false);
-    }
-  };
-
-  const handleCreateBulkEvents = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isCreatingBulkEvents) {
-      return;
-    }
-
-    if (bulkEventTemplate.selectedPerformanceTypes.length === 0) {
-      showAlert('Please select at least one performance type', 'warning');
-      return;
-    }
-
-    setIsCreatingBulkEvents(true);
-    setBulkCreationProgress({ current: 0, total: bulkEventTemplate.selectedPerformanceTypes.length });
-
-    try {
-      const session = localStorage.getItem('adminSession');
-      if (!session) {
-        showAlert('Session expired. Please log in again.', 'error');
-        return;
-      }
-
-      const adminData = JSON.parse(session);
-      const results = [];
-
-      for (let i = 0; i < bulkEventTemplate.selectedPerformanceTypes.length; i++) {
-        const performanceType = bulkEventTemplate.selectedPerformanceTypes[i];
-        setBulkCreationProgress({ current: i + 1, total: bulkEventTemplate.selectedPerformanceTypes.length });
-
-        const eventName = `${bulkEventTemplate.baseName} - ${performanceType}`;
-        const entryFee = parseFloat(bulkEventTemplate.entryFees[performanceType] || '0');
-
-        try {
-          const response = await fetch('/api/events', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              name: eventName,
-              description: bulkEventTemplate.description,
-              region: bulkEventTemplate.region,
-              ageCategory: bulkEventTemplate.ageCategory,
-              performanceType: performanceType,
-              eventDate: bulkEventTemplate.eventDate,
-              registrationDeadline: bulkEventTemplate.registrationDeadline,
-              venue: bulkEventTemplate.venue,
-              maxParticipants: null,
-              entryFee: entryFee,
-              createdBy: adminData.id,
-              status: 'upcoming'
-            }),
-          });
-
-          const data = await response.json();
-          results.push({ performanceType, success: data.success, error: data.error });
-        } catch (error) {
-          results.push({ performanceType, success: false, error: 'Network error' });
-        }
-      }
-
-      // Show results
-      const successCount = results.filter(r => r.success).length;
-      const failedResults = results.filter(r => !r.success);
-
-      if (successCount === results.length) {
-        showAlert(`Successfully created ${successCount} events!`, 'success');
-        setShowBulkEventModal(false);
-        setBulkEventTemplate({
-          baseName: '',
-          description: '',
-          region: '',
-          ageCategory: '',
-          eventDate: '',
-          eventEndDate: '',
-          registrationDeadline: '',
-          venue: '',
-          selectedPerformanceTypes: [],
-          entryFees: {
-            Solo: '300',
-            Duet: '400',
-            Trio: '600',
-            Group: '720'
-          }
-        });
-        fetchData();
-      } else {
-        let errorMessage = `Created ${successCount} out of ${results.length} events.\n\nFailed events:\n`;
-        failedResults.forEach(r => {
-          errorMessage += `- ${r.performanceType}: ${r.error || 'Unknown error'}\n`;
-        });
-        showAlert(errorMessage, 'warning');
-      }
-    } catch (error) {
-      console.error('Error creating bulk events:', error);
-      showAlert('Error creating events. Please check your connection and try again.', 'error');
-    } finally {
-      setIsCreatingBulkEvents(false);
-      setBulkCreationProgress({ current: 0, total: 0 });
     }
   };
 
@@ -485,15 +354,15 @@ export default function AdminDashboard() {
 
       const adminData = JSON.parse(session);
 
-      // Assign judge to all events in the selected region
-      const response = await fetch('/api/judge-assignments/nationals', {
+      // Assign judge to the selected event
+      const response = await fetch('/api/judge-assignments/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           judgeId: assignment.judgeId,
-          region: assignment.region,
+          eventId: assignment.eventId,
           assignedBy: adminData.id
         }),
       });
@@ -501,10 +370,11 @@ export default function AdminDashboard() {
       const data = await response.json();
 
       if (data.success) {
-        setAssignmentMessage(`Judge assigned to ${assignment.region} successfully! Assigned to ${data.assignedCount || 0} events.`);
+        const eventName = events.find(e => e.id === assignment.eventId)?.name || 'event';
+        setAssignmentMessage(`Judge assigned to "${eventName}" successfully!`);
         setAssignment({
           judgeId: '',
-          region: ''
+          eventId: ''
         });
         fetchData();
         setShowAssignJudgeModal(false);
@@ -521,55 +391,10 @@ export default function AdminDashboard() {
   };
 
   const handleReassignJudge = async (assignment: JudgeAssignment) => {
-    const reassignKey = `${assignment.judgeId}-${assignment.region}`;
-    
-    if (reassigningJudges.has(reassignKey)) {
-      return; // Already reassigning
-    }
-
-    setReassigningJudges(prev => new Set([...prev, reassignKey]));
-
-    try {
-      const session = localStorage.getItem('adminSession');
-      if (!session) {
-        setAssignmentMessage('Error: Session expired. Please log in again.');
-        return;
-      }
-
-      const adminData = JSON.parse(session);
-
-      // Reassign judge to all events in their current region (picks up new events)
-      const response = await fetch('/api/judge-assignments/nationals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          judgeId: assignment.judgeId,
-          region: assignment.region,
-          assignedBy: adminData.id
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setAssignmentMessage(`✅ ${assignment.judgeName} reassigned to ${assignment.region}! Now assigned to ${data.assignedCount || 0} new events.`);
-        fetchData(); // Refresh the assignments table
-        setTimeout(() => setAssignmentMessage(''), 5000);
-      } else {
-        setAssignmentMessage(`❌ Reassignment failed: ${data.error || 'Unknown error occurred'}`);
-      }
-    } catch (error) {
-      console.error('Error reassigning judge:', error);
-      setAssignmentMessage('❌ Error reassigning judge. Please check your connection and try again.');
-    } finally {
-      setReassigningJudges(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(reassignKey);
-        return newSet;
-      });
-    }
+    // For event-based assignments, we don't need reassignment since each assignment is to a specific event
+    // We could remove this button or change it to "Remove Assignment"
+    setAssignmentMessage('Event-based assignments do not need reassignment. Each judge is assigned to a specific event.');
+    setTimeout(() => setAssignmentMessage(''), 3000);
   };
 
   const handleCleanDatabase = async () => {
@@ -1192,14 +1017,6 @@ export default function AdminDashboard() {
                   </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => setShowBulkEventModal(true)}
-                      className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg sm:rounded-xl hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base font-medium"
-                    >
-                      <span>📦</span>
-                      <span className="hidden sm:inline">Bulk Create</span>
-                      <span className="sm:hidden">Bulk</span>
-                    </button>
                   <button
                     onClick={() => setShowCreateEventModal(true)}
                     className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg sm:rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base font-medium"
@@ -1247,26 +1064,16 @@ export default function AdminDashboard() {
                             <div>
                               <div className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">{event.name}</div>
                               <div className="text-xs sm:text-sm text-gray-700 font-medium mt-1">{event.venue}</div>
-                              <div className="text-xs text-gray-500 sm:hidden mt-1">
-                                {event.region} • {event.performanceType} • {event.ageCategory}
-                </div>
+                                                            <div className="text-xs text-gray-500 sm:hidden mt-1">
+                                {event.region} • All Performance Types • All Age Categories
+                              </div>
               </div>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900 hidden sm:table-cell">{event.region}</td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                             <div className="space-y-1">
-                              <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border ${
-                                event.performanceType === 'Solo' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                event.performanceType === 'Duet' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                event.performanceType === 'Trio' ? 'bg-green-50 text-green-700 border-green-200' :
-                                event.performanceType === 'Group' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                'bg-gray-50 text-gray-700 border-gray-200'
-                              }`}>
-                                {event.performanceType === 'Solo' && '👤 '}
-                                {event.performanceType === 'Duet' && '👥 '}
-                                {event.performanceType === 'Trio' && '👥 '}
-                                {event.performanceType === 'Group' && '👥 '}
-                                {event.performanceType}
+                              <span className="inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700 border-purple-200">
+                                🎭 All Types
                               </span>
                             <div className="text-xs sm:text-sm text-gray-700">{event.ageCategory}</div>
                             </div>
@@ -1457,7 +1264,7 @@ export default function AdminDashboard() {
                     <thead className="bg-gray-50/80">
                       <tr>
                         <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Judge</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Region</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Event</th>
                         <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Email</th>
                         <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -1472,23 +1279,18 @@ export default function AdminDashboard() {
                             </div>
                         </td>
                           <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                            {assignment.regionName}
-                            <div className="text-xs text-gray-500 mt-1">{assignment.eventCount || 0} events</div>
+                            {assignment.eventName}
+                            <div className="text-xs text-gray-500 mt-1">{assignment.eventDate ? new Date(assignment.eventDate).toLocaleDateString() : 'No date'}</div>
                           </td>
                           <td className="px-6 py-4 text-sm font-medium text-gray-600 hidden sm:table-cell">{assignment.judgeEmail}</td>
                           <td className="px-6 py-4">
                             <button
                               onClick={() => handleReassignJudge(assignment)}
-                              disabled={reassigningJudges.has(`${assignment.judgeId}-${assignment.region}`)}
-                              className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Reassign judge to pick up new events in this region"
+                              className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-red-500 to-rose-600 text-white text-xs font-medium rounded-lg hover:from-red-600 hover:to-rose-700 transition-all duration-200 transform hover:scale-105 shadow-sm"
+                              title="Judge is assigned to this specific event"
                             >
-                              <span className="mr-1">
-                                {reassigningJudges.has(`${assignment.judgeId}-${assignment.region}`) ? '⏳' : '🔄'}
-                              </span>
-                              <span className="hidden sm:inline">
-                                {reassigningJudges.has(`${assignment.judgeId}-${assignment.region}`) ? 'Reassigning...' : 'Reassign'}
-                              </span>
+                              <span className="mr-1">ℹ️</span>
+                              <span className="hidden sm:inline">Event Assignment</span>
                             </button>
                           </td>
                       </tr>
@@ -2164,32 +1966,55 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Max Participants (Optional)</label>
-                  <input
-                    type="number"
-                    value={newEvent.maxParticipants}
-                    onChange={(e) => setNewEvent(prev => ({ ...prev, maxParticipants: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
-                    placeholder="50"
-                  />
-                </div>
+
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Type *</label>
-                  <select
-                    value={newEvent.performanceType}
-                    onChange={(e) => setNewEvent(prev => ({ ...prev, performanceType: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900"
-                    required
-                  >
-                    {Object.keys(PERFORMANCE_TYPES).map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Types</label>
+                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium text-base">
+                    All Performance Types (Solo, Duet, Trio, Group)
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    💡 Tip: Create separate events for different performance types (e.g., "Solo Competition" and "Group Competition")
+                    💡 Events now accept all performance types by default. Age categories are determined automatically based on dancer's date of birth.
                   </p>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
+                    <h3 className="text-lg font-bold text-blue-900 mb-4">💰 Fee Structure Information</h3>
+                    
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="bg-white p-4 rounded-lg border border-orange-200">
+                        <h4 className="font-bold text-orange-800 mb-3 flex items-center">
+                          🔥 Water/Fire (Competitive/Advanced)
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div><strong>Registration:</strong> R{EODSA_FEES.REGISTRATION['Water (Competition)']} per person</div>
+                          <div><strong>Solo:</strong> R{EODSA_FEES.PERFORMANCE.WATER_FIRE.Solo} (packages available)</div>
+                          <div><strong>Duet/Trio:</strong> R{EODSA_FEES.PERFORMANCE.WATER_FIRE.Duet} per person</div>
+                          <div><strong>Groups:</strong> R{EODSA_FEES.PERFORMANCE.WATER_FIRE.SmallGroup} per person</div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white p-4 rounded-lg border border-green-200">
+                        <h4 className="font-bold text-green-800 mb-3 flex items-center">
+                          🌱 Earth/Air (Eisteddfod/Special)
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div><strong>Registration:</strong> R{EODSA_FEES.REGISTRATION['Earth (Eisteddfod)']} per person</div>
+                          <div><strong>Solo:</strong> R{EODSA_FEES.PERFORMANCE.EARTH_AIR.Solo} each</div>
+                          <div><strong>Duet/Trio:</strong> R{EODSA_FEES.PERFORMANCE.EARTH_AIR.Duet} per person</div>
+                          <div><strong>Groups:</strong> R{EODSA_FEES.PERFORMANCE.EARTH_AIR.SmallGroup} per person</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> Events automatically accept all performance types (Solo, Duet, Trio, Group). 
+                        Fees are calculated based on the participant's selected mastery level.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -2371,7 +2196,7 @@ export default function AdminDashboard() {
                   <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">🔗</span>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Assign Judge to Region</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Assign Judge to Event</h2>
                 </div>
                 <button
                   onClick={() => setShowAssignJudgeModal(false)}
@@ -2400,17 +2225,17 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Region</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Event</label>
                   <select
-                    value={assignment.region}
-                    onChange={(e) => setAssignment(prev => ({ ...prev, region: e.target.value }))}
+                    value={assignment.eventId}
+                    onChange={(e) => setAssignment(prev => ({ ...prev, eventId: e.target.value }))}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium text-gray-900"
                     required
                   >
-                    <option value="">Choose a region</option>
-                    <option value="Gauteng">Gauteng</option>
-                    <option value="Free State">Free State</option>
-                    <option value="Mpumalanga">Mpumalanga</option>
+                    <option value="">Choose an event</option>
+                    {events.map(event => (
+                      <option key={event.id} value={event.id}>{event.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -2461,247 +2286,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Bulk Event Creation Modal */}
-      {showBulkEventModal && (
-        <div className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/30">
-            <div className="p-6 border-b border-gray-200/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
-                    <span className="text-white text-lg">📦</span>
-                  </div>
-                  <h2 className="text-xl font-bold text-gray-900">Bulk Create Events</h2>
-                </div>
-                <button
-                  onClick={() => setShowBulkEventModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
-                >
-                  <span className="text-2xl">×</span>
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateBulkEvents} className="p-6">
-              <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                <h3 className="text-sm font-semibold text-emerald-800 mb-2">💡 How Bulk Creation Works:</h3>
-                <p className="text-sm text-emerald-700">Create multiple events at once, one for each performance type you select. Perfect for setting up competitions with separate Solo, Duet, Trio, and Group categories.</p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="lg:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Base Event Name</label>
-                  <input
-                    type="text"
-                    value={bulkEventTemplate.baseName}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, baseName: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
-                    required
-                    placeholder="e.g. EODSA Nationals Championships 2024"
-                  />
-                                      <p className="text-xs text-gray-500 mt-1">Performance type will be appended automatically (e.g. "EODSA Nationals Championships 2024 - Solo")</p>
-                </div>
-
-                <div className="lg:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Description</label>
-                  <textarea
-                    value={bulkEventTemplate.description}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
-                    rows={3}
-                    required
-                    placeholder="Describe the event..."
-                  />
-                </div>
-
-                <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
-                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium text-base">
-                    EODSA Nationals
-                  </div>
-              </div>
-
-                <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Age Category</label>
-                  <select
-                    value={bulkEventTemplate.ageCategory}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, ageCategory: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900"
-                    required
-                  >
-                    <option value="">Select Age Category</option>
-                    {AGE_CATEGORIES.map(category => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Event Date</label>
-                  <input
-                    type="datetime-local"
-                    value={bulkEventTemplate.eventDate}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, eventDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900"
-                    required
-                  />
-                </div>
-
-                <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Event End Date</label>
-                  <input
-                    type="datetime-local"
-                    value={bulkEventTemplate.eventEndDate}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, eventEndDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900"
-                    placeholder="Optional - for multi-day events"
-                  />
-                </div>
-
-                <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Registration Deadline</label>
-                  <input
-                    type="datetime-local"
-                    value={bulkEventTemplate.registrationDeadline}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, registrationDeadline: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900"
-                    required
-                  />
-                </div>
-
-                <div className="lg:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Venue</label>
-                  <input
-                    type="text"
-                    value={bulkEventTemplate.venue}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, venue: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
-                    required
-                    placeholder="e.g. Johannesburg Theatre"
-                  />
-                </div>
-
-                <div className="lg:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Performance Types to Create</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {['Solo', 'Duet', 'Trio', 'Group'].map(type => (
-                      <div key={type} className="relative">
-                        <input
-                          type="checkbox"
-                          id={`bulk-${type}`}
-                          checked={bulkEventTemplate.selectedPerformanceTypes.includes(type)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setBulkEventTemplate(prev => ({
-                                ...prev,
-                                selectedPerformanceTypes: [...prev.selectedPerformanceTypes, type]
-                              }));
-                            } else {
-                              setBulkEventTemplate(prev => ({
-                                ...prev,
-                                selectedPerformanceTypes: prev.selectedPerformanceTypes.filter(t => t !== type)
-                              }));
-                            }
-                          }}
-                          className="sr-only"
-                        />
-                        <label
-                          htmlFor={`bulk-${type}`}
-                          className={`block p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 text-center ${
-                            bulkEventTemplate.selectedPerformanceTypes.includes(type)
-                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                          }`}
-                        >
-                          <span className="text-2xl mb-1 block">
-                            {type === 'Solo' && '👤'}
-                            {type === 'Duet' && '👥'}
-                            {type === 'Trio' && '👥'}
-                            {type === 'Group' && '👥'}
-                          </span>
-                          <span className="font-semibold">{type}</span>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Entry Fees by Performance Type</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {['Solo', 'Duet', 'Trio', 'Group'].map(type => (
-                      <div key={type} className={`${!bulkEventTemplate.selectedPerformanceTypes.includes(type) ? 'opacity-50' : ''}`}>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">{type}</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">R</span>
-                          <input
-                            type="number"
-                            value={bulkEventTemplate.entryFees[type]}
-                            onChange={(e) => setBulkEventTemplate(prev => ({
-                              ...prev,
-                              entryFees: { ...prev.entryFees, [type]: e.target.value }
-                            }))}
-                            disabled={!bulkEventTemplate.selectedPerformanceTypes.includes(type)}
-                            className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-sm font-medium text-gray-900 disabled:bg-gray-100"
-                            min="0"
-                            step="10"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">💡 Standard fees: Solo R300, Duet R400, Trio R600, Group R720</p>
-                </div>
-              </div>
-
-              {isCreatingBulkEvents && bulkCreationProgress.total > 0 && (
-                <div className="mt-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-emerald-800">Creating events...</span>
-                    <span className="text-sm text-emerald-700">{bulkCreationProgress.current} / {bulkCreationProgress.total}</span>
-                  </div>
-                  <div className="w-full bg-emerald-200 rounded-full h-2">
-                    <div 
-                      className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(bulkCreationProgress.current / bulkCreationProgress.total) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
-                  <button
-                  type="button"
-                  onClick={() => setShowBulkEventModal(false)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-                  disabled={isCreatingBulkEvents}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingBulkEvents || bulkEventTemplate.selectedPerformanceTypes.length === 0}
-                  className="inline-flex items-center space-x-3 px-8 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
-                >
-                  {isCreatingBulkEvents ? (
-                    <>
-                      <div className="relative w-5 h-5">
-                        <div className="absolute inset-0 border-2 border-white/30 rounded-full"></div>
-                      </div>
-                      <span>Creating {bulkCreationProgress.current}/{bulkCreationProgress.total}...</span>
-                      </>
-                    ) : (
-                      <>
-                      <span>✨</span>
-                      <span>Create {bulkEventTemplate.selectedPerformanceTypes.length} Events</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-            </form>
-              </div>
-        </div>
-      )}
 
       {/* Email Test Modal - Disabled for Phase 1 */}
       {false && showEmailTestModal && (

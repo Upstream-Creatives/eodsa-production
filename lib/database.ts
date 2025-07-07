@@ -47,6 +47,16 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS qualified_for_nationals BOOLEAN DEFAULT FALSE`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS item_number INTEGER`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_end_date TEXT`;
+    
+    // Fix performance type constraint to allow 'All' - FORCE UPDATE
+    try {
+      console.log('🔧 Updating performance type constraint...');
+      await sqlClient`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_performance_type_check`;
+      await sqlClient`ALTER TABLE events ADD CONSTRAINT events_performance_type_check CHECK (performance_type IN ('Solo', 'Duet', 'Trio', 'Group', 'All'))`;
+      console.log('✅ Performance type constraint updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating performance type constraint:', error);
+    }
 
     // 🏆 NATIONALS TABLES - REMOVED
     // The nationals system has been removed. Regional competitions are now referred to as "Nationals".

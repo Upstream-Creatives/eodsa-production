@@ -6,6 +6,7 @@ import { emailService } from '@/lib/email';
 function checkAgeEligibility(dancerAge: number, ageCategory: string): boolean {
   switch (ageCategory) {
     case 'All Ages':
+    case 'All':
       return true; // All ages are welcome
     case '4 & Under':
       return dancerAge <= 4;
@@ -199,7 +200,23 @@ export async function POST(request: NextRequest) {
 
     // Validate performance type participant limits and time limits
     const participantCount = body.participantIds.length;
-    const performanceType = event.performanceType;
+    // Determine performance type from participant count (since events now have performanceType: 'All')
+    let performanceType: string;
+    if (participantCount === 1) {
+      performanceType = 'Solo';
+    } else if (participantCount === 2) {
+      performanceType = 'Duet';
+    } else if (participantCount === 3) {
+      performanceType = 'Trio';
+    } else if (participantCount >= 4) {
+      performanceType = 'Group';
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid participant count: must be at least 1 participant' },
+        { status: 400 }
+      );
+    }
+    
     const estimatedDurationMinutes = body.estimatedDuration;
     
     const limits = {
@@ -210,12 +227,6 @@ export async function POST(request: NextRequest) {
     };
     
     const limit = limits[performanceType as keyof typeof limits];
-    if (!limit) {
-      return NextResponse.json(
-        { error: 'Invalid performance type in event' },
-        { status: 400 }
-      );
-    }
     
     // Validate participant count
     if (participantCount < limit.min || participantCount > limit.max) {

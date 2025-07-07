@@ -424,7 +424,7 @@ export default function PerformanceTypeEntryPage() {
         if (data.success) {
           const matchingEvents = data.events.filter((event: Event) => 
             event.region.toLowerCase() === region?.toLowerCase() &&
-            event.performanceType.toLowerCase() === performanceType?.toLowerCase() &&
+            (event.performanceType.toLowerCase() === performanceType?.toLowerCase() || event.performanceType === 'All') &&
             (event.status === 'registration_open' || event.status === 'upcoming')
           );
           setEvents(matchingEvents);
@@ -677,6 +677,7 @@ export default function PerformanceTypeEntryPage() {
   const checkAgeEligibility = (dancerAge: number, ageCategory: string): boolean => {
     switch (ageCategory) {
       case 'All Ages':
+      case 'All':
         return true; // All ages are welcome
       case '4 & Under':
         return dancerAge <= 4;
