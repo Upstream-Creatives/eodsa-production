@@ -45,7 +45,7 @@ export default function AdminRankingsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   // Filters
-  const [selectedRegion, setSelectedRegion] = useState('');
+  // Region filtering removed - Nationals only now
   const [selectedAgeCategory, setSelectedAgeCategory] = useState('');
   const [selectedPerformanceType, setSelectedPerformanceType] = useState('');
   const [viewMode, setViewMode] = useState<'all' | 'top5_age' | 'top5_style'>('all');
@@ -82,7 +82,7 @@ export default function AdminRankingsPage() {
     if (isAuthenticated && !isLoading) {
       loadRankings();
     }
-  }, [selectedRegion, selectedAgeCategory, selectedPerformanceType]);
+  }, [selectedAgeCategory, selectedPerformanceType]);
 
   const loadInitialData = async () => {
     setIsLoading(true);
@@ -109,7 +109,7 @@ export default function AdminRankingsPage() {
       const params = new URLSearchParams();
       params.append('type', 'nationals'); // Only nationals now
       
-      if (selectedRegion) params.append('region', selectedRegion);
+      // No region filter needed - only Nationals now
       if (selectedAgeCategory) params.append('ageCategory', selectedAgeCategory);
       if (selectedPerformanceType) params.append('performanceType', selectedPerformanceType);
       
@@ -171,7 +171,6 @@ export default function AdminRankingsPage() {
   };
 
   const clearFilters = () => {
-    setSelectedRegion('');
     setSelectedAgeCategory('');
     setSelectedPerformanceType('');
     setViewMode('all');
@@ -445,17 +444,10 @@ export default function AdminRankingsPage() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Region</label>
-              <select
-                value={selectedRegion}
-                onChange={(e) => setSelectedRegion(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
-              >
-                <option value="">All Regions</option>
-                {REGIONS.map(region => (
-                  <option key={region} value={region}>{region}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
+              <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium">
+                EODSA Nationals
+              </div>
             </div>
             
             <div>

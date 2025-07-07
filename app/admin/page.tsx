@@ -115,7 +115,7 @@ export default function AdminDashboard() {
   const [newEvent, setNewEvent] = useState({
     name: '',
     description: '',
-    region: '',
+    region: 'Nationals',
     ageCategory: 'All',
     performanceType: 'Solo',
     eventDate: '',
@@ -133,7 +133,7 @@ export default function AdminDashboard() {
   const [bulkEventTemplate, setBulkEventTemplate] = useState({
     baseName: '',
     description: '',
-    region: '',
+    region: 'Nationals',
     ageCategory: '',
     eventDate: '',
     eventEndDate: '',
@@ -295,7 +295,7 @@ export default function AdminDashboard() {
         setNewEvent({
           name: '',
           description: '',
-          region: '',
+          region: 'Nationals',
           ageCategory: 'All',
           performanceType: 'Solo',
           eventDate: '',
@@ -2123,18 +2123,10 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Region</label>
-                  <select
-                    value={newEvent.region}
-                    onChange={(e) => setNewEvent(prev => ({ ...prev, region: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900"
-                    required
-                  >
-                    <option value="">Select Region</option>
-                    {REGIONS.map(region => (
-                      <option key={region} value={region}>{region}</option>
-                    ))}
-                  </select>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
+                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium text-base">
+                    EODSA Nationals
+                  </div>
                 </div>
 
 
@@ -2505,9 +2497,9 @@ export default function AdminDashboard() {
                     onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, baseName: e.target.value }))}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
                     required
-                    placeholder="e.g. EODSA Gauteng Nationals 2024"
+                    placeholder="e.g. EODSA Nationals Championships 2024"
                   />
-                                      <p className="text-xs text-gray-500 mt-1">Performance type will be appended automatically (e.g. "EODSA Gauteng Nationals 2024 - Solo")</p>
+                                      <p className="text-xs text-gray-500 mt-1">Performance type will be appended automatically (e.g. "EODSA Nationals Championships 2024 - Solo")</p>
                 </div>
 
                 <div className="lg:col-span-2">
@@ -2523,18 +2515,10 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Region</label>
-                  <select
-                    value={bulkEventTemplate.region}
-                    onChange={(e) => setBulkEventTemplate(prev => ({ ...prev, region: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base font-medium text-gray-900"
-                    required
-                  >
-                    <option value="">Select Region</option>
-                    {REGIONS.map(region => (
-                      <option key={region} value={region}>{region}</option>
-                    ))}
-                  </select>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
+                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium text-base">
+                    EODSA Nationals
+                  </div>
               </div>
 
                 <div className="lg:col-span-1">

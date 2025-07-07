@@ -165,12 +165,12 @@ export default function NationalsEventsPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          // Filter events by region and open status
-          const regionEvents = data.events.filter((event: Event) => 
-            event.region.toLowerCase() === region?.toLowerCase() &&
-            (event.status === 'registration_open' || event.status === 'upcoming')
-          );
-          setEvents(regionEvents);
+                // Filter events by nationals status (since we only have Nationals now)
+      const nationalsEvents = data.events.filter((event: Event) =>
+        event.region === 'Nationals' &&
+        (event.status === 'registration_open' || event.status === 'upcoming')
+      );
+      setEvents(nationalsEvents);
         }
       }
     } catch (error) {
@@ -217,7 +217,7 @@ export default function NationalsEventsPage() {
         <div className="max-w-md w-full bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-8 text-center">
           <div className="text-6xl mb-6">❌</div>
           <h2 className="text-2xl font-bold text-white mb-4">Missing Information</h2>
-          <p className="text-gray-300 mb-6">Region or authentication not provided.</p>
+          <p className="text-gray-300 mb-6">Authentication not provided for Nationals dashboard.</p>
           <Link 
             href="/"
             className="block w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
@@ -234,7 +234,7 @@ export default function NationalsEventsPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading events for {region}...</p>
+          <p className="text-gray-300">Loading nationals events...</p>
         </div>
       </div>
     );
@@ -252,14 +252,14 @@ export default function NationalsEventsPage() {
             <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span>Back to Region Selection</span>
+            <span>Back to Main Portal</span>
           </Link>
         </div>
 
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">
-            {region} Events
+            EODSA Nationals Events
           </h1>
           {(contestant || studioInfo) && (
             <div className="bg-gray-800/50 backdrop-blur rounded-2xl p-4 inline-block">
@@ -379,7 +379,7 @@ export default function NationalsEventsPage() {
           ) : (
             <div className="text-center py-16 bg-gray-800/50 rounded-2xl">
               <h3 className="text-xl font-semibold text-white">No Events Found</h3>
-              <p className="text-gray-400 mt-2">There are currently no open events for the {region} region.</p>
+              <p className="text-gray-400 mt-2">There are currently no open events for the nationals competition.</p>
             </div>
           )}
         </div>

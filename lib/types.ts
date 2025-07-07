@@ -66,7 +66,7 @@ export interface Event {
   id: string;
   name: string; // e.g. "EODSA Nationals Championships 2024 - Gauteng"
   description: string;
-  region: 'Gauteng' | 'Free State' | 'Mpumalanga';
+  region: 'Nationals';
   ageCategory: string;
   performanceType: 'Solo' | 'Duet' | 'Trio' | 'Group' | 'All';
   eventDate: string;
@@ -194,9 +194,7 @@ export const AGE_CATEGORIES = [
 ];
 
 export const REGIONS = [
-  'Gauteng',
-  'Free State', 
-  'Mpumalanga'
+  'Nationals'
 ];
 
 export const PERFORMANCE_TYPES = {
