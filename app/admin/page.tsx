@@ -111,7 +111,7 @@ export default function AdminDashboard() {
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
   
-  // Event creation state - simplified to remove performance type, age category, and entry fee
+  // Event creation state - simplified to remove age category and entry fee
   const [newEvent, setNewEvent] = useState({
     name: '',
     description: '',
@@ -246,27 +246,53 @@ export default function AdminDashboard() {
 
       const adminData = JSON.parse(session);
 
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...newEvent,
-          // Set defaults for simplified event creation
-          ageCategory: 'All',
-          performanceType: 'All',
-          entryFee: 0,
-          maxParticipants: null,
-          createdBy: adminData.id,
-          status: 'upcoming'
-        }),
-      });
+      // Create separate events for each performance type
+      const performanceTypes = ['Solo', 'Duet', 'Trio', 'Group'];
+      const performanceEmojis = {
+        'Solo': '🕺',
+        'Duet': '👯',
+        'Trio': '👨‍👩‍👧',
+        'Group': '👥'
+      };
 
-      const data = await response.json();
+      let successCount = 0;
+      let errorMessages = [];
 
-      if (data.success) {
-        setCreateEventMessage('Event created successfully!');
+      for (const performanceType of performanceTypes) {
+        try {
+          const response = await fetch('/api/events', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...newEvent,
+              name: `${newEvent.name} - ${performanceType}`,
+              description: `${newEvent.description} (${performanceType} performances)`,
+              performanceType: performanceType,
+              // Set defaults for simplified event creation
+              ageCategory: 'All',
+              entryFee: 0,
+              maxParticipants: null,
+              createdBy: adminData.id,
+              status: 'upcoming'
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            successCount++;
+          } else {
+            errorMessages.push(`${performanceType}: ${data.error}`);
+          }
+        } catch (error) {
+          errorMessages.push(`${performanceType}: Failed to create`);
+        }
+      }
+
+      if (successCount === 4) {
+        setCreateEventMessage('🎉 All 4 events created successfully! (Solo, Duet, Trio, Group)');
         setNewEvent({
           name: '',
           description: '',
@@ -279,12 +305,14 @@ export default function AdminDashboard() {
         fetchData();
         setShowCreateEventModal(false);
         setTimeout(() => setCreateEventMessage(''), 5000);
+      } else if (successCount > 0) {
+        setCreateEventMessage(`⚠️ ${successCount} out of 4 events created successfully. Errors: ${errorMessages.join(', ')}`);
       } else {
-        setCreateEventMessage(`Error: ${data.error || 'Unknown error occurred'}`);
+        setCreateEventMessage(`❌ Failed to create any events. Errors: ${errorMessages.join(', ')}`);
       }
     } catch (error) {
-      console.error('Error creating event:', error);
-      setCreateEventMessage('Error creating event. Please check your connection and try again.');
+      console.error('Error creating events:', error);
+      setCreateEventMessage('Error creating events. Please check your connection and try again.');
     } finally {
       setIsCreatingEvent(false);
     }
@@ -354,24 +382,47 @@ export default function AdminDashboard() {
 
       const adminData = JSON.parse(session);
 
-      // Assign judge to the selected event
-      const response = await fetch('/api/judge-assignments/event', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          judgeId: assignment.judgeId,
-          eventId: assignment.eventId,
-          assignedBy: adminData.id
-        }),
-      });
+      // Find all events that match the selected root name
+      const rootEventName = assignment.eventId; // This is now the root name
+      const relatedEvents = events.filter(event => event.name.startsWith(rootEventName));
 
-      const data = await response.json();
+      if (relatedEvents.length === 0) {
+        setAssignmentMessage('Error: No events found for the selected event group.');
+        return;
+      }
 
-      if (data.success) {
-        const eventName = events.find(e => e.id === assignment.eventId)?.name || 'event';
-        setAssignmentMessage(`Judge assigned to "${eventName}" successfully!`);
+      let successCount = 0;
+      let errorMessages = [];
+
+      // Assign judge to all related events (Solo, Duet, Trio, Group)
+      for (const event of relatedEvents) {
+        try {
+          const response = await fetch('/api/judge-assignments/event', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              judgeId: assignment.judgeId,
+              eventId: event.id,
+              assignedBy: adminData.id
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            successCount++;
+          } else {
+            errorMessages.push(`${event.performanceType}: ${data.error}`);
+          }
+        } catch (error) {
+          errorMessages.push(`${event.performanceType}: Failed to assign`);
+        }
+      }
+
+      if (successCount === relatedEvents.length) {
+        setAssignmentMessage(`🎉 Judge assigned to all ${successCount} performance types successfully! (${relatedEvents.map(e => e.performanceType).join(', ')})`);
         setAssignment({
           judgeId: '',
           eventId: ''
@@ -379,8 +430,10 @@ export default function AdminDashboard() {
         fetchData();
         setShowAssignJudgeModal(false);
         setTimeout(() => setAssignmentMessage(''), 5000);
+      } else if (successCount > 0) {
+        setAssignmentMessage(`⚠️ Judge assigned to ${successCount} out of ${relatedEvents.length} events. Errors: ${errorMessages.join(', ')}`);
       } else {
-        setAssignmentMessage(`Error: ${data.error || 'Unknown error occurred'}`);
+        setAssignmentMessage(`❌ Failed to assign judge to any events. Errors: ${errorMessages.join(', ')}`);
       }
     } catch (error) {
       console.error('Error assigning judge:', error);
@@ -845,6 +898,8 @@ export default function AdminDashboard() {
     }
   };
 
+
+
   useEffect(() => {
     clearMessages();
   }, [activeTab]);
@@ -914,6 +969,7 @@ export default function AdminDashboard() {
                 <span className="text-sm sm:text-base">📧</span>
                 <span className="font-medium">Email Test</span>
               </button> */}
+
               <button
                 onClick={handleCleanDatabase}
                 disabled={isCleaningDatabase}
@@ -1065,16 +1121,25 @@ export default function AdminDashboard() {
                               <div className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">{event.name}</div>
                               <div className="text-xs sm:text-sm text-gray-700 font-medium mt-1">{event.venue}</div>
                                                             <div className="text-xs text-gray-500 sm:hidden mt-1">
-                                {event.region} • All Performance Types • All Age Categories
+                                {event.region} • {event.performanceType === 'All' ? 'All Performance Types' : event.performanceType} • {event.ageCategory}
                               </div>
               </div>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900 hidden sm:table-cell">{event.region}</td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                             <div className="space-y-1">
-                              <span className="inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700 border-purple-200">
-                                🎭 All Types
-                              </span>
+                              {event.performanceType === 'All' ? (
+                                <span className="inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700 border-purple-200">
+                                  🎭 All Types
+                                </span>
+                              ) : (
+                                <span className="inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border bg-gradient-to-r from-green-50 to-teal-50 text-green-700 border-green-200">
+                                  {event.performanceType === 'Solo' ? '🕺' : 
+                                   event.performanceType === 'Duet' ? '👯' : 
+                                   event.performanceType === 'Trio' ? '👨‍👩‍👧' : 
+                                   event.performanceType === 'Group' ? '👥' : '🎭'} {event.performanceType}
+                                </span>
+                              )}
                             <div className="text-xs sm:text-sm text-gray-700">{event.ageCategory}</div>
                             </div>
                           </td>
@@ -1971,10 +2036,10 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-1">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Types</label>
                   <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium text-base">
-                    All Performance Types (Solo, Duet, Trio, Group)
+                    🎭 Creates All Performance Types (Solo, Duet, Trio, Group)
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    💡 Events now accept all performance types by default. Age categories are determined automatically based on dancer's date of birth.
+                    💡 This will automatically create separate events for Solo, Duet, Trio, and Group performances.
                   </p>
                 </div>
 
@@ -2233,10 +2298,29 @@ export default function AdminDashboard() {
                     required
                   >
                     <option value="">Choose an event</option>
-                    {events.map(event => (
-                      <option key={event.id} value={event.id}>{event.name}</option>
-                    ))}
+                    {(() => {
+                      // Group events by their root name (remove " - Solo", " - Duet", etc.)
+                      const groupedEvents = events.reduce((acc, event) => {
+                        const rootName = event.name.replace(/ - (Solo|Duet|Trio|Group)$/, '');
+                        if (!acc.some(group => group.rootName === rootName)) {
+                          acc.push({
+                            rootName,
+                            events: events.filter(e => e.name.startsWith(rootName))
+                          });
+                        }
+                        return acc;
+                      }, [] as { rootName: string; events: typeof events }[]);
+
+                      return groupedEvents.map(group => (
+                        <option key={group.rootName} value={group.rootName}>
+                          {group.rootName} (All Performance Types)
+                        </option>
+                      ));
+                    })()}
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 Selecting an event will assign the judge to ALL performance types (Solo, Duet, Trio, Group).
+                  </p>
                 </div>
               </div>
 
@@ -2276,7 +2360,7 @@ export default function AdminDashboard() {
                   ) : (
                     <>
                       <span>✨</span>
-                      <span>Assign Judge</span>
+                      <span>Assign to All Types</span>
                     </>
                   )}
                 </button>

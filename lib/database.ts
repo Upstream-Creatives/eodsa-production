@@ -1521,6 +1521,18 @@ export const db = {
     return { canRegister: true };
   },
 
+  async updateEventPerformanceType(eventId: string, performanceType: string) {
+    const sqlClient = getSql();
+    
+    await sqlClient`
+      UPDATE events 
+      SET performance_type = ${performanceType}
+      WHERE id = ${eventId}
+    `;
+    
+    console.log(`✅ Event ${eventId} updated to ${performanceType} performance type`);
+  },
+
   // Waiver management for minors under 18
   async createWaiver(waiver: {
     dancerId: string;
