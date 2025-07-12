@@ -29,9 +29,34 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
   if (!isOpen) return null;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    
+    // Validate parent name to allow only letters, spaces, hyphens, and apostrophes
+    if (name === 'parentName') {
+      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+      setFormData({
+        ...formData,
+        [name]: cleanValue
+      });
+      return;
+    }
+    
+    // Validate parent email format in real-time
+    if (name === 'parentEmail') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (value && !emailRegex.test(value)) {
+        setError('Please enter a valid email address');
+      } else {
+        setError('');
+      }
+    }
+    
+    // Trim whitespace for text inputs  
+    const trimmedValue = typeof value === 'string' ? value.trim() : value;
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: trimmedValue
     });
   };
 

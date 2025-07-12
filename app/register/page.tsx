@@ -122,18 +122,96 @@ export default function RegisterPage() {
       return;
     }
 
-    // Validate National ID to only accept numbers
+    // Validate National ID to only accept numbers and auto-format
     if (name === 'nationalId') {
       // Remove any non-numeric characters
       const numericValue = value.replace(/\D/g, '');
       // Limit to 13 digits (South African ID length)
       const limitedValue = numericValue.slice(0, 13);
       
+      // Auto-format: XX-XXXX-XXXX-X
+      let formattedValue = limitedValue;
+      if (limitedValue.length >= 2) {
+        formattedValue = limitedValue.slice(0, 2);
+        if (limitedValue.length >= 6) {
+          formattedValue += '-' + limitedValue.slice(2, 6);
+          if (limitedValue.length >= 10) {
+            formattedValue += '-' + limitedValue.slice(6, 10);
+            if (limitedValue.length >= 11) {
+              formattedValue += '-' + limitedValue.slice(10, 13);
+            }
+          } else if (limitedValue.length > 6) {
+            formattedValue += '-' + limitedValue.slice(6);
+          }
+        } else if (limitedValue.length > 2) {
+          formattedValue += '-' + limitedValue.slice(2);
+        }
+      }
+      
       setFormData(prev => {
-        const newFormData = { ...prev, [name]: limitedValue };
+        const newFormData = { ...prev, [name]: formattedValue };
         return newFormData;
       });
       return;
+    }
+
+    // Validate phone number to allow only digits, spaces, hyphens, parentheses, and plus with auto-formatting
+    if (name === 'phone') {
+      const cleanValue = value.replace(/[^0-9\s\-\(\)\+]/g, '');
+      // Auto-format: XXX XXX XXXX (for 10-digit numbers)
+      const numbersOnly = cleanValue.replace(/\D/g, '');
+      let formattedValue = cleanValue;
+      
+      if (numbersOnly.length <= 10 && !cleanValue.includes('+')) {
+        if (numbersOnly.length >= 3) {
+          formattedValue = numbersOnly.slice(0, 3);
+          if (numbersOnly.length >= 6) {
+            formattedValue += ' ' + numbersOnly.slice(3, 6);
+            if (numbersOnly.length > 6) {
+              formattedValue += ' ' + numbersOnly.slice(6, 10);
+            }
+          } else if (numbersOnly.length > 3) {
+            formattedValue += ' ' + numbersOnly.slice(3);
+          }
+        } else {
+          formattedValue = numbersOnly;
+        }
+      }
+      
+      setFormData(prev => {
+        const newFormData = { ...prev, [name]: formattedValue };
+        return newFormData;
+      });
+      return;
+    }
+
+    // Validate name fields to allow only letters, spaces, hyphens, and apostrophes
+    if (name === 'name') {
+      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+      setFormData(prev => {
+        const newFormData = { ...prev, [name]: cleanValue };
+        return newFormData;
+      });
+      return;
+    }
+
+    // Validate date of birth to prevent future dates and unrealistic ages
+    if (name === 'dateOfBirth') {
+      const today = new Date();
+      const selectedDate = new Date(value);
+      const minDate = new Date('1900-01-01');
+      
+      // Prevent future dates
+      if (selectedDate > today) {
+        warning('Date of birth cannot be in the future.', 4000);
+        return;
+      }
+      
+      // Prevent dates before 1900
+      if (selectedDate < minDate) {
+        warning('Please enter a valid date of birth after 1900.', 4000);
+        return;
+      }
     }
 
     setFormData(prev => {
@@ -151,6 +229,44 @@ export default function RegisterPage() {
   };
 
   const handleGuardianChange = (field: keyof GuardianInfo, value: string) => {
+    // Validate guardian phone number with auto-formatting
+    if (field === 'cell') {
+      const cleanValue = value.replace(/[^0-9\s\-\(\)\+]/g, '');
+      // Auto-format: XXX XXX XXXX (for 10-digit numbers)
+      const numbersOnly = cleanValue.replace(/\D/g, '');
+      
+      if (numbersOnly.length <= 10 && !cleanValue.includes('+')) {
+        if (numbersOnly.length >= 3) {
+          value = numbersOnly.slice(0, 3);
+          if (numbersOnly.length >= 6) {
+            value += ' ' + numbersOnly.slice(3, 6);
+            if (numbersOnly.length > 6) {
+              value += ' ' + numbersOnly.slice(6, 10);
+            }
+          } else if (numbersOnly.length > 3) {
+            value += ' ' + numbersOnly.slice(3);
+          }
+        } else {
+          value = numbersOnly;
+        }
+      } else {
+        value = cleanValue;
+      }
+    }
+    
+    // Validate guardian name to allow only letters, spaces, hyphens, and apostrophes
+    if (field === 'name') {
+      value = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+    }
+    
+    // Validate guardian email format in real-time
+    if (field === 'email') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (value && !emailRegex.test(value)) {
+        warning('Please enter a valid guardian email address.', 4000);
+      }
+    }
+    
     setFormData(prev => ({
       ...prev,
       guardianInfo: prev.guardianInfo ? {
@@ -541,6 +657,8 @@ export default function RegisterPage() {
                         name="dateOfBirth"
                         value={formData.dateOfBirth}
                         onChange={handleInputChange}
+                        min="1900-01-01"
+                        max={new Date().toISOString().split('T')[0]}
                           className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white text-lg"
                         required
                       />

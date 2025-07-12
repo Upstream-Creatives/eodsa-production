@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { PERFORMANCE_TYPES } from '@/lib/types';
+import { PERFORMANCE_TYPES, MASTERY_LEVELS } from '@/lib/types';
 import CountdownTimer from '@/app/components/CountdownTimer';
 import { useToast } from '@/components/ui/simple-toast';
 
@@ -81,7 +81,7 @@ export default function CompetitionEntryPage() {
   const [currentForm, setCurrentForm] = useState({
     itemName: '',
     choreographer: '',
-    mastery: 'Beginner',
+    mastery: 'Water (Competitive)',
     itemStyle: '',
     estimatedDuration: '',
     participantIds: [] as string[],
@@ -333,7 +333,7 @@ export default function CompetitionEntryPage() {
       setCurrentForm({
         itemName: '',
         choreographer: '',
-        mastery: 'Beginner',
+        mastery: 'Water (Competitive)',
         itemStyle: '',
         estimatedDuration: '',
         participantIds: [],
@@ -677,7 +677,16 @@ export default function CompetitionEntryPage() {
                     <input
                       type="text"
                       value={currentForm.itemName}
-                      onChange={(e) => setCurrentForm({...currentForm, itemName: e.target.value})}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Prevent empty strings with just spaces and enforce minimum length
+                        if (value && value.trim().length > 0 && value.trim().length < 3) {
+                          error('Item name must be at least 3 characters long.');
+                        } else if (value && value.trim().length === 0) {
+                          error('Item name cannot be empty or contain only spaces.');
+                        }
+                        setCurrentForm({...currentForm, itemName: value});
+                      }}
                       className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
@@ -687,7 +696,10 @@ export default function CompetitionEntryPage() {
                     <input
                       type="text"
                       value={currentForm.choreographer}
-                      onChange={(e) => setCurrentForm({...currentForm, choreographer: e.target.value})}
+                      onChange={(e) => {
+                        const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
+                        setCurrentForm({...currentForm, choreographer: cleanValue});
+                      }}
                       className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
@@ -699,9 +711,10 @@ export default function CompetitionEntryPage() {
                       onChange={(e) => setCurrentForm({...currentForm, mastery: e.target.value})}
                       className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     >
-                      <option value="Beginner">Beginner</option>
-                      <option value="Intermediate">Intermediate</option>
-                      <option value="Advanced">Advanced</option>
+                      <option value="">Select mastery level</option>
+                      {MASTERY_LEVELS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
                     </select>
                   </div>
                   

@@ -1453,7 +1453,16 @@ export default function PerformanceTypeEntryPage() {
                             <input
                               type="text"
                               value={solo.itemName}
-                              onChange={(e) => updateSoloField(index, 'itemName', e.target.value)}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Prevent empty strings with just spaces and enforce minimum length
+                                if (value && value.trim().length > 0 && value.trim().length < 3) {
+                                  showAlert('Item name must be at least 3 characters long.', 'warning');
+                                } else if (value && value.trim().length === 0) {
+                                  showAlert('Item name cannot be empty or contain only spaces.', 'warning');
+                                }
+                                updateSoloField(index, 'itemName', value);
+                              }}
                               placeholder="Name of your performance piece"
                               className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
                               required
@@ -1465,7 +1474,10 @@ export default function PerformanceTypeEntryPage() {
                             <input
                               type="text"
                               value={solo.choreographer}
-                              onChange={(e) => updateSoloField(index, 'choreographer', e.target.value)}
+                              onChange={(e) => {
+                                const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
+                                updateSoloField(index, 'choreographer', cleanValue);
+                              }}
                               placeholder="Name of the choreographer"
                               className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
                               required
@@ -1529,7 +1541,16 @@ export default function PerformanceTypeEntryPage() {
                           type="text"
                           name="itemName"
                           value={formData.itemName}
-                          onChange={handleInputChange}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Prevent empty strings with just spaces and enforce minimum length
+                            if (value && value.trim().length > 0 && value.trim().length < 3) {
+                              showAlert('Item name must be at least 3 characters long.', 'warning');
+                            } else if (value && value.trim().length === 0) {
+                              showAlert('Item name cannot be empty or contain only spaces.', 'warning');
+                            }
+                            setFormData(prev => ({ ...prev, itemName: value }));
+                          }}
                           placeholder="Name of your performance piece"
                           className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
                           required
@@ -1542,7 +1563,10 @@ export default function PerformanceTypeEntryPage() {
                           type="text"
                           name="choreographer"
                           value={formData.choreographer}
-                          onChange={handleInputChange}
+                          onChange={(e) => {
+                            const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
+                            setFormData(prev => ({ ...prev, choreographer: cleanValue }));
+                          }}
                           placeholder="Name of the choreographer"
                           className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
                           required
@@ -1611,9 +1635,9 @@ export default function PerformanceTypeEntryPage() {
                         </div>
                         <div className="text-blue-200 text-sm">
                           Solo: 2:00 • Duet/Trio: 3:00 • Group: 3:30
-                        </div>
-                      </div>
-                    </div>
+                          </div>
+                          </div>
+                          </div>
                   )}
 
                   {/* Age Category - Read-only, calculated from oldest participant */}
@@ -1622,8 +1646,8 @@ export default function PerformanceTypeEntryPage() {
                       Age Category
                       <span className="text-xs text-gray-400 block mt-1">Read-only: Based on oldest participant</span>
                     </label>
-                    <input
-                      type="text"
+                      <input
+                        type="text"
                       value={getCalculatedAgeCategory()}
                       readOnly
                       className="w-full px-4 py-3 border border-gray-500 bg-gray-600 rounded-xl text-gray-300 cursor-not-allowed"
@@ -1645,8 +1669,8 @@ export default function PerformanceTypeEntryPage() {
                             .map(dancer => dancer.age)
                           )} years → Category: {getCalculatedAgeCategory()}
                         </div>
-                      </div>
-                    )}
+                    </div>
+                  )}
                   </div>
                 </div>
               </div>

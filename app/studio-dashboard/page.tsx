@@ -474,6 +474,105 @@ export default function StudioDashboardPage() {
     router.push('/studio-login');
   };
 
+  // National ID validation handler
+  const handleNationalIdChange = (value: string, setData: (prev: any) => void) => {
+    // Remove any non-numeric characters
+    const numericValue = value.replace(/\D/g, '');
+    // Limit to 13 digits (South African ID length)
+    const limitedValue = numericValue.slice(0, 13);
+    
+    // Auto-format: XX-XXXX-XXXX-X
+    let formattedValue = limitedValue;
+    if (limitedValue.length >= 2) {
+      formattedValue = limitedValue.slice(0, 2);
+      if (limitedValue.length >= 6) {
+        formattedValue += '-' + limitedValue.slice(2, 6);
+        if (limitedValue.length >= 10) {
+          formattedValue += '-' + limitedValue.slice(6, 10);
+          if (limitedValue.length >= 11) {
+            formattedValue += '-' + limitedValue.slice(10, 13);
+          }
+        } else if (limitedValue.length > 6) {
+          formattedValue += '-' + limitedValue.slice(6);
+        }
+      } else if (limitedValue.length > 2) {
+        formattedValue += '-' + limitedValue.slice(2);
+      }
+    }
+    
+    setData((prev: any) => ({ ...prev, nationalId: formattedValue }));
+  };
+
+  // Phone number validation handler
+  const handlePhoneChange = (value: string, setData: (prev: any) => void, field: string) => {
+    // Allow only digits, spaces, hyphens, parentheses, and plus sign
+    const cleanValue = value.replace(/[^0-9\s\-\(\)\+]/g, '');
+    
+    // Auto-format: XXX XXX XXXX (for 10-digit numbers)
+    const numbersOnly = cleanValue.replace(/\D/g, '');
+    let formattedValue = cleanValue;
+    
+    if (numbersOnly.length <= 10 && !cleanValue.includes('+')) {
+      if (numbersOnly.length >= 3) {
+        formattedValue = numbersOnly.slice(0, 3);
+        if (numbersOnly.length >= 6) {
+          formattedValue += ' ' + numbersOnly.slice(3, 6);
+          if (numbersOnly.length > 6) {
+            formattedValue += ' ' + numbersOnly.slice(6, 10);
+          }
+        } else if (numbersOnly.length > 3) {
+          formattedValue += ' ' + numbersOnly.slice(3);
+        }
+      } else {
+        formattedValue = numbersOnly;
+      }
+    }
+    
+    setData((prev: any) => ({ ...prev, [field]: formattedValue }));
+  };
+
+  // Name validation handler
+  const handleNameChange = (value: string, setData: (prev: any) => void, field: string) => {
+    // Allow only letters, spaces, hyphens, and apostrophes
+    const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+    
+    setData((prev: any) => ({ ...prev, [field]: cleanValue }));
+  };
+
+  // Email validation handler
+  const handleEmailChange = (value: string, setData: (prev: any) => void, field: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (value && !emailRegex.test(value)) {
+      setError('Please enter a valid email address');
+    } else {
+      setError('');
+    }
+    setData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  // Date of birth validation handler
+  const handleDateOfBirthChange = (value: string, setData: (prev: any) => void) => {
+    const today = new Date();
+    const selectedDate = new Date(value);
+    const minDate = new Date('1900-01-01');
+    
+    // Prevent future dates
+    if (selectedDate > today) {
+      setError('Date of birth cannot be in the future.');
+      return;
+    }
+    
+    // Prevent dates before 1900
+    if (selectedDate < minDate) {
+      setError('Please enter a valid date of birth after 1900');
+      return;
+    }
+    
+    // Clear error if date is valid
+    setError('');
+    setData((prev: any) => ({ ...prev, dateOfBirth: value }));
+  };
+
   // Calculate studio metrics
   const getStudioStats = () => {
     return {
@@ -1212,7 +1311,7 @@ export default function StudioDashboardPage() {
                 <input
                   type="text"
                   value={registerDancerData.name}
-                  onChange={(e) => setRegisterDancerData({...registerDancerData, name: e.target.value})}
+                  onChange={(e) => handleNameChange(e.target.value, setRegisterDancerData, 'name')}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
@@ -1223,7 +1322,9 @@ export default function StudioDashboardPage() {
                 <input
                   type="date"
                   value={registerDancerData.dateOfBirth}
-                  onChange={(e) => setRegisterDancerData({...registerDancerData, dateOfBirth: e.target.value})}
+                  onChange={(e) => handleDateOfBirthChange(e.target.value, setRegisterDancerData)}
+                  min="1900-01-01"
+                  max={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
@@ -1234,8 +1335,13 @@ export default function StudioDashboardPage() {
                 <input
                   type="text"
                   value={registerDancerData.nationalId}
-                  onChange={(e) => setRegisterDancerData({...registerDancerData, nationalId: e.target.value})}
+                  onChange={(e) => handleNationalIdChange(e.target.value, setRegisterDancerData)}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="13 digit ID number"
+                  pattern="[0-9]{13}"
+                  maxLength={13}
+                  inputMode="numeric"
+                  title="Please enter exactly 13 digits"
                   required
                 />
               </div>
@@ -1245,7 +1351,7 @@ export default function StudioDashboardPage() {
                 <input
                   type="email"
                   value={registerDancerData.email}
-                  onChange={(e) => setRegisterDancerData({...registerDancerData, email: e.target.value})}
+                  onChange={(e) => handleEmailChange(e.target.value, setRegisterDancerData, 'email')}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
               </div>
@@ -1255,8 +1361,9 @@ export default function StudioDashboardPage() {
                 <input
                   type="tel"
                   value={registerDancerData.phone}
-                  onChange={(e) => setRegisterDancerData({...registerDancerData, phone: e.target.value})}
+                  onChange={(e) => handlePhoneChange(e.target.value, setRegisterDancerData, 'phone')}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="081 234 5678"
                 />
               </div>
               
@@ -1271,7 +1378,7 @@ export default function StudioDashboardPage() {
                     <input
                       type="text"
                       value={registerDancerData.guardianName}
-                      onChange={(e) => setRegisterDancerData({...registerDancerData, guardianName: e.target.value})}
+                      onChange={(e) => handleNameChange(e.target.value, setRegisterDancerData, 'guardianName')}
                       className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       required
                     />
@@ -1282,7 +1389,7 @@ export default function StudioDashboardPage() {
                     <input
                       type="email"
                       value={registerDancerData.guardianEmail}
-                      onChange={(e) => setRegisterDancerData({...registerDancerData, guardianEmail: e.target.value})}
+                      onChange={(e) => handleEmailChange(e.target.value, setRegisterDancerData, 'guardianEmail')}
                       className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       required
                     />
@@ -1293,8 +1400,9 @@ export default function StudioDashboardPage() {
                     <input
                       type="tel"
                       value={registerDancerData.guardianPhone}
-                      onChange={(e) => setRegisterDancerData({...registerDancerData, guardianPhone: e.target.value})}
+                      onChange={(e) => handlePhoneChange(e.target.value, setRegisterDancerData, 'guardianPhone')}
                       className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      placeholder="081 234 5678"
                       required
                     />
                   </div>
@@ -1351,7 +1459,7 @@ export default function StudioDashboardPage() {
                 <input
                   type="text"
                   value={editDancerData.name}
-                  onChange={(e) => setEditDancerData({...editDancerData, name: e.target.value})}
+                  onChange={(e) => handleNameChange(e.target.value, setEditDancerData, 'name')}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
@@ -1362,7 +1470,9 @@ export default function StudioDashboardPage() {
                 <input
                   type="date"
                   value={editDancerData.dateOfBirth}
-                  onChange={(e) => setEditDancerData({...editDancerData, dateOfBirth: e.target.value})}
+                  onChange={(e) => handleDateOfBirthChange(e.target.value, setEditDancerData)}
+                  min="1900-01-01"
+                  max={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
@@ -1373,8 +1483,13 @@ export default function StudioDashboardPage() {
                 <input
                   type="text"
                   value={editDancerData.nationalId}
-                  onChange={(e) => setEditDancerData({...editDancerData, nationalId: e.target.value})}
+                  onChange={(e) => handleNationalIdChange(e.target.value, setEditDancerData)}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="13 digit ID number"
+                  pattern="[0-9]{13}"
+                  maxLength={13}
+                  inputMode="numeric"
+                  title="Please enter exactly 13 digits"
                   required
                 />
               </div>
@@ -1384,7 +1499,7 @@ export default function StudioDashboardPage() {
                 <input
                   type="email"
                   value={editDancerData.email || ''}
-                  onChange={(e) => setEditDancerData({...editDancerData, email: e.target.value})}
+                  onChange={(e) => handleEmailChange(e.target.value, setEditDancerData, 'email')}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
               </div>
@@ -1394,8 +1509,9 @@ export default function StudioDashboardPage() {
                 <input
                   type="tel"
                   value={editDancerData.phone || ''}
-                  onChange={(e) => setEditDancerData({...editDancerData, phone: e.target.value})}
+                  onChange={(e) => handlePhoneChange(e.target.value, setEditDancerData, 'phone')}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="081 234 5678"
                 />
               </div>
             </div>
@@ -1435,7 +1551,18 @@ export default function StudioDashboardPage() {
                 <input
                   type="text"
                   value={editEntryData.itemName}
-                  onChange={(e) => setEditEntryData({...editEntryData, itemName: e.target.value})}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Prevent empty strings with just spaces and enforce minimum length
+                    if (value && value.trim().length > 0 && value.trim().length < 3) {
+                      setError('Item name must be at least 3 characters long');
+                    } else if (value && value.trim().length === 0) {
+                      setError('Item name cannot be empty or contain only spaces');
+                    } else {
+                      setError('');
+                    }
+                    setEditEntryData({...editEntryData, itemName: value});
+                  }}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
@@ -1446,7 +1573,10 @@ export default function StudioDashboardPage() {
                 <input
                   type="text"
                   value={editEntryData.choreographer}
-                  onChange={(e) => setEditEntryData({...editEntryData, choreographer: e.target.value})}
+                  onChange={(e) => {
+                    const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
+                    setEditEntryData({...editEntryData, choreographer: cleanValue});
+                  }}
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
@@ -1491,12 +1621,26 @@ export default function StudioDashboardPage() {
                   type="number"
                   value={editEntryData.estimatedDuration}
                   onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0.5;
-                    setEditEntryData({...editEntryData, estimatedDuration: Math.max(0.5, value)});
+                    const value = parseFloat(e.target.value);
+                    // Prevent negative numbers and enforce realistic ranges
+                                         if (isNaN(value) || value < 0) {
+                       setError('Duration must be a positive number');
+                       return;
+                     }
+                     if (value < 0.5) {
+                       setError('Duration must be at least 30 seconds (0.5 minutes)');
+                       return;
+                     }
+                     if (value > 3.5) {
+                       setError('Duration cannot exceed 3.5 minutes (maximum for any performance type)');
+                       return;
+                     }
+                    setError('');
+                    setEditEntryData({...editEntryData, estimatedDuration: value});
                   }}
                   min="0.5"
                   max="3.5"
-                  step="0.5"
+                  step="0.1"
                   className="w-full px-4 py-2 border border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                   title="Minimum 30 seconds (0.5 minutes), maximum 3.5 minutes"

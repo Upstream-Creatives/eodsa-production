@@ -34,9 +34,80 @@ export default function StudioRegisterPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    
+    // Validate phone number to allow only digits, spaces, hyphens, parentheses, and plus with auto-formatting
+    if (name === 'phone') {
+      const cleanValue = value.replace(/[^0-9\s\-\(\)\+]/g, '');
+      // Auto-format: XXX XXX XXXX (for 10-digit numbers)
+      const numbersOnly = cleanValue.replace(/\D/g, '');
+      let formattedValue = cleanValue;
+      
+      if (numbersOnly.length <= 10 && !cleanValue.includes('+')) {
+        if (numbersOnly.length >= 3) {
+          formattedValue = numbersOnly.slice(0, 3);
+          if (numbersOnly.length >= 6) {
+            formattedValue += ' ' + numbersOnly.slice(3, 6);
+            if (numbersOnly.length > 6) {
+              formattedValue += ' ' + numbersOnly.slice(6, 10);
+            }
+          } else if (numbersOnly.length > 3) {
+            formattedValue += ' ' + numbersOnly.slice(3);
+          }
+        } else {
+          formattedValue = numbersOnly;
+        }
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: formattedValue
+      }));
+      return;
+    }
+    
+    // Validate contact person name to allow only letters, spaces, hyphens, and apostrophes
+    if (name === 'contactPerson') {
+      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+      setFormData(prev => ({
+        ...prev,
+        [name]: cleanValue
+      }));
+      return;
+    }
+    
+    // Validate email format in real-time
+    if (name === 'email') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (value && !emailRegex.test(value)) {
+        setError('Please enter a valid email address');
+      } else {
+        setError('');
+      }
+    }
+    
+    // Validate password strength in real-time
+    if (name === 'password') {
+      if (value.length < 8) {
+        setError('Password must be at least 8 characters long');
+      } else if (!/[A-Z]/.test(value)) {
+        setError('Password must contain at least one uppercase letter');
+      } else if (!/[a-z]/.test(value)) {
+        setError('Password must contain at least one lowercase letter');
+      } else if (!/[0-9]/.test(value)) {
+        setError('Password must contain at least one number');
+      } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
+        setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
+      } else {
+        setError('');
+      }
+    }
+    
+    // Trim whitespace for all text inputs except password fields
+    const trimmedValue = (name === 'password' || name === 'confirmPassword') ? value : value.trim();
+    
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: trimmedValue
     }));
   };
 
@@ -53,8 +124,36 @@ export default function StudioRegisterPage() {
     }
 
     // Validate password strength
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Check for uppercase letter
+    if (!/[A-Z]/.test(formData.password)) {
+      setError('Password must contain at least one uppercase letter');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Check for lowercase letter
+    if (!/[a-z]/.test(formData.password)) {
+      setError('Password must contain at least one lowercase letter');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Check for number
+    if (!/[0-9]/.test(formData.password)) {
+      setError('Password must contain at least one number');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Check for special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
       setIsSubmitting(false);
       return;
     }

@@ -2961,13 +2961,13 @@ export const unifiedDb = {
     // Create both records to ensure consistency
     try {
       // Create the dancer record
-      await sqlClient`
-        INSERT INTO dancers (id, eodsa_id, name, date_of_birth, age, national_id, email, phone, 
-                            guardian_name, guardian_email, guardian_phone, approved, approved_at)
-        VALUES (${id}, ${eodsaId}, ${dancer.name}, ${dancer.dateOfBirth}, ${age}, ${dancer.nationalId},
-                ${dancer.email || null}, ${dancer.phone || null}, ${dancer.guardianName || null},
-                ${dancer.guardianEmail || null}, ${dancer.guardianPhone || null}, TRUE, ${approvedAt})
-      `;
+    await sqlClient`
+      INSERT INTO dancers (id, eodsa_id, name, date_of_birth, age, national_id, email, phone, 
+                          guardian_name, guardian_email, guardian_phone, approved, approved_at)
+      VALUES (${id}, ${eodsaId}, ${dancer.name}, ${dancer.dateOfBirth}, ${age}, ${dancer.nationalId},
+              ${dancer.email || null}, ${dancer.phone || null}, ${dancer.guardianName || null},
+              ${dancer.guardianEmail || null}, ${dancer.guardianPhone || null}, TRUE, ${approvedAt})
+    `;
       
       // CONSISTENCY FIX: Also create a corresponding contestant record
       // This prevents future foreign key constraint violations
@@ -3065,11 +3065,11 @@ export const unifiedDb = {
       const dancerData = dancer[0];
       
       // Update dancer approval status
-      await sqlClient`
-        UPDATE dancers 
-        SET approved = true, approved_by = ${adminId}, approved_at = ${approvedAt}, rejection_reason = null
-        WHERE id = ${dancerId}
-      `;
+    await sqlClient`
+      UPDATE dancers 
+      SET approved = true, approved_by = ${adminId}, approved_at = ${approvedAt}, rejection_reason = null
+      WHERE id = ${dancerId}
+    `;
       
       // CONSISTENCY FIX: Create corresponding contestant record to prevent future FK errors
       await sqlClient`

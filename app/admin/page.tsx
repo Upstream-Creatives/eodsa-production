@@ -299,6 +299,36 @@ export default function AdminDashboard() {
       return;
     }
 
+    // Validate password strength
+    if (newJudge.password.length < 8) {
+      setCreateJudgeMessage('Error: Password must be at least 8 characters long');
+      return;
+    }
+    
+    // Check for uppercase letter
+    if (!/[A-Z]/.test(newJudge.password)) {
+      setCreateJudgeMessage('Error: Password must contain at least one uppercase letter');
+      return;
+    }
+    
+    // Check for lowercase letter
+    if (!/[a-z]/.test(newJudge.password)) {
+      setCreateJudgeMessage('Error: Password must contain at least one lowercase letter');
+      return;
+    }
+    
+    // Check for number
+    if (!/[0-9]/.test(newJudge.password)) {
+      setCreateJudgeMessage('Error: Password must contain at least one number');
+      return;
+    }
+    
+    // Check for special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newJudge.password)) {
+      setCreateJudgeMessage('Error: Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
+      return;
+    }
+
     setIsCreatingJudge(true);
     setCreateJudgeMessage('');
 
@@ -2005,25 +2035,25 @@ export default function AdminDashboard() {
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="bg-white p-4 rounded-lg border border-orange-200">
                         <h4 className="font-bold text-orange-800 mb-3 flex items-center">
-                          🔥 Water/Fire (Competitive/Advanced)
+                          💧 Water (Competition)
                         </h4>
                         <div className="space-y-2 text-sm">
-                          <div><strong>Registration:</strong> R{EODSA_FEES.REGISTRATION['Water (Competition)']} per person</div>
-                          <div><strong>Solo:</strong> R{EODSA_FEES.PERFORMANCE.WATER_FIRE.Solo} (packages available)</div>
-                          <div><strong>Duet/Trio:</strong> R{EODSA_FEES.PERFORMANCE.WATER_FIRE.Duet} per person</div>
-                          <div><strong>Groups:</strong> R{EODSA_FEES.PERFORMANCE.WATER_FIRE.SmallGroup} per person</div>
+                          <div><strong>Registration:</strong> R{EODSA_FEES.REGISTRATION['Water (Competitive)']} per person</div>
+                          <div><strong>Solo:</strong> R{EODSA_FEES.PERFORMANCE.Solo} (packages available)</div>
+                          <div><strong>Duet/Trio:</strong> R{EODSA_FEES.PERFORMANCE.Duet} per person</div>
+                          <div><strong>Groups:</strong> R{EODSA_FEES.PERFORMANCE.SmallGroup} per person</div>
                         </div>
                       </div>
                       
-                      <div className="bg-white p-4 rounded-lg border border-green-200">
-                        <h4 className="font-bold text-green-800 mb-3 flex items-center">
-                          🌱 Earth/Air (Eisteddfod/Special)
+                      <div className="bg-white p-4 rounded-lg border border-red-200">
+                        <h4 className="font-bold text-red-800 mb-3 flex items-center">
+                          🔥 Fire (Advanced)
                         </h4>
                         <div className="space-y-2 text-sm">
-                          <div><strong>Registration:</strong> R{EODSA_FEES.REGISTRATION['Earth (Eisteddfod)']} per person</div>
-                          <div><strong>Solo:</strong> R{EODSA_FEES.PERFORMANCE.EARTH_AIR.Solo} each</div>
-                          <div><strong>Duet/Trio:</strong> R{EODSA_FEES.PERFORMANCE.EARTH_AIR.Duet} per person</div>
-                          <div><strong>Groups:</strong> R{EODSA_FEES.PERFORMANCE.EARTH_AIR.SmallGroup} per person</div>
+                          <div><strong>Registration:</strong> R{EODSA_FEES.REGISTRATION['Fire (Advanced)']} per person</div>
+                          <div><strong>Solo:</strong> R{EODSA_FEES.PERFORMANCE.Solo} (packages available)</div>
+                          <div><strong>Duet/Trio:</strong> R{EODSA_FEES.PERFORMANCE.Duet} per person</div>
+                          <div><strong>Groups:</strong> R{EODSA_FEES.PERFORMANCE.SmallGroup} per person</div>
                         </div>
                       </div>
                     </div>
@@ -2112,7 +2142,10 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                       value={newJudge.name}
-                      onChange={(e) => setNewJudge(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => {
+                        const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+                        setNewJudge(prev => ({ ...prev, name: cleanValue }));
+                      }}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
                       required
                     placeholder="Full Name"

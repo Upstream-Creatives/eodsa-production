@@ -91,10 +91,8 @@ export const checkGroupRegistrationStatus = async (
 
   if (analysis.needRegistration.length > 0) {
     const registrationFeePerPerson = {
-      'Water (Competition)': 250,
-      'Fire (Advanced)': 250,
-      'Earth (Eisteddfod)': 150,
-      'Air (Special Needs)': 150
+      'Water (Competitive)': 250,
+      'Fire (Advanced)': 250
     }[masteryLevel] || 0;
 
     analysis.registrationFeeRequired = registrationFeePerPerson * analysis.needRegistration.length;

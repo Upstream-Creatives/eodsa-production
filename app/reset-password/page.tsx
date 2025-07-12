@@ -32,11 +32,31 @@ function ResetPasswordContent() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    
+    // Validate password strength in real-time
+    if (name === 'newPassword') {
+      if (value.length < 8) {
+        setError('Password must be at least 8 characters long');
+      } else if (!/[A-Z]/.test(value)) {
+        setError('Password must contain at least one uppercase letter');
+      } else if (!/[a-z]/.test(value)) {
+        setError('Password must contain at least one lowercase letter');
+      } else if (!/[0-9]/.test(value)) {
+        setError('Password must contain at least one number');
+      } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
+        setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
+      } else {
+        setError('');
+      }
+    } else {
+      // Clear error when user starts typing in other fields
+      if (error) setError('');
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    if (error) setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,8 +72,36 @@ function ResetPasswordContent() {
     }
 
     // Validate password strength
-    if (formData.newPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (formData.newPassword.length < 8) {
+      setError('Password must be at least 8 characters long');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Check for uppercase letter
+    if (!/[A-Z]/.test(formData.newPassword)) {
+      setError('Password must contain at least one uppercase letter');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Check for lowercase letter
+    if (!/[a-z]/.test(formData.newPassword)) {
+      setError('Password must contain at least one lowercase letter');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Check for number
+    if (!/[0-9]/.test(formData.newPassword)) {
+      setError('Password must contain at least one number');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Check for special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword)) {
+      setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
       setIsLoading(false);
       return;
     }
