@@ -331,9 +331,9 @@ export default function StudioDashboardPage() {
           setRecaptchaToken(''); // Reset reCAPTCHA on failure
         }
         
-        // If it's a duplicate National ID error, suggest changing it
+        // If it's a duplicate National ID error, suggest checking account
         if (registerData.error && registerData.error.includes('National ID is already registered')) {
-          setError(registerData.error + ' - Please try using a different National ID number.');
+          setError('Please double check your national ID or maybe this dancer already has an account.');
         }
       }
     } catch (error) {
@@ -1293,6 +1293,18 @@ export default function StudioDashboardPage() {
             <h3 className="text-xl font-bold text-white mb-4">Add Dancer by EODSA ID</h3>
             <p className="text-gray-300 mb-4">Enter the EODSA ID of a dancer to add them to your studio.</p>
             
+            {/* Error Message Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-red-300 text-sm font-medium">{error}</p>
+                </div>
+              </div>
+            )}
+            
             <input
               type="text"
               value={addDancerEodsaId}
@@ -1329,6 +1341,18 @@ export default function StudioDashboardPage() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-white mb-4">Register New Dancer</h3>
+            
+            {/* Error Message Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-red-300 text-sm font-medium">{error}</p>
+                </div>
+              </div>
+            )}
             
             <div className="space-y-4">
               <div>
@@ -1479,6 +1503,18 @@ export default function StudioDashboardPage() {
           <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6">
             <h3 className="text-xl font-bold text-white mb-4">Edit Dancer Information</h3>
             
+            {/* Error Message Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-red-300 text-sm font-medium">{error}</p>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-gray-300 text-sm font-medium mb-1">Full Name *</label>
@@ -1570,6 +1606,18 @@ export default function StudioDashboardPage() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6">
             <h3 className="text-xl font-bold text-white mb-4">Edit Competition Entry</h3>
+            
+            {/* Error Message Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-red-300 text-sm font-medium">{error}</p>
+                </div>
+              </div>
+            )}
             
             <div className="space-y-4">
               <div>

@@ -1120,10 +1120,10 @@ export default function PerformanceTypeEntryPage() {
             ) : (
               <>
             <Link 
-              href={`/event-dashboard?${authQueryParam}`}
+              href={isStudioMode ? `/event-dashboard?studioId=${studioId}` : `/`}
               className="block w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
             >
-              Enter Another Event
+              {isStudioMode ? 'Enter Another Event' : 'Back to Main Portal'}
             </Link>
             <Link 
               href="/"
@@ -1185,13 +1185,13 @@ export default function PerformanceTypeEntryPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Link 
-            href={`/event-dashboard/${region}?${authQueryParam}`} 
+            href={isStudioMode ? `/event-dashboard/${region}?studioId=${studioId}` : `/`}
             className="inline-flex items-center text-purple-400 hover:text-purple-300 mb-4 transition-colors"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to {region} Events
+            {isStudioMode ? `Back to ${region} Events` : 'Back to Main Portal'}
           </Link>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
             {performanceType?.charAt(0).toUpperCase() + performanceType?.slice(1)} Entry

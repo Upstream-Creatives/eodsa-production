@@ -280,7 +280,7 @@ export default function NationalsEventsPage() {
           {/* Back Navigation */}
           <div className="mb-4">
             <Link 
-              href={isStudioMode ? `/studio-dashboard?studioId=${studioId}` : `/event-dashboard?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
+              href={isStudioMode ? `/studio-dashboard?studioId=${studioId}` : `/`}
               className="inline-flex items-center space-x-2 px-3 py-2 bg-slate-800/80 text-slate-300 rounded-lg hover:bg-slate-700 transition-all duration-300 group text-sm"
             >
               <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">

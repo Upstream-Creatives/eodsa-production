@@ -542,13 +542,13 @@ export default function CompetitionEntryPage() {
           {/* Back Navigation */}
           <div className="mb-4">
             <Link 
-              href={`/event-dashboard/${region}?${isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`}`}
+              href={isStudioMode ? `/event-dashboard/${region}?studioId=${studioId}` : `/`}
               className="inline-flex items-center space-x-2 px-3 py-2 bg-slate-800/80 text-slate-300 rounded-lg hover:bg-slate-700 transition-all duration-300 group text-sm"
             >
               <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              <span>Back to Events</span>
+              <span>{isStudioMode ? 'Back to Events' : 'Back to Main Portal'}</span>
             </Link>
           </div>
 
@@ -1173,10 +1173,10 @@ export default function CompetitionEntryPage() {
                     Enter More Events
                   </button>
                   <button
-                    onClick={() => router.push(`/event-dashboard?eodsaId=${eodsaId}`)}
+                    onClick={() => router.push(`/`)}
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
                   >
-                    Event Dashboard
+                    Main Portal
                   </button>
                 </>
               )}
