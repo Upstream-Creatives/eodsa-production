@@ -61,14 +61,68 @@ export default function HomePage() {
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   id="eodsa-id-input"
                 />
+                <div id="eodsa-error" className="hidden text-red-300 text-xs mt-1"></div>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const input = document.getElementById('eodsa-id-input') as HTMLInputElement;
-                    if (input?.value.trim()) {
-                      window.location.href = `/event-dashboard?eodsaId=${input.value.trim()}`;
+                    const errorDiv = document.getElementById('eodsa-error') as HTMLDivElement;
+                    const button = event?.target as HTMLButtonElement;
+                    
+                    if (!input?.value.trim()) {
+                      errorDiv.textContent = 'Please enter an EODSA ID';
+                      errorDiv.classList.remove('hidden');
+                      return;
+                    }
+                    
+                    const eodsaId = input.value.trim().toUpperCase();
+                    
+                    // Show loading state
+                    const originalText = button.textContent;
+                    button.textContent = 'Validating...';
+                    button.disabled = true;
+                    errorDiv.classList.add('hidden');
+                    
+                    try {
+                      // Try unified system first
+                      let found = false;
+                      const unifiedResponse = await fetch(`/api/dancers/by-eodsa-id/${eodsaId}`);
+                      if (unifiedResponse.ok) {
+                        const unifiedData = await unifiedResponse.json();
+                        if (unifiedData.success && unifiedData.dancer) {
+                          found = true;
+                        }
+                      }
+                      
+                      // If not found in unified system, try legacy system
+                      if (!found) {
+                        const legacyResponse = await fetch(`/api/contestants/by-eodsa-id/${eodsaId}`);
+                        if (legacyResponse.ok) {
+                          const legacyData = await legacyResponse.json();
+                          if (legacyData && legacyData.eodsaId) {
+                            found = true;
+                          }
+                        }
+                      }
+                      
+                      if (found) {
+                        // Valid EODSA ID, redirect to dashboard
+                        window.location.href = `/event-dashboard?eodsaId=${eodsaId}`;
+                      } else {
+                        // Invalid EODSA ID
+                        errorDiv.textContent = `EODSA ID "${eodsaId}" not found. Please check your ID or register first.`;
+                        errorDiv.classList.remove('hidden');
+                        button.textContent = originalText;
+                        button.disabled = false;
+                      }
+                    } catch (error) {
+                      console.error('Error validating EODSA ID:', error);
+                      errorDiv.textContent = 'Unable to validate EODSA ID. Please check your connection and try again.';
+                      errorDiv.classList.remove('hidden');
+                      button.textContent = originalText;
+                      button.disabled = false;
                     }
                   }}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl text-sm"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Enter Event Dashboard
                 </button>

@@ -716,19 +716,26 @@ export default function RegisterPage() {
                         name="province"
                         value={formData.province}
                         onChange={handleInputChange}
-                        className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white text-lg"
+                        className="w-full px-6 py-4 bg-gray-800/90 border border-white/20 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-white text-lg appearance-none cursor-pointer"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 1rem center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '2.5rem'
+                        }}
                         required={formData.type === 'individual_dancer'}
                       >
-                        <option value="">Select your province</option>
-                        <option value="Western Cape">Western Cape</option>
-                        <option value="Eastern Cape">Eastern Cape</option>
-                        <option value="Northern Cape">Northern Cape</option>
-                        <option value="Free State">Free State</option>
-                        <option value="KwaZulu-Natal">KwaZulu-Natal</option>
-                        <option value="North West">North West</option>
-                        <option value="Gauteng">Gauteng</option>
-                        <option value="Mpumalanga">Mpumalanga</option>
-                        <option value="Limpopo">Limpopo</option>
+                        <option value="" className="bg-gray-800 text-white">Select your province</option>
+                        <option value="Western Cape" className="bg-gray-800 text-white">Western Cape</option>
+                        <option value="Eastern Cape" className="bg-gray-800 text-white">Eastern Cape</option>
+                        <option value="Northern Cape" className="bg-gray-800 text-white">Northern Cape</option>
+                        <option value="Free State" className="bg-gray-800 text-white">Free State</option>
+                        <option value="KwaZulu-Natal" className="bg-gray-800 text-white">KwaZulu-Natal</option>
+                        <option value="North West" className="bg-gray-800 text-white">North West</option>
+                        <option value="Gauteng" className="bg-gray-800 text-white">Gauteng</option>
+                        <option value="Mpumalanga" className="bg-gray-800 text-white">Mpumalanga</option>
+                        <option value="Limpopo" className="bg-gray-800 text-white">Limpopo</option>
                       </select>
                       </div>
                     </div>

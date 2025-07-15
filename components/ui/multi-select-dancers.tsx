@@ -150,6 +150,8 @@ export function MultiSelectDancers({
     // Show initial loading if no previous search
     if (!searchQuery && searchResults.length === 0 && !isSearching) {
       setIsInitialLoading(true);
+      // Trigger initial search with empty query to load available dancers
+      performSearch('');
       setTimeout(() => setIsInitialLoading(false), 500);
     }
   };

@@ -164,12 +164,30 @@ export default function PerformanceTypeEntryPage() {
         await loadMatchingEvents();
         
         // Then load contestant/studio data
-    if (eodsaId) {
+        let userEodsaId = eodsaId;
+        
+        // If no eodsaId from URL, try to get from session
+        if (!userEodsaId) {
+          const session = localStorage.getItem('dancerSession');
+          if (session) {
+            try {
+              const parsedSession = JSON.parse(session);
+              userEodsaId = parsedSession.eodsaId;
+              console.log('🎭 Using EODSA ID from dancer session:', userEodsaId);
+            } catch (error) {
+              console.error('Failed to parse dancer session:', error);
+            }
+          }
+        }
+        
+        if (userEodsaId) {
           setIsDancersLoading(true);
-          await loadContestant(eodsaId);
-    } else if (studioId) {
+          await loadContestant(userEodsaId);
+        } else if (studioId) {
           setIsDancersLoading(true);
           await loadStudioData(studioId);
+        } else {
+          console.warn('No EODSA ID or Studio ID found - user may need to log in');
         }
       } catch (error) {
         console.error('Failed to initialize data:', error);
@@ -308,25 +326,57 @@ export default function PerformanceTypeEntryPage() {
 
   // Sync multi-select state with form data
   useEffect(() => {
-    if (contestant && formData.participantIds.length > 0) {
-      const selectedDancers = formData.participantIds.map(id => {
-        const dancer = contestant.dancers.find(d => d.id === id);
-        if (dancer) {
-          return {
-            id: dancer.id,
-            name: dancer.name,
-            age: dancer.age,
-            eodsaId: contestant.eodsaId || '',
-            studioName: dancer.style || (isStudioMode ? studioInfo?.name : 'Private'),
-            nationalId: dancer.nationalId
-          };
-        }
-        return null;
-      }).filter(Boolean);
-      
-      setSelectedDancersForMultiSelect(selectedDancers);
+    if (contestant) {
+      if (formData.participantIds.length > 0) {
+        const selectedDancers = formData.participantIds.map(id => {
+          const dancer = contestant.dancers.find(d => d.id === id);
+          if (dancer) {
+            return {
+              id: dancer.id,
+              name: dancer.name,
+              age: dancer.age,
+              eodsaId: contestant.eodsaId || '',
+              studioName: dancer.style || (isStudioMode ? studioInfo?.name : 'Private'),
+              nationalId: dancer.nationalId
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        
+        console.log('🎭 Setting selected dancers for multi-select:', selectedDancers);
+        setSelectedDancersForMultiSelect(selectedDancers);
+      } else {
+        // Clear selection when no participants are selected
+        console.log('🎭 Clearing selected dancers for multi-select');
+        setSelectedDancersForMultiSelect([]);
+      }
     }
   }, [contestant, formData.participantIds, isStudioMode, studioInfo]);
+
+  // Auto-select participant for solo performances by independent dancers
+  useEffect(() => {
+    if (contestant && contestant.type === 'private' && performanceType?.toLowerCase() === 'solo' && formData.participantIds.length === 0) {
+      if (contestant.dancers.length > 0) {
+        console.log('🎭 Auto-selecting solo dancer for independent performer');
+        setFormData(prev => ({
+          ...prev,
+          participantIds: [contestant.dancers[0].id]
+        }));
+      }
+    }
+  }, [contestant, performanceType, formData.participantIds]);
+
+  // Initialize available dancers for independent performers  
+  useEffect(() => {
+    if (contestant && contestant.type === 'private' && contestant.dancers.length > 0) {
+      // Trigger an initial search to populate the multi-select with current dancer
+      searchDancersForMultiSelect('').then(dancers => {
+        if (dancers.length > 0) {
+          console.log('🎭 Pre-populated available dancers for independent performer');
+        }
+      });
+    }
+  }, [contestant]);
 
   const loadContestant = async (id: string) => {
     try {
@@ -562,17 +612,17 @@ export default function PerformanceTypeEntryPage() {
 
   // Search function for multi-select component
   const searchDancersForMultiSelect = async (query: string): Promise<any[]> => {
-    if (!query || query.length < 2) {
-      return [];
-    }
-    
     try {
       // For studio mode, search only within the studio's dancers
       if (isStudioMode && availableDancers.length > 0) {
-        const filtered = availableDancers.filter(dancer => 
-          dancer.name.toLowerCase().includes(query.toLowerCase()) ||
-          dancer.nationalId?.toLowerCase().includes(query.toLowerCase())
-        );
+        let filtered = availableDancers;
+        
+        if (query && query.length >= 2) {
+          filtered = availableDancers.filter(dancer => 
+            dancer.name.toLowerCase().includes(query.toLowerCase()) ||
+            dancer.nationalId?.toLowerCase().includes(query.toLowerCase())
+          );
+        }
         
         return filtered.map((dancer: any) => ({
           id: dancer.id,
@@ -584,20 +634,54 @@ export default function PerformanceTypeEntryPage() {
         }));
       }
       
-      // For individual mode, search all dancers
-      const response = await fetch(`/api/dancers/search?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        return data.dancers.map((dancer: any) => ({
-          id: dancer.id,
-          name: dancer.name,
-          age: dancer.age,
-          eodsaId: dancer.eodsaId,
-          studioName: dancer.studioName || 'Private',
-          nationalId: dancer.nationalId
-        }));
+      // For individual mode - show current dancer if available and query is empty or matches
+      if (contestant && contestant.type === 'private' && contestant.dancers.length > 0) {
+        const currentDancer = contestant.dancers[0];
+        
+        // If no query or short query, show the current dancer
+        if (!query || query.length < 2) {
+          return [{
+            id: currentDancer.id,
+            name: currentDancer.name,
+            age: currentDancer.age,
+            eodsaId: contestant.eodsaId,
+            studioName: 'Private',
+            nationalId: currentDancer.nationalId
+          }];
+        }
+        
+        // If query matches current dancer, show them
+        if (currentDancer.name.toLowerCase().includes(query.toLowerCase()) ||
+            contestant.eodsaId.toLowerCase().includes(query.toLowerCase()) ||
+            currentDancer.nationalId?.toLowerCase().includes(query.toLowerCase())) {
+          return [{
+            id: currentDancer.id,
+            name: currentDancer.name,
+            age: currentDancer.age,
+            eodsaId: contestant.eodsaId,
+            studioName: 'Private',
+            nationalId: currentDancer.nationalId
+          }];
+        }
       }
+      
+      // If query is long enough, search all dancers
+      if (query && query.length >= 2) {
+        const response = await fetch(`/api/dancers/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          return data.dancers.map((dancer: any) => ({
+            id: dancer.id,
+            name: dancer.name,
+            age: dancer.age,
+            eodsaId: dancer.eodsaId,
+            studioName: dancer.studioName || 'Private',
+            nationalId: dancer.nationalId
+          }));
+        }
+      }
+      
       return [];
     } catch (error) {
       console.error('Search error:', error);

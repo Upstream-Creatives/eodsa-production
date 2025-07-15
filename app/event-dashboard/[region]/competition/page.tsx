@@ -105,16 +105,40 @@ export default function CompetitionEntryPage() {
     }
   }, [region, eodsaId, studioId, eventId]);
 
+  // Auto-select current dancer when opening Solo form for independent dancers
+  useEffect(() => {
+    if (showAddForm === 'Solo' && !isStudioMode && contestant && contestant.type === 'private') {
+      if (contestant.dancers.length > 0 && currentForm.participantIds.length === 0) {
+        console.log(`🎭 Auto-selecting dancer for Solo form: ${contestant.dancers[0].name}`);
+        setCurrentForm(prev => ({
+          ...prev,
+          participantIds: [contestant.dancers[0].id]
+        }));
+      }
+    }
+  }, [showAddForm, isStudioMode, contestant, currentForm.participantIds]);
+
   const loadContestant = async (id: string) => {
+    setIsLoading(true);
     try {
+      console.log(`🎭 Loading contestant for competition entry: ${id}`);
+      
       // Try unified system first (new dancers)
+      console.log(`🔍 Fetching: /api/dancers/by-eodsa-id/${id}`);
       const unifiedResponse = await fetch(`/api/dancers/by-eodsa-id/${id}`);
+      console.log(`📡 Unified response status: ${unifiedResponse.status}`);
+      
       if (unifiedResponse.ok) {
         const unifiedData = await unifiedResponse.json();
+        console.log(`📦 Unified response data:`, unifiedData);
+        
         if (unifiedData.success && unifiedData.dancer) {
           const dancer = unifiedData.dancer;
           const isStudioLinked = dancer.studioAssociation !== null;
-          setContestant({
+          
+          console.log(`✅ Loaded dancer: ${dancer.name}, Studio linked: ${isStudioLinked}`);
+          
+          const contestantData = {
             id: dancer.id,
             eodsaId: dancer.eodsaId,
             name: dancer.name,
@@ -129,44 +153,119 @@ export default function CompetitionEntryPage() {
               style: '',
               nationalId: dancer.nationalId
             }]
-          });
+          };
+          
+          setContestant(contestantData);
+          
           // For solo dancers, add them to availableDancers so they can select themselves
-          setAvailableDancers([{
+          const availableDancerData = {
             id: dancer.id,
             name: dancer.name,
             fullName: dancer.name,
             eodsaId: dancer.eodsaId,
             age: dancer.age,
             nationalId: dancer.nationalId
-          }]);
+          };
+          
+          console.log(`🎭 Setting available dancers:`, [availableDancerData]);
+          setAvailableDancers([availableDancerData]);
           
           // Auto-select the dancer as participant for independent dancers
-          setCurrentForm(prev => ({
-            ...prev,
-            participantIds: [dancer.id]
-          }));
+          if (!isStudioLinked) {
+            console.log(`🎭 Auto-selecting independent dancer: ${dancer.name}`);
+            setCurrentForm(prev => ({
+              ...prev,
+              participantIds: [dancer.id]
+            }));
+          }
+          setIsLoading(false);
           return;
+        } else {
+          console.log(`⚠️ Unified API returned but no dancer found: ${JSON.stringify(unifiedData)}`);
         }
+      } else {
+        console.log(`❌ Unified API failed with status ${unifiedResponse.status}`);
+        const errorText = await unifiedResponse.text();
+        console.log(`❌ Unified API error response:`, errorText);
       }
       
       // Fallback to legacy system (contestants)
+      console.log(`🔄 Trying legacy system for: ${id}`);
+      console.log(`🔍 Fetching: /api/contestants/by-eodsa-id/${id}`);
       const legacyResponse = await fetch(`/api/contestants/by-eodsa-id/${id}`);
+      console.log(`📡 Legacy response status: ${legacyResponse.status}`);
+      
       if (legacyResponse.ok) {
         const legacyData = await legacyResponse.json();
+        console.log(`✅ Loaded legacy contestant:`, legacyData);
+        
+        // For independent dancers, if no dancers exist, create dancer from contestant data
+        if (legacyData.type === 'private' && (!legacyData.dancers || legacyData.dancers.length === 0)) {
+          console.log(`🎭 Creating dancer entry for independent contestant: ${legacyData.name}`);
+          
+          // Calculate age from date of birth
+          let age = 18; // Default age
+          if (legacyData.dateOfBirth) {
+            const birthDate = new Date(legacyData.dateOfBirth);
+            const today = new Date();
+            age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+              age--;
+            }
+          }
+          
+          // Create dancer entry from contestant data
+          const dancerEntry = {
+            id: legacyData.id, // Use contestant ID as dancer ID
+            name: legacyData.name,
+            age: age,
+            style: '',
+            nationalId: legacyData.eodsaId
+          };
+          
+          // Add dancer to contestant data
+          legacyData.dancers = [dancerEntry];
+          console.log(`✅ Created dancer entry:`, dancerEntry);
+        }
+        
         setContestant(legacyData);
+        
         // For legacy contestants, also add them to availableDancers
         if (legacyData.dancers && legacyData.dancers.length > 0) {
-          setAvailableDancers(legacyData.dancers.map((dancer: any) => ({
+          const mappedDancers = legacyData.dancers.map((dancer: any) => ({
             id: dancer.id,
             name: dancer.name,
             fullName: dancer.name,
-            eodsaId: dancer.nationalId,
+            eodsaId: dancer.nationalId || legacyData.eodsaId,
             age: dancer.age
-          })));
+          }));
+          console.log(`🎭 Setting legacy available dancers:`, mappedDancers);
+          setAvailableDancers(mappedDancers);
+          
+          // Auto-select for private contestants
+          if (legacyData.type === 'private' && legacyData.dancers.length > 0) {
+            console.log(`🎭 Auto-selecting legacy private dancer: ${legacyData.dancers[0].name}`);
+            setCurrentForm(prev => ({
+              ...prev,
+              participantIds: [legacyData.dancers[0].id]
+            }));
+          }
+        } else {
+          console.log(`⚠️ Legacy contestant has no dancers: ${JSON.stringify(legacyData)}`);
         }
+      } else {
+        console.log(`❌ Legacy API failed with status ${legacyResponse.status}`);
+        const errorText = await legacyResponse.text();
+        console.log(`❌ Legacy API error response:`, errorText);
       }
+      
+      console.log(`❌ No dancer found in either system for EODSA ID: ${id}`);
+      
     } catch (error) {
-      console.error('Failed to load contestant:', error);
+      console.error('❌ Failed to load contestant:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -861,8 +960,17 @@ export default function CompetitionEntryPage() {
                          ? 'bg-emerald-900/20 border-2 border-emerald-500/50'
                          : 'bg-slate-700/30 border border-slate-600/50'
                    }`}>
-                     {availableDancers.length === 0 && (
-                       <p className="text-slate-400 text-sm">No dancers available</p>
+                     {isLoading && (
+                       <div className="text-slate-400 text-sm flex items-center space-x-2">
+                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+                         <span>Loading your dancer information...</span>
+                       </div>
+                     )}
+                     {!isLoading && availableDancers.length === 0 && (
+                       <div className="text-slate-400 text-sm">
+                         <p>No dancers available for EODSA ID: {eodsaId}</p>
+                         <p className="text-xs mt-1">Check console for debug info</p>
+                       </div>
                      )}
                      {availableDancers.map(dancer => {
                        const isSelected = currentForm.participantIds.includes(dancer.id);
