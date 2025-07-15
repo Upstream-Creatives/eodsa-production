@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { RecaptchaV2 } from '@/components/RecaptchaV2';
 import { useRouter } from 'next/navigation';
@@ -30,7 +30,17 @@ export default function StudioRegisterPage() {
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [error, setError] = useState('');
   const [recaptchaToken, setRecaptchaToken] = useState<string>('');
+  const [nameValidationTimeout, setNameValidationTimeout] = useState<NodeJS.Timeout | null>(null);
   const router = useRouter();
+
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (nameValidationTimeout) {
+        clearTimeout(nameValidationTimeout);
+      }
+    };
+  }, [nameValidationTimeout]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -72,21 +82,27 @@ export default function StudioRegisterPage() {
     // Also ensure at least one space is present (first name + last name)
     if (name === 'contactPerson') {
       const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '');
+      
+      // Clear existing timeout
+      if (nameValidationTimeout) {
+        clearTimeout(nameValidationTimeout);
+      }
+      
       const hasSpace = cleanValue.includes(' ');
-      const trimmedValue = cleanValue.trim();
       
       // Show warning if name doesn't contain a space and has more than 2 characters
-      if (!hasSpace && trimmedValue.length > 2) {
-        setTimeout(() => {
+      if (!hasSpace && cleanValue.length > 2) {
+        const newTimeout = setTimeout(() => {
           if (!cleanValue.includes(' ')) {
             setError('Please enter the contact person\'s full name (first name and last name separated by a space).');
           }
-        }, 1000);
+        }, 3000); // Increased timeout to 3 seconds
+        setNameValidationTimeout(newTimeout);
       }
       
       setFormData(prev => ({
         ...prev,
-        [name]: trimmedValue
+        [name]: cleanValue
       }));
       return;
     }
@@ -118,12 +134,12 @@ export default function StudioRegisterPage() {
       }
     }
     
-    // Trim whitespace for all text inputs except password fields
-    const trimmedValue = (name === 'password' || name === 'confirmPassword') ? value : value.trim();
+    // Keep whitespace for text inputs except password fields (to allow spaces during typing)
+    const processedValue = (name === 'password' || name === 'confirmPassword') ? value : value;
     
     setFormData(prev => ({
       ...prev,
-      [name]: trimmedValue
+      [name]: processedValue
     }));
   };
 
@@ -140,7 +156,7 @@ export default function StudioRegisterPage() {
     }
 
     // Validate that contact person name contains at least one space (first name + last name)
-    if (!formData.contactPerson.includes(' ')) {
+    if (!formData.contactPerson.trim().includes(' ')) {
       setError('Please enter the contact person\'s full name with both first name and last name separated by a space.');
       setIsSubmitting(false);
       return;

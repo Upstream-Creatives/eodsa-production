@@ -139,6 +139,12 @@ export default function CompetitionEntryPage() {
             age: dancer.age,
             nationalId: dancer.nationalId
           }]);
+          
+          // Auto-select the dancer as participant for independent dancers
+          setCurrentForm(prev => ({
+            ...prev,
+            participantIds: [dancer.id]
+          }));
           return;
         }
       }

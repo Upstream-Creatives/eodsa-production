@@ -33,7 +33,7 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
     
     // Validate parent name to allow only letters, spaces, hyphens, and apostrophes
     if (name === 'parentName') {
-      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '');
       setFormData({
         ...formData,
         [name]: cleanValue
@@ -84,12 +84,12 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
       return;
     }
     
-    // Trim whitespace for text inputs  
-    const trimmedValue = typeof value === 'string' ? value.trim() : value;
+    // Keep whitespace for text inputs to allow spaces during typing
+    const processedValue = value;
     
     setFormData({
       ...formData,
-      [name]: trimmedValue
+      [name]: processedValue
     });
   };
 

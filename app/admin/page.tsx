@@ -2143,7 +2143,7 @@ export default function AdminDashboard() {
                     type="text"
                       value={newJudge.name}
                       onChange={(e) => {
-                        const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+                        const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
                         setNewJudge(prev => ({ ...prev, name: cleanValue }));
                       }}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"

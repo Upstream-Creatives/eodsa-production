@@ -96,16 +96,24 @@ export default function RegisterPage() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string>('');
   const [dateValidationTimeout, setDateValidationTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [nameValidationTimeout, setNameValidationTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [guardianNameValidationTimeout, setGuardianNameValidationTimeout] = useState<NodeJS.Timeout | null>(null);
   const { success, error, warning, info } = useToast();
 
-  // Cleanup timeout on component unmount
+  // Cleanup timeouts on component unmount
   useEffect(() => {
     return () => {
       if (dateValidationTimeout) {
         clearTimeout(dateValidationTimeout);
       }
+      if (nameValidationTimeout) {
+        clearTimeout(nameValidationTimeout);
+      }
+      if (guardianNameValidationTimeout) {
+        clearTimeout(guardianNameValidationTimeout);
+      }
     };
-  }, [dateValidationTimeout]);
+  }, [dateValidationTimeout, nameValidationTimeout, guardianNameValidationTimeout]);
 
   // Calculate age from date of birth
   const calculateAge = (dateOfBirth: string): number => {
@@ -186,22 +194,27 @@ export default function RegisterPage() {
     if (name === 'name') {
       const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '');
       
+      // Clear existing timeout
+      if (nameValidationTimeout) {
+        clearTimeout(nameValidationTimeout);
+      }
+      
       // Check if the name contains at least one space (first name + last name requirement)
       const hasSpace = cleanValue.includes(' ');
-      const trimmedValue = cleanValue.trim();
       
       // Show warning if name doesn't contain a space and has more than 2 characters
-      if (!hasSpace && trimmedValue.length > 2) {
-        // Use a timeout to avoid showing the warning immediately
-        setTimeout(() => {
+      if (!hasSpace && cleanValue.length > 2) {
+        // Use a debounced timeout to avoid showing the warning immediately
+        const newTimeout = setTimeout(() => {
           if (!cleanValue.includes(' ')) {
             warning('Please enter your full name (first name and last name separated by a space).', 5000);
           }
-        }, 1000);
+        }, 3000); // Increased timeout to 3 seconds
+        setNameValidationTimeout(newTimeout);
       }
       
       setFormData(prev => {
-        const newFormData = { ...prev, [name]: trimmedValue };
+        const newFormData = { ...prev, [name]: cleanValue };
         return newFormData;
       });
       return;
@@ -289,19 +302,25 @@ export default function RegisterPage() {
     // Also ensure at least one space is present (first name + last name)
     if (field === 'name') {
       const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '');
+      
+      // Clear existing timeout
+      if (guardianNameValidationTimeout) {
+        clearTimeout(guardianNameValidationTimeout);
+      }
+      
       const hasSpace = cleanValue.includes(' ');
-      const trimmedValue = cleanValue.trim();
       
       // Show warning if name doesn't contain a space and has more than 2 characters
-      if (!hasSpace && trimmedValue.length > 2) {
-        setTimeout(() => {
+      if (!hasSpace && cleanValue.length > 2) {
+        const newTimeout = setTimeout(() => {
           if (!cleanValue.includes(' ')) {
             warning('Please enter the guardian\'s full name (first name and last name separated by a space).', 5000);
           }
-        }, 1000);
+        }, 3000); // Increased timeout to 3 seconds
+        setGuardianNameValidationTimeout(newTimeout);
       }
       
-      value = trimmedValue;
+      value = cleanValue;
     }
     
     // Validate guardian email format in real-time
