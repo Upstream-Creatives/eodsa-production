@@ -482,8 +482,8 @@ export default function PerformanceTypeEntryPage() {
               eventId: matchingEvents[0].id
             }));
             
-            // Skip Step 1 entirely when there's only one event - go directly to Step 2
-            setStep(2);
+            // Don't skip step 1 - let users see the event selection for consistency
+            // This provides better navigation flow
           } else if (matchingEvents.length === 0) {
             // No events available
             showAlert(
@@ -1057,12 +1057,8 @@ export default function PerformanceTypeEntryPage() {
   };
 
   const prevStep = () => {
-    // If we're at step 2 and there's only one event (meaning we skipped step 1), 
-    // go back to the region selection page
-    if (step === 2 && events.length === 1) {
-      router.push(`/event-dashboard/${region}?${authQueryParam}`);
-      return;
-    }
+    // Always allow going back to the previous step, even if there's only one event
+    // This provides a more intuitive navigation experience
     setStep(prev => Math.max(prev - 1, 1));
   };
 
@@ -1844,10 +1840,10 @@ export default function PerformanceTypeEntryPage() {
             <div className="flex justify-between mt-8">
               <button
                 onClick={prevStep}
-                disabled={step === 1 && events.length > 1} // Only disable if we're at step 1 with multiple events
+                disabled={step === 1} // Disable only when at the first step
                 className="px-6 py-3 border-2 border-gray-600 text-gray-300 rounded-xl hover:bg-gray-700 hover:border-gray-500 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {step === 2 && events.length === 1 ? 'Back to Region' : 'Previous'}
+                Previous
               </button>
               
               {step < 4 ? (

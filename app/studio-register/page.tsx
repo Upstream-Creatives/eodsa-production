@@ -69,11 +69,24 @@ export default function StudioRegisterPage() {
     }
     
     // Validate contact person name to allow only letters, spaces, hyphens, and apostrophes
+    // Also ensure at least one space is present (first name + last name)
     if (name === 'contactPerson') {
-      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '');
+      const hasSpace = cleanValue.includes(' ');
+      const trimmedValue = cleanValue.trim();
+      
+      // Show warning if name doesn't contain a space and has more than 2 characters
+      if (!hasSpace && trimmedValue.length > 2) {
+        setTimeout(() => {
+          if (!cleanValue.includes(' ')) {
+            setError('Please enter the contact person\'s full name (first name and last name separated by a space).');
+          }
+        }, 1000);
+      }
+      
       setFormData(prev => ({
         ...prev,
-        [name]: cleanValue
+        [name]: trimmedValue
       }));
       return;
     }
@@ -122,6 +135,13 @@ export default function StudioRegisterPage() {
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate that contact person name contains at least one space (first name + last name)
+    if (!formData.contactPerson.includes(' ')) {
+      setError('Please enter the contact person\'s full name with both first name and last name separated by a space.');
       setIsSubmitting(false);
       return;
     }
@@ -274,10 +294,10 @@ export default function StudioRegisterPage() {
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
               Register Studio
             </h1>
-            <p className="text-gray-300">
+            <p className="text-gray-200">
               Element of Dance South Africa
             </p>
-            <p className="text-sm text-gray-400 mt-2">
+            <p className="text-sm text-gray-300 mt-2">
               Join EODSA and start managing your dancers
             </p>
           </div>
@@ -295,7 +315,7 @@ export default function StudioRegisterPage() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-200 mb-2">
                       Studio Name *
                     </label>
                     <input
@@ -311,7 +331,7 @@ export default function StudioRegisterPage() {
                   </div>
                   
                   <div>
-                    <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-300 mb-2">
+                    <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-200 mb-2">
                       Contact Person *
                     </label>
                     <input
@@ -328,7 +348,7 @@ export default function StudioRegisterPage() {
                 </div>
                 
                 <div className="mt-6">
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="address" className="block text-sm font-medium text-gray-200 mb-2">
                     Studio Address *
                   </label>
                   <input
@@ -344,7 +364,7 @@ export default function StudioRegisterPage() {
                 </div>
 
                 <div className="mt-6">
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-200 mb-2">
                     Phone Number *
                   </label>
                   <input
@@ -371,7 +391,7 @@ export default function StudioRegisterPage() {
                 </h3>
                 <div className="space-y-6">
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-2">
                       Email Address *
                     </label>
                     <input
@@ -388,7 +408,7 @@ export default function StudioRegisterPage() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                      <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
                         Password *
                       </label>
                       <input
@@ -404,7 +424,7 @@ export default function StudioRegisterPage() {
                     </div>
                     
                     <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-2">
                         Confirm Password *
                       </label>
                       <input

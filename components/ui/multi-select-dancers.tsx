@@ -269,7 +269,7 @@ export function MultiSelectDancers({
             {/* Loading State */}
             {(isSearching || isInitialLoading) && (
               <div className="px-4 py-6 text-center">
-                <div className="flex items-center justify-center space-x-3 text-gray-400">
+                <div className="flex items-center justify-center space-x-3 text-gray-300">
                   <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
                   <p className="text-sm">
                     {isInitialLoading ? 'Loading dancers...' : `Searching for "${searchQuery}"...`}
@@ -344,7 +344,7 @@ export function MultiSelectDancers({
                         </div>
                         <div>
                           <div className="font-medium">{dancer.name}</div>
-                          <div className={`text-sm ${isEligible ? 'text-gray-400' : 'text-red-400'}`}>
+                          <div className={`text-sm ${isEligible ? 'text-gray-300' : 'text-red-400'}`}>
                             {dancer.eodsaId && `${dancer.eodsaId} • `}
                             Age {dancer.age} • {dancer.studioName || 'Private'}
                             {!isEligible && ageCategory && (

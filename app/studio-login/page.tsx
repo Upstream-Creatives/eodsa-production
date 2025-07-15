@@ -52,10 +52,10 @@ export default function StudioLoginPage() {
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
               Studio Portal
             </h1>
-            <p className="text-gray-300">
+            <p className="text-gray-200">
               Element of Dance South Africa
             </p>
-            <p className="text-sm text-gray-400 mt-2">
+            <p className="text-sm text-gray-300 mt-2">
               Access your studio dashboard to manage dancers
             </p>
           </div>
@@ -64,7 +64,7 @@ export default function StudioLoginPage() {
           <div className="bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/20 p-8">
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-2">
                   Studio Email
                 </label>
                 <input
@@ -79,7 +79,7 @@ export default function StudioLoginPage() {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
                   Password
                 </label>
                 <input

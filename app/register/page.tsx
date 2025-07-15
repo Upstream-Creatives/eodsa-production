@@ -180,10 +180,26 @@ export default function RegisterPage() {
     }
 
     // Validate name fields to allow only letters, spaces, hyphens, and apostrophes
+    // Also ensure at least one space is present (first name + last name)
     if (name === 'name') {
-      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '');
+      
+      // Check if the name contains at least one space (first name + last name requirement)
+      const hasSpace = cleanValue.includes(' ');
+      const trimmedValue = cleanValue.trim();
+      
+      // Show warning if name doesn't contain a space and has more than 2 characters
+      if (!hasSpace && trimmedValue.length > 2) {
+        // Use a timeout to avoid showing the warning immediately
+        setTimeout(() => {
+          if (!cleanValue.includes(' ')) {
+            warning('Please enter your full name (first name and last name separated by a space).', 5000);
+          }
+        }, 1000);
+      }
+      
       setFormData(prev => {
-        const newFormData = { ...prev, [name]: cleanValue };
+        const newFormData = { ...prev, [name]: trimmedValue };
         return newFormData;
       });
       return;
@@ -268,8 +284,22 @@ export default function RegisterPage() {
     }
     
     // Validate guardian name to allow only letters, spaces, hyphens, and apostrophes
+    // Also ensure at least one space is present (first name + last name)
     if (field === 'name') {
-      value = value.replace(/[^a-zA-Z\s\-\']/g, '').trim();
+      const cleanValue = value.replace(/[^a-zA-Z\s\-\']/g, '');
+      const hasSpace = cleanValue.includes(' ');
+      const trimmedValue = cleanValue.trim();
+      
+      // Show warning if name doesn't contain a space and has more than 2 characters
+      if (!hasSpace && trimmedValue.length > 2) {
+        setTimeout(() => {
+          if (!cleanValue.includes(' ')) {
+            warning('Please enter the guardian\'s full name (first name and last name separated by a space).', 5000);
+          }
+        }, 1000);
+      }
+      
+      value = trimmedValue;
     }
     
     // Validate guardian email format in real-time
@@ -308,6 +338,13 @@ export default function RegisterPage() {
         return;
       }
 
+      // Validate that name contains at least one space (first name + last name)
+      if (!formData.name.includes(' ')) {
+        warning('Please enter your full name with both first name and last name separated by a space.', 6000);
+        setIsSubmitting(false);
+        return;
+      }
+
       // Calculate age for validation
       const age = calculateAge(formData.dateOfBirth);
       
@@ -340,6 +377,13 @@ export default function RegisterPage() {
       if (age < 18) {
         if (!formData.guardianInfo?.name || !formData.guardianInfo?.email || !formData.guardianInfo?.cell) {
           warning('Complete guardian information is required for dancers under 18 years old.', 7000);
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Validate that guardian name contains at least one space (first name + last name)
+        if (!formData.guardianInfo.name.includes(' ')) {
+          warning('Please enter the guardian\'s full name with both first name and last name separated by a space.', 7000);
           setIsSubmitting(false);
           return;
         }
