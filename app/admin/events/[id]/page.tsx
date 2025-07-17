@@ -423,7 +423,6 @@ export default function EventParticipantsPage() {
         ['Region:', event?.region || '', '', '', '', '', '', '', '', '', ''],
         ['Performance Type:', event?.performanceType || '', '', '', '', '', '', '', '', '', ''],
         ['Age Category:', event?.ageCategory || '', '', '', '', '', '', '', '', '', ''],
-        ['Entry Fee:', `R${event?.entryFee?.toFixed(2) || '0.00'}`, '', '', '', '', '', '', '', '', ''],
         ['Total Entries:', entries.length.toString(), '', '', '', '', '', '', '', '', ''],
         ['', '', '', '', '', '', '', '', '', '', ''], // Empty row for separation
         ['PARTICIPANT ENTRIES', '', '', '', '', '', '', '', '', '', ''],
@@ -945,7 +944,7 @@ export default function EventParticipantsPage() {
       </div>
     )}
 
-  return (
+
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       {/* Enhanced Header */}
       <header className="bg-white/90 backdrop-blur-lg shadow-xl border-b border-indigo-100">
@@ -984,23 +983,6 @@ export default function EventParticipantsPage() {
                 </div>
                 <h2 className="text-xl font-bold text-gray-900">Event Details</h2>
               </div>
-              {/* Sync Item Numbers Button */}
-              <button
-                onClick={async () => {
-                  try {
-                    const response = await fetch('/api/admin/sync-item-numbers', { method: 'POST' });
-                    const result = await response.json();
-                    showAlert(result.message, 'success');
-                    loadEventData(); // Reload to show updated numbers
-                  } catch (error) {
-                    showAlert('Failed to sync item numbers', 'error');
-                  }
-                }}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
-              >
-                <span>🔄</span>
-                <span>Sync Item Numbers</span>
-              </button>
               
               {/* Excel Export Button */}
               <button
@@ -1020,10 +1002,6 @@ export default function EventParticipantsPage() {
               <div>
                 <p className="font-semibold text-gray-700">Venue</p>
                 <p className="text-gray-700">{event.venue}</p>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-700">Entry Fee</p>
-                <p className="text-gray-700">R{event.entryFee.toFixed(2)}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Entries</p>
