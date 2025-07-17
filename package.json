@@ -14,6 +14,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.15.4",
+    "@vercel/analytics": "^1.5.0",
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^11.10.0",
