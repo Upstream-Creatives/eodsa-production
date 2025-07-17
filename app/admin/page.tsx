@@ -518,7 +518,7 @@ export default function AdminDashboard() {
       const data = await response.json();
 
       if (data.success) {
-        setCleanDatabaseMessage('✅ Database cleaned successfully! All data removed except admin users.');
+        setCleanDatabaseMessage('✅ Database cleaned successfully! All data removed. New admin: mains@elementscentral.com');
         // Refresh the dashboard data
         fetchData();
         setTimeout(() => setCleanDatabaseMessage(''), 7000);
@@ -940,7 +940,7 @@ export default function AdminDashboard() {
           {/* Loading Text */}
           <div className="space-y-3">
             <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Loading EODSA Admin
+              Loading Avalon Admin Dashboard
             </h2>
             <p className="text-gray-700 font-medium animate-pulse">Preparing your dashboard...</p>
             
@@ -964,11 +964,11 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:py-8 gap-4">
             <div className="flex items-center space-x-3 sm:space-x-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-lg sm:text-xl font-bold">E</span>
+                <span className="text-white text-lg sm:text-xl font-bold">A</span>
             </div>
               <div className="min-w-0 flex-1">
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent leading-tight">
-                  EODSA Admin
+                  Avalon Admin Dashboard
                 </h1>
                 <p className="text-gray-700 text-xs sm:text-sm lg:text-base font-medium">Competition Management System</p>
               </div>

@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Database cleaned successfully. All data removed except admin users.'
+      message: 'Database cleaned successfully. All data removed. New admin: mains@elementscentral.com / 624355Mage55!'
     });
   } catch (error) {
     console.error('Error cleaning database:', error);

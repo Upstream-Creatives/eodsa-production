@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Element of Dance South Africa - Competition Management",
-  description: "EODSA Competition Management System - Register, compete, and manage dance competitions across South Africa",
+  title: "Avalon",
+  description: "Avalon - Competition Management System - Register, compete, and manage dance competitions",
 };
 
 export default function RootLayout({

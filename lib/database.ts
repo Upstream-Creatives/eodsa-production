@@ -76,27 +76,42 @@ export const initializeDatabase = async () => {
   }
 };
 
-// Clean database while preserving admin and essential data
+// Clean database and create only the main admin account
 export const cleanDatabase = async () => {
   try {
     const sqlClient = getSql();
+    const bcrypt = await import('bcryptjs');
     
-    console.log('🧹 Cleaning database...');
+    console.log('🧹 Cleaning database completely...');
     
     // Delete all data in dependency order (most dependent first)
     await sqlClient`DELETE FROM scores`;
     await sqlClient`DELETE FROM rankings`;
     await sqlClient`DELETE FROM performances`;
     await sqlClient`DELETE FROM event_entries`;
+    await sqlClient`DELETE FROM nationals_event_entries`;
     await sqlClient`DELETE FROM judge_event_assignments`;
     await sqlClient`DELETE FROM events`;
+    await sqlClient`DELETE FROM studio_applications`;
     await sqlClient`DELETE FROM dancers`;
     await sqlClient`DELETE FROM contestants`;
+    await sqlClient`DELETE FROM studios`;
     
-    // Keep only admin users, remove regular judges
-    await sqlClient`DELETE FROM judges WHERE is_admin = false`;
+    // Remove ALL judges (including admins)
+    await sqlClient`DELETE FROM judges`;
     
-    console.log('✅ Database cleaned successfully - Admin user and fee schedule preserved');
+    // Create the main admin account
+    console.log('👑 Creating main admin account...');
+    const hashedPassword = await bcrypt.hash('624355Mage55!', 10);
+    const newAdminId = `judge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    await sqlClient`
+      INSERT INTO judges (id, name, email, password, is_admin, specialization) 
+      VALUES (${newAdminId}, 'Main Admin', 'mains@elementscentral.com', ${hashedPassword}, true, '[]')
+    `;
+    
+    console.log('✅ Database cleaned successfully - Only main admin account remains');
+    console.log('📝 Admin login: mains@elementscentral.com / 624355Mage55!');
   } catch (error) {
     console.error('Error cleaning database:', error);
     throw error;
@@ -1467,26 +1482,41 @@ export const db = {
     })) as (Performance & { contestantName: string })[];
   },
 
-  // Database cleaning - reset all data except admin users
+  // Database cleaning - reset all data and create only main admin
   async cleanDatabase() {
     const sqlClient = getSql();
+    const bcrypt = await import('bcryptjs');
     
-    console.log('🧹 Cleaning database...');
+    console.log('🧹 Cleaning database completely...');
     
     // Delete all data in dependency order (most dependent first)
     await sqlClient`DELETE FROM scores`;
     await sqlClient`DELETE FROM rankings`;
     await sqlClient`DELETE FROM performances`;
     await sqlClient`DELETE FROM event_entries`;
+    await sqlClient`DELETE FROM nationals_event_entries`;
     await sqlClient`DELETE FROM judge_event_assignments`;
     await sqlClient`DELETE FROM events`;
+    await sqlClient`DELETE FROM studio_applications`;
     await sqlClient`DELETE FROM dancers`;
     await sqlClient`DELETE FROM contestants`;
+    await sqlClient`DELETE FROM studios`;
     
-    // Keep only admin users, remove regular judges
-    await sqlClient`DELETE FROM judges WHERE is_admin = false`;
+    // Remove ALL judges (including admins)
+    await sqlClient`DELETE FROM judges`;
     
-    console.log('✅ Database cleaned successfully - Admin user and fee schedule preserved');
+    // Create the main admin account
+    console.log('👑 Creating main admin account...');
+    const hashedPassword = await bcrypt.hash('624355Mage55!', 10);
+    const newAdminId = `judge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    await sqlClient`
+      INSERT INTO judges (id, name, email, password, is_admin, specialization) 
+      VALUES (${newAdminId}, 'Main Admin', 'mains@elementscentral.com', ${hashedPassword}, true, '[]')
+    `;
+    
+    console.log('✅ Database cleaned successfully - Only main admin account remains');
+    console.log('📝 Admin login: mains@elementscentral.com / 624355Mage55!');
   },
 
   // NEW: Event status management methods

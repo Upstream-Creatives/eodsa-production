@@ -86,7 +86,7 @@ export default function DancerLoginPage() {
           <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent mb-2">
             Dancer Portal
           </h1>
-          <p className="text-gray-300 font-medium text-lg">Element of Dance South Africa</p>
+                          <p className="text-gray-300 font-medium text-lg">Avalon</p>
         </div>
 
         {/* Login Card */}

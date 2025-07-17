@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { REGIONS, getMedalFromPercentage } from '@/lib/types';
+import { getMedalFromPercentage } from '@/lib/types';
 
 interface RankingData {
   performanceId: string;
@@ -50,7 +50,8 @@ export default function AdminRankingsPage() {
   // Region filtering removed - Nationals only now
   const [selectedAgeCategory, setSelectedAgeCategory] = useState('');
   const [selectedPerformanceType, setSelectedPerformanceType] = useState('');
-  const [viewMode, setViewMode] = useState<'all' | 'top5_age' | 'top5_style'>('all');
+  const [viewMode, setViewMode] = useState<'all' | 'top3_age' | 'top3_style' | 'top3_duets' | 'top3_groups' | 'top3_trios' | 'top10_soloists'>('all');
+  const [masteryFilter, setMasteryFilter] = useState<'all' | 'competitive' | 'advanced'>('all');
 
   useEffect(() => {
     // Check admin authentication
@@ -77,7 +78,7 @@ export default function AdminRankingsPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [rankings, viewMode]);
+  }, [rankings, viewMode, masteryFilter]);
 
   // Trigger rankings reload when server-side filters change
   useEffect(() => {
@@ -137,12 +138,16 @@ export default function AdminRankingsPage() {
   const applyFilters = () => {
     let filtered = rankings;
     
-    // Only apply client-side filters that weren't applied server-side
-    // Region, age category, performance type, and event selection are handled server-side
+    // Apply mastery level filter first
+    if (masteryFilter === 'competitive') {
+      filtered = filtered.filter(ranking => ranking.mastery?.toLowerCase().includes('water') || ranking.mastery?.toLowerCase().includes('competition'));
+    } else if (masteryFilter === 'advanced') {
+      filtered = filtered.filter(ranking => ranking.mastery?.toLowerCase().includes('fire') || ranking.mastery?.toLowerCase().includes('advanced'));
+    }
     
     // Apply view mode filters
-    if (viewMode === 'top5_age') {
-      // Group by age category and get top 5 from each
+    if (viewMode === 'top3_age') {
+      // Group by age category and get top 3 from each
       const groupedByAge = filtered.reduce((groups, ranking) => {
         if (!groups[ranking.ageCategory]) {
           groups[ranking.ageCategory] = [];
@@ -152,10 +157,10 @@ export default function AdminRankingsPage() {
       }, {} as Record<string, RankingData[]>);
 
       filtered = Object.values(groupedByAge).flatMap(group => 
-        group.sort((a, b) => b.totalScore - a.totalScore).slice(0, 5)
+        group.sort((a, b) => b.totalScore - a.totalScore).slice(0, 3)
       );
-    } else if (viewMode === 'top5_style') {
-      // Group by style and get top 5 from each
+    } else if (viewMode === 'top3_style') {
+      // Group by style and get top 3 from each
       const groupedByStyle = filtered.reduce((groups, ranking) => {
         if (!groups[ranking.itemStyle]) {
           groups[ranking.itemStyle] = [];
@@ -165,8 +170,32 @@ export default function AdminRankingsPage() {
       }, {} as Record<string, RankingData[]>);
 
       filtered = Object.values(groupedByStyle).flatMap(group => 
-        group.sort((a, b) => b.totalScore - a.totalScore).slice(0, 5)
+        group.sort((a, b) => b.totalScore - a.totalScore).slice(0, 3)
       );
+    } else if (viewMode === 'top3_duets') {
+      // Filter for duets only and get top 3
+      filtered = filtered
+        .filter(ranking => ranking.performanceType === 'Duet')
+        .sort((a, b) => b.totalScore - a.totalScore)
+        .slice(0, 3);
+    } else if (viewMode === 'top3_groups') {
+      // Filter for groups only and get top 3
+      filtered = filtered
+        .filter(ranking => ranking.performanceType === 'Group')
+        .sort((a, b) => b.totalScore - a.totalScore)
+        .slice(0, 3);
+    } else if (viewMode === 'top3_trios') {
+      // Filter for trios only and get top 3
+      filtered = filtered
+        .filter(ranking => ranking.performanceType === 'Trio')
+        .sort((a, b) => b.totalScore - a.totalScore)
+        .slice(0, 3);
+    } else if (viewMode === 'top10_soloists') {
+      // Filter for solos only and get top 10
+      filtered = filtered
+        .filter(ranking => ranking.performanceType === 'Solo')
+        .sort((a, b) => b.totalScore - a.totalScore)
+        .slice(0, 10);
     }
     
     setFilteredRankings(filtered);
@@ -176,6 +205,7 @@ export default function AdminRankingsPage() {
     setSelectedAgeCategory('');
     setSelectedPerformanceType('');
     setViewMode('all');
+    setMasteryFilter('all');
   };
 
   const getRankBadgeColor = (rank: number) => {
@@ -277,8 +307,8 @@ export default function AdminRankingsPage() {
                 <span className="text-white text-xl">🏆</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Competition Rankings</h1>
-                <p className="text-sm text-gray-600">View and analyze performance rankings</p>
+                <h1 className="text-2xl font-bold text-gray-900">Nationals Rankings</h1>
+                <p className="text-sm text-gray-600">View and analyze nationals performance rankings</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -301,15 +331,15 @@ export default function AdminRankingsPage() {
               <div className="text-2xl font-bold text-blue-600">
                 {filteredRankings.length}
               </div>
-              <div className="text-sm text-gray-700 font-medium">Total Rankings</div>
+              <div className="text-sm text-gray-700 font-medium">Total Performances</div>
             </div>
           </div>
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-green-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {new Set(filteredRankings.map(r => r.region)).size}
+                {new Set(filteredRankings.map(r => r.studioName)).size}
               </div>
-              <div className="text-sm text-gray-700 font-medium">Regions</div>
+              <div className="text-sm text-gray-700 font-medium">Studios</div>
             </div>
           </div>
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-purple-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
@@ -323,9 +353,9 @@ export default function AdminRankingsPage() {
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-teal-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
             <div className="text-center">
               <div className="text-2xl font-bold text-teal-600">
-                {new Set(filteredRankings.map(r => r.performanceType)).size}
+                {new Set(filteredRankings.map(r => r.itemStyle)).size}
               </div>
-              <div className="text-sm text-gray-700 font-medium">Types</div>
+              <div className="text-sm text-gray-700 font-medium">Dance Styles</div>
             </div>
           </div>
         </div>
@@ -334,29 +364,40 @@ export default function AdminRankingsPage() {
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-indigo-100 mb-8">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-sm">📍</span>
+              <span className="text-white text-sm">🏫</span>
             </div>
-            <h3 className="text-xl font-bold text-gray-900">Total Items per Region</h3>
+            <h3 className="text-xl font-bold text-gray-900">Performances per Studio</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {(() => {
-              // Calculate items per region
-              const regionCounts = filteredRankings.reduce((acc, ranking) => {
-                acc[ranking.region] = (acc[ranking.region] || 0) + 1;
+              // Calculate performances per studio
+              const studioCounts = filteredRankings.reduce((acc, ranking) => {
+                const studio = ranking.studioName || 'Unknown Studio';
+                acc[studio] = (acc[studio] || 0) + 1;
                 return acc;
               }, {} as Record<string, number>);
 
-              // Sort regions by count (descending) then alphabetically
-              const sortedRegions = Object.entries(regionCounts)
+              // Sort studios by count (descending) then alphabetically
+              const sortedStudios = Object.entries(studioCounts)
                 .sort(([a, countA], [b, countB]) => {
                   if (countB !== countA) return countB - countA;
                   return a.localeCompare(b);
                 });
 
-              return sortedRegions.map(([region, count], index) => (
+              if (sortedStudios.length === 0) {
+                return (
+                  <div className="col-span-full text-center py-8">
+                    <div className="text-gray-400 text-4xl mb-2">🏫</div>
+                    <p className="text-gray-500">No nationals data available</p>
+                    <p className="text-gray-400 text-sm">Nationals breakdown will appear when rankings are loaded</p>
+                  </div>
+                );
+              }
+
+              return sortedStudios.map(([studio, count], index) => (
                 <div
-                  key={region}
+                  key={studio}
                   className={`p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-lg ${
                     index === 0 
                       ? 'border-emerald-500 bg-emerald-50' 
@@ -369,7 +410,7 @@ export default function AdminRankingsPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-gray-900 text-sm">{region}</div>
+                      <div className="font-bold text-gray-900 text-sm">{studio}</div>
                       <div className="text-xs text-gray-600">
                         {((count / filteredRankings.length) * 100).toFixed(1)}% of total
                       </div>
@@ -402,16 +443,6 @@ export default function AdminRankingsPage() {
             })()}
           </div>
           
-          {Object.keys(filteredRankings.reduce((acc, ranking) => {
-            acc[ranking.region] = true;
-            return acc;
-          }, {} as Record<string, boolean>)).length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-4">📍</div>
-              <p className="text-lg font-medium">No nationals data available</p>
-              <p className="text-sm">Nationals breakdown will appear when rankings are loaded</p>
-            </div>
-          )}
         </div>
 
         {/* Enhanced Filters with View Mode Tabs */}
@@ -429,24 +460,64 @@ export default function AdminRankingsPage() {
               All Rankings
             </button>
             <button
-              onClick={() => setViewMode('top5_age')}
+              onClick={() => setViewMode('top3_age')}
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
-                viewMode === 'top5_age'
+                viewMode === 'top3_age'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Top 5 by Age
+              Top 3 by Age
             </button>
             <button
-              onClick={() => setViewMode('top5_style')}
+              onClick={() => setViewMode('top3_style')}
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
-                viewMode === 'top5_style'
+                viewMode === 'top3_style'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Top 5 by Style
+              Top 3 by Style
+            </button>
+            <button
+              onClick={() => setViewMode('top3_duets')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                viewMode === 'top3_duets'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Top 3 Duets
+            </button>
+            <button
+              onClick={() => setViewMode('top3_groups')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                viewMode === 'top3_groups'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Top 3 Groups
+            </button>
+            <button
+              onClick={() => setViewMode('top3_trios')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                viewMode === 'top3_trios'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Top 3 Trios
+            </button>
+            <button
+              onClick={() => setViewMode('top10_soloists')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                viewMode === 'top10_soloists'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Top 10 Soloists
             </button>
           </div>
 
@@ -455,14 +526,14 @@ export default function AdminRankingsPage() {
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white text-sm">🔍</span>
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Filter Nationals Rankings</h2>
+            <h2 className="text-xl font-bold text-gray-900">Filter Avalon Rankings</h2>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
               <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium">
-                EODSA Nationals
+                Avalon
               </div>
             </div>
             
@@ -495,6 +566,19 @@ export default function AdminRankingsPage() {
             </div>
             
             <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">Mastery Level</label>
+              <select
+                value={masteryFilter}
+                onChange={(e) => setMasteryFilter(e.target.value as 'all' | 'competitive' | 'advanced')}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
+              >
+                <option value="all">All Levels</option>
+                <option value="competitive">Competitive (Water)</option>
+                <option value="advanced">Advanced (Fire)</option>
+              </select>
+            </div>
+            
+            <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">Actions</label>
               <div className="flex flex-col space-y-2">
                 <button
@@ -520,8 +604,8 @@ export default function AdminRankingsPage() {
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold">Nationals Rankings</h2>
-                <p className="text-indigo-100 mt-1">Competition performance results</p>
+                <h2 className="text-2xl font-bold">Avalon Nationals Rankings</h2>
+                <p className="text-indigo-100 mt-1">Performance results and awards</p>
               </div>
               <div className="text-right">
                 <div className="text-sm text-indigo-100">Total Results</div>
@@ -546,7 +630,7 @@ export default function AdminRankingsPage() {
                       <th className="text-left py-4 px-6 font-bold text-gray-900">Item #</th>
                       <th className="text-left py-4 px-6 font-bold text-gray-900">Performance</th>
                       <th className="text-left py-4 px-6 font-bold text-gray-900">Contestant</th>
-                      <th className="text-left py-4 px-6 font-bold text-gray-900">Region</th>
+                      
                       <th className="text-left py-4 px-6 font-bold text-gray-900">Score</th>
                       <th className="text-left py-4 px-6 font-bold text-gray-900">Level</th>
                     </tr>
@@ -583,11 +667,7 @@ export default function AdminRankingsPage() {
                               <div className="text-xs text-gray-500 mt-1">{ranking.studioName}</div>
                             )}
                           </td>
-                          <td className="py-4 px-6">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {ranking.region}
-                            </span>
-                          </td>
+
                           <td className="py-4 px-6">
                             <div className="font-bold text-gray-900">{ranking.totalScore.toFixed(1)}</div>
                             <div className="text-sm text-gray-600">{percentage}% • {ranking.judgeCount} judges</div>

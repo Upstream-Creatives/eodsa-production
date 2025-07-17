@@ -21,12 +21,12 @@ const transporter = nodemailer.createTransport(EMAIL_CONFIG);
 export const emailTemplates = {
   // Individual dancer registration confirmation
   dancerRegistration: (name: string, eodsaId: string) => ({
-    subject: 'Welcome to EODSA - Registration Successful!',
+    subject: 'Welcome to Avalon - Registration Successful!',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to EODSA!</h1>
-          <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Element of Dance South Africa</p>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Avalon!</h1>
+          <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Avalon</p>
         </div>
         
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
@@ -37,7 +37,7 @@ export const emailTemplates = {
           </p>
           
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
-            Congratulations! Your registration with Element of Dance South Africa has been completed successfully.
+            Congratulations! Your registration with Avalon has been completed successfully.
           </p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 20px 0;">
@@ -78,16 +78,16 @@ export const emailTemplates = {
 
   // Studio registration confirmation
   studioRegistration: (studioName: string, contactPerson: string, registrationNumber: string, email: string) => ({
-    subject: 'EODSA Studio Registration Successful!',
+    subject: 'Avalon Studio Registration Successful!',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
           <h1 style="color: white; margin: 0; font-size: 28px;">🏢 Studio Registration Successful!</h1>
-          <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Element of Dance South Africa</p>
+          <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Avalon</p>
         </div>
         
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
-          <h2 style="color: #333; margin: 0 0 20px 0;">Welcome to EODSA!</h2>
+          <h2 style="color: #333; margin: 0 0 20px 0;">Welcome to Avalon!</h2>
           
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
             Hello <strong>${contactPerson}</strong>,
@@ -187,7 +187,7 @@ export const emailTemplates = {
           <h2 style="color: #333; margin: 0 0 20px 0;">Hello ${name},</h2>
           
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
-            Thank you for your interest in registering with EODSA (Element of Dance South Africa). We have reviewed your application and require some additional information before we can proceed.
+            Thank you for your interest in registering with Avalon. We have reviewed your application and require some additional information before we can proceed.
           </p>
           
           <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">

@@ -190,20 +190,7 @@ export default function AdminPortalPage() {
               <ForgotPasswordLink userType="admin" />
             </div>
 
-            {/* Demo Credentials */}
-            <div className="mt-6 sm:mt-8 p-3 sm:p-4 bg-white/5 backdrop-blur-sm rounded-lg sm:rounded-xl border border-white/10">
-              <p className="text-xs text-emerald-300 font-medium mb-2">Demo Admin Access:</p>
-              <div className="text-xs text-emerald-200 space-y-1">
-                <div className="flex flex-col sm:flex-row">
-                  <span className="sm:w-16">Email:</span>
-                  <span className="font-mono text-emerald-100">admin@competition.com</span>
-                </div>
-                <div className="flex flex-col sm:flex-row">
-                  <span className="sm:w-16">Password:</span>
-                  <span className="font-mono text-emerald-100">admin123</span>
-                </div>
-              </div>
-            </div>
+
           </div>
 
           {/* Security Notice */}

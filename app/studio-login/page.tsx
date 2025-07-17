@@ -53,7 +53,7 @@ export default function StudioLoginPage() {
               Studio Portal
             </h1>
             <p className="text-gray-200">
-              Element of Dance South Africa
+              Avalon
             </p>
             <p className="text-sm text-gray-300 mt-2">
               Access your studio dashboard to manage dancers

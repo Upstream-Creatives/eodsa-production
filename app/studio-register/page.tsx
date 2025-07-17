@@ -318,7 +318,7 @@ export default function StudioRegisterPage() {
               Register Studio
             </h1>
             <p className="text-gray-200">
-              Element of Dance South Africa
+              Avalon
             </p>
             <p className="text-sm text-gray-300 mt-2">
               Join EODSA and start managing your dancers

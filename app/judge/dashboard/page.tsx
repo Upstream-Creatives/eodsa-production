@@ -469,6 +469,11 @@ export default function JudgeDashboard() {
     if (typeof value === 'number') {
       const cappedValue = Math.min(Math.max(value, 0), 20);
       setCurrentScore(prev => ({ ...prev, [category]: cappedValue }));
+      
+      // Clear error message when user enters valid scores
+      if (cappedValue > 0 && errorMessage.includes('All score fields must have a value')) {
+        setErrorMessage('');
+      }
     } else {
       setCurrentScore(prev => ({ ...prev, [category]: value }));
     }
@@ -513,6 +518,16 @@ export default function JudgeDashboard() {
 
   const handleSubmitScore = async () => {
     if (!selectedPerformance) return;
+    
+    // Validation: All score fields must be greater than 0 (comments can be empty)
+    if (currentScore.technique <= 0 || 
+        currentScore.musicality <= 0 || 
+        currentScore.performance <= 0 || 
+        currentScore.styling <= 0 || 
+        currentScore.overallImpression <= 0) {
+      setErrorMessage('All score fields must have a value greater than 0. Only comments can be left empty.');
+      return;
+    }
     
     setIsSubmittingScore(true);
     setErrorMessage('');
@@ -735,7 +750,7 @@ export default function JudgeDashboard() {
                     {/* Technical Execution */}
                     <div>
                       <label className="block text-lg font-semibold text-gray-900 mb-2">
-                        Technical Execution
+                        Technical Execution *
                       </label>
                       <input
                         type="text"
@@ -749,14 +764,15 @@ export default function JudgeDashboard() {
                           handleScoreChange('technique', validated);
                         }}
                         className="score-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none text-center text-xl font-semibold"
+                        required
                       />
-                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points</p>
+                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points (required)</p>
                     </div>
 
                     {/* Musical Interpretation */}
                     <div>
                       <label className="block text-lg font-semibold text-gray-900 mb-2">
-                        Musical Interpretation
+                        Musical Interpretation *
                       </label>
                       <input
                         type="text"
@@ -770,14 +786,15 @@ export default function JudgeDashboard() {
                           handleScoreChange('musicality', validated);
                         }}
                         className="score-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none text-center text-xl font-semibold"
+                        required
                       />
-                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points</p>
+                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points (required)</p>
                     </div>
 
                     {/* Performance Quality */}
                     <div>
                       <label className="block text-lg font-semibold text-gray-900 mb-2">
-                        Performance Quality
+                        Performance Quality *
                       </label>
                       <input
                         type="text"
@@ -791,8 +808,9 @@ export default function JudgeDashboard() {
                           handleScoreChange('performance', validated);
                         }}
                         className="score-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none text-center text-xl font-semibold"
+                        required
                       />
-                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points</p>
+                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points (required)</p>
                     </div>
                   </div>
 
@@ -801,7 +819,7 @@ export default function JudgeDashboard() {
                     {/* Styling & Presentation */}
                     <div>
                       <label className="block text-lg font-semibold text-gray-900 mb-2">
-                        Styling & Presentation
+                        Styling & Presentation *
                       </label>
                       <input
                         type="text"
@@ -815,14 +833,15 @@ export default function JudgeDashboard() {
                           handleScoreChange('styling', validated);
                         }}
                         className="score-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none text-center text-xl font-semibold"
+                        required
                       />
-                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points</p>
+                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points (required)</p>
                     </div>
 
                     {/* Overall Impression */}
                     <div>
                       <label className="block text-lg font-semibold text-gray-900 mb-2">
-                        Overall Impression
+                        Overall Impression *
                       </label>
                       <input
                         type="text"
@@ -836,8 +855,9 @@ export default function JudgeDashboard() {
                           handleScoreChange('overallImpression', validated);
                         }}
                         className="score-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none text-center text-xl font-semibold"
+                        required
                       />
-                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points</p>
+                      <p className="text-xs text-gray-500 mt-1 text-center">0-20 points (required)</p>
                     </div>
 
                     {/* Comments */}
@@ -850,8 +870,9 @@ export default function JudgeDashboard() {
                         onChange={(e) => handleScoreChange('comments', e.target.value)}
                         rows={4}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Additional feedback..."
+                        placeholder="Additional feedback (not required)..."
                       />
+                      <p className="text-xs text-gray-500 mt-1">Optional field - can be left empty</p>
                     </div>
                   </div>
                 </div>

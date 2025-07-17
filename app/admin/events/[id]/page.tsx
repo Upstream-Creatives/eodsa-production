@@ -188,7 +188,11 @@ export default function EventParticipantsPage() {
       if (response.ok) {
         // After approval, create a performance from the entry
         await createPerformanceFromEntry(entryId);
-        loadEventData(); // Reload data
+        
+        // Update local state instead of reloading
+        setEntries(prev => prev.map(entry => 
+          entry.id === entryId ? { ...entry, approved: true } : entry
+        ));
       } else {
         const errorData = await response.json();
         showAlert(`Failed to approve entry: ${errorData.error || 'Unknown error'}`, 'error');
@@ -212,7 +216,13 @@ export default function EventParticipantsPage() {
         method: 'POST'
       });
       
-      if (!response.ok) {
+      if (response.ok) {
+        const result = await response.json();
+        if (result.performance) {
+          // Add the new performance to local state
+          setPerformances(prev => [...prev, result.performance]);
+        }
+      } else {
         console.error('Failed to create performance from entry');
       }
     } catch (error) {
@@ -240,7 +250,11 @@ export default function EventParticipantsPage() {
       if (response.ok) {
         const result = await response.json();
         showAlert(result.message, 'success');
-        loadEventData(); // Reload data
+        
+        // Update local state instead of reloading
+        setEntries(prev => prev.map(entry => 
+          entry.id === entryId ? { ...entry, qualifiedForNationals: !currentStatus } : entry
+        ));
       } else {
         const error = await response.json();
         showAlert(`Failed to update qualification: ${error.error}`, 'error');
@@ -279,26 +293,17 @@ export default function EventParticipantsPage() {
         setEditingItemNumber(null);
         setTempItemNumber('');
         
-        // Then update the local state immediately to show the change
-        setEntries(prev => {
-          console.log('Updating entry:', entryId, 'with item number:', itemNumber);
-          const updatedEntries = prev.map(entry => {
-            if (entry.id === entryId) {
-              console.log('Found matching entry:', entry.id, 'updating item number from', entry.itemNumber, 'to', itemNumber);
-              return { ...entry, itemNumber: itemNumber };
-            }
-            return entry;
-          });
-          console.log('Updated entries:', updatedEntries.filter(e => e.id === entryId));
-          return updatedEntries;
-        });
+        // Update both entries and performances state immediately
+        setEntries(prev => prev.map(entry => 
+          entry.id === entryId ? { ...entry, itemNumber: itemNumber } : entry
+        ));
+        
+        // Also update performances state if there's a matching performance
+        setPerformances(prev => prev.map(performance => 
+          performance.eventEntryId === entryId ? { ...performance, itemNumber: itemNumber } : performance
+        ));
         
         showAlert(result.message, 'success');
-        
-        // Reload data in background to ensure consistency (with delay to avoid race condition)
-        setTimeout(() => {
-          loadEventData().catch(console.error);
-        }, 1000);
       } else {
         const error = await response.json();
         showAlert(`Failed to assign item number: ${error.error}`, 'error');
@@ -367,7 +372,9 @@ export default function EventParticipantsPage() {
       if (response.ok) {
         const result = await response.json();
         showAlert(result.message, 'success');
-        loadEventData(); // Reload data
+        
+        // Remove entry from local state instead of reloading
+        setEntries(prev => prev.filter(entry => entry.id !== entryId));
       } else {
         const error = await response.json();
         showAlert(`Failed to delete entry: ${error.error}`, 'error');

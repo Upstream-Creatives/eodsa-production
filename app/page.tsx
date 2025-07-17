@@ -94,7 +94,7 @@ export default function HomePage() {
             <span className="text-white text-3xl font-bold">EODSA</span>
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-            Element of Dance South Africa
+                          Avalon
           </h1>
           <p className="text-gray-300 text-lg">Competition Management Portal</p>
         </div>

@@ -44,7 +44,7 @@ const PrivacyPolicyModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
         </div>
         <div className="text-gray-300 space-y-4 text-sm">
           <p><strong>Protection of Personal Information Act (POPIA) Notice</strong></p>
-          <p>Element of Dance South Africa (EODSA) respects your privacy and is committed to protecting your personal information in accordance with POPIA.</p>
+          <p>Avalon respects your privacy and is committed to protecting your personal information in accordance with POPIA.</p>
           
           <h3 className="text-white font-semibold">Information We Collect:</h3>
           <ul className="list-disc list-inside space-y-1">
