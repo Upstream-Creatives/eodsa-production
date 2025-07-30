@@ -48,6 +48,8 @@ export const initializeDatabase = async () => {
     // Add other checks here as needed, for example:
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS qualified_for_nationals BOOLEAN DEFAULT FALSE`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS item_number INTEGER`;
+    await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_reference TEXT`;
+    await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_date TEXT`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_end_date TEXT`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS item_number INTEGER`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS withdrawn_from_judging BOOLEAN DEFAULT FALSE`;
@@ -392,6 +394,8 @@ export const db = {
       calculatedFee: parseFloat(row.calculated_fee),
       paymentStatus: row.payment_status,
       paymentMethod: row.payment_method,
+      paymentReference: row.payment_reference,
+      paymentDate: row.payment_date,
       submittedAt: row.submitted_at,
       approved: row.approved,
       qualifiedForNationals: row.qualified_for_nationals,
@@ -444,6 +448,22 @@ export const db = {
       await sqlClient`
         UPDATE event_entries 
         SET payment_method = ${updates.paymentMethod}
+        WHERE id = ${id}
+      `;
+    }
+    
+    if (updates.paymentReference !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET payment_reference = ${updates.paymentReference}
+        WHERE id = ${id}
+      `;
+    }
+    
+    if (updates.paymentDate !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET payment_date = ${updates.paymentDate}
         WHERE id = ${id}
       `;
     }
@@ -3132,7 +3152,11 @@ export const unifiedDb = {
       approvedAt: row.approved_at,
       rejectionReason: row.rejection_reason,
       approvedByName: row.approved_by_name,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      // Registration fee tracking fields
+      registrationFeePaid: row.registration_fee_paid || false,
+      registrationFeePaidAt: row.registration_fee_paid_at,
+      registrationFeeMasteryLevel: row.registration_fee_mastery_level
     }));
   },
 
@@ -4218,6 +4242,43 @@ export const unifiedDb = {
   // Calculate nationals rankings
   async calculateNationalsRankings(eventIds?: string[]) {
     return await db.calculateNationalsRankings(eventIds);
+  },
+
+  // Add payment reference columns
+  async addPaymentReferenceColumns() {
+    const sqlClient = getSql();
+    
+    try {
+      console.log('🔄 Adding payment reference columns to event_entries table...');
+      
+      // Add payment_reference column
+      await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_reference TEXT`;
+      console.log('✅ Added payment_reference column');
+      
+      // Add payment_date column
+      await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_date TEXT`;
+      console.log('✅ Added payment_date column');
+      
+      console.log('✅ Payment reference columns migration completed');
+      return true;
+    } catch (error) {
+      console.error('❌ Error adding payment reference columns:', error);
+      return false;
+    }
+  },
+
+  // Mark registration fee as unpaid
+  async markRegistrationFeeUnpaid(dancerId: string) {
+    const sqlClient = getSql();
+    await sqlClient`
+      UPDATE dancers 
+      SET registration_fee_paid = false, 
+          registration_fee_paid_at = NULL,
+          registration_fee_mastery_level = NULL
+      WHERE id = ${dancerId}
+    `;
+    
+    return { success: true };
   }
 };
 

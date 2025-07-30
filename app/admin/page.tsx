@@ -62,6 +62,10 @@ interface Dancer {
   rejectionReason?: string;
   approvedByName?: string;
   createdAt: string;
+  // Registration fee tracking
+  registrationFeePaid?: boolean;
+  registrationFeePaidAt?: string;
+  registrationFeeMasteryLevel?: string;
 }
 
 interface Studio {
@@ -159,15 +163,18 @@ export default function AdminDashboard() {
 
   // Dancer search and filter state
   const [dancerSearchTerm, setDancerSearchTerm] = useState('');
-  const [dancerStatusFilter, setDancerStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [dancerStatusFilter, setDancerStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   // Studio search and filter state
   const [studioSearchTerm, setStudioSearchTerm] = useState('');
-  const [studioStatusFilter, setStudioStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [studioStatusFilter, setStudioStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   // Modal states
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
   const [showCreateJudgeModal, setShowCreateJudgeModal] = useState(false);
+  const [showFinancialModal, setShowFinancialModal] = useState(false);
+  const [selectedDancerFinances, setSelectedDancerFinances] = useState<any>(null);
+  const [loadingFinances, setLoadingFinances] = useState(false);
   const [showAssignJudgeModal, setShowAssignJudgeModal] = useState(false);
   const [showEmailTestModal, setShowEmailTestModal] = useState(false);
 
@@ -676,6 +683,134 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error rejecting dancer:', error);
       showAlert('Error rejecting dancer. Please check your connection and try again.', 'error');
+    }
+  };
+
+  const handleRegistrationFeeUpdate = async (dancerId: string, markAsPaid: boolean) => {
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        showAlert('Session expired. Please log in again.', 'error');
+        return;
+      }
+
+      const adminData = JSON.parse(session);
+      
+      if (markAsPaid) {
+        // Prompt for mastery level when marking as paid
+        showPrompt(
+          'Enter the mastery level for registration fee payment:',
+          async (masteryLevel) => {
+            if (!masteryLevel || masteryLevel.trim() === '') {
+              showAlert('Mastery level is required when marking registration fee as paid.', 'warning');
+              return;
+            }
+            
+            try {
+              const response = await fetch('/api/admin/dancers/registration-fee', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  dancerId,
+                  action: 'mark_paid',
+                  masteryLevel: masteryLevel.trim(),
+                  adminId: adminData.id
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success) {
+                showAlert('Registration fee marked as paid successfully!', 'success');
+                fetchData(); // Refresh the data
+              } else {
+                showAlert(`Error: ${data.error || 'Unknown error occurred'}`, 'error');
+              }
+            } catch (error) {
+              console.error('Error updating registration fee:', error);
+              showAlert('Error updating registration fee. Please check your connection and try again.', 'error');
+            }
+          },
+          undefined,
+          'e.g., Water, Fire, Earth, Air...'
+        );
+      } else {
+        // Mark as unpaid (confirmation)
+        showConfirm(
+          'Are you sure you want to mark this registration fee as unpaid?',
+          async () => {
+            try {
+              const response = await fetch('/api/admin/dancers/registration-fee', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  dancerId,
+                  action: 'mark_unpaid',
+                  adminId: adminData.id
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success) {
+                showAlert('Registration fee marked as unpaid.', 'success');
+                fetchData(); // Refresh the data
+              } else {
+                showAlert(`Error: ${data.error || 'Unknown error occurred'}`, 'error');
+              }
+            } catch (error) {
+              console.error('Error updating registration fee:', error);
+              showAlert('Error updating registration fee. Please check your connection and try again.', 'error');
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error updating registration fee:', error);
+      showAlert('Error updating registration fee. Please check your connection and try again.', 'error');
+    }
+  };
+
+  const handleViewFinances = async (dancer: any) => {
+    setSelectedDancerFinances(dancer);
+    setShowFinancialModal(true);
+    setLoadingFinances(true);
+    
+    try {
+      // Fetch event entries for this dancer to calculate outstanding balances
+      const response = await fetch(`/api/admin/dancers/${dancer.eodsaId}/finances`);
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedDancerFinances({
+          ...dancer,
+          eventEntries: data.eventEntries || [],
+          totalOutstanding: data.totalOutstanding || 0,
+          registrationFeeAmount: data.registrationFeeAmount || 0
+        });
+      } else {
+        // If API doesn't exist yet, just show basic info
+        setSelectedDancerFinances({
+          ...dancer,
+          eventEntries: [],
+          totalOutstanding: 0,
+          registrationFeeAmount: 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading financial data:', error);
+      // Fallback to basic info
+      setSelectedDancerFinances({
+        ...dancer,
+        eventEntries: [],
+        totalOutstanding: 0,
+        registrationFeeAmount: 0
+      });
+    } finally {
+      setLoadingFinances(false);
     }
   };
 
@@ -1560,24 +1695,61 @@ export default function AdminDashboard() {
                               )}
                             </td>
                             <td className="px-6 py-4">
-                              {!dancer.approved && !dancer.rejectionReason ? (
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleApproveDancer(dancer.id)}
-                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                                  >
-                                    ✅ Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectDancer(dancer.id)}
-                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                                  >
-                                    <span className="text-white">✖️</span> Reject
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400">No actions</span>
-                              )}
+                              <div className="space-y-2">
+                                {!dancer.approved && !dancer.rejectionReason ? (
+                                  <div className="flex space-x-2">
+                                    <button
+                                      onClick={() => handleApproveDancer(dancer.id)}
+                                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                                    >
+                                      ✅ Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleRejectDancer(dancer.id)}
+                                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                                    >
+                                      <span className="text-white">✖️</span> Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {/* Registration Fee Quick Status */}
+                                    <div className="text-xs">
+                                      <span className="font-medium text-gray-700">Reg Fee: </span>
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        dancer.registrationFeePaid 
+                                          ? 'bg-green-100 text-green-800 border border-green-200' 
+                                          : 'bg-red-100 text-red-800 border border-red-200'
+                                      }`}>
+                                        {dancer.registrationFeePaid ? '✅ Paid' : '❌ Not Paid'}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-col space-y-1">
+                                      <button
+                                        onClick={() => handleViewFinances(dancer)}
+                                        className="w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-colors"
+                                      >
+                                        💰 View Finances
+                                      </button>
+                                      
+                                      {dancer.approved && (
+                                        <button
+                                          onClick={() => handleRegistrationFeeUpdate(dancer.id, !dancer.registrationFeePaid)}
+                                          className={`w-full px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                                            dancer.registrationFeePaid
+                                              ? 'bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-200'
+                                              : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-200'
+                                          }`}
+                                        >
+                                          {dancer.registrationFeePaid ? 'Mark Reg Unpaid' : 'Mark Reg Paid'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -2432,6 +2604,183 @@ export default function AdminDashboard() {
           transform: scale(1.05);
         }
       `}</style>
+
+      {/* Financial Management Modal */}
+      {showFinancialModal && selectedDancerFinances && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+                    <span className="text-white text-lg">💰</span>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Financial Overview</h2>
+                    <p className="text-gray-600">{selectedDancerFinances.name} - {selectedDancerFinances.eodsaId}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowFinancialModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-2xl">×</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {loadingFinances ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading financial information...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Registration Fee Section */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="mr-2">📝</span>
+                      Registration Fee
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Status:</span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selectedDancerFinances.registrationFeePaid
+                            ? 'bg-green-100 text-green-800 border border-green-200'
+                            : 'bg-red-100 text-red-800 border border-red-200'
+                        }`}>
+                          {selectedDancerFinances.registrationFeePaid ? '✅ Paid' : '❌ Not Paid'}
+                        </span>
+                      </div>
+                      
+                      {selectedDancerFinances.registrationFeePaid && selectedDancerFinances.registrationFeePaidAt && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Paid Date:</span>
+                          <span className="text-sm text-gray-900">
+                            {new Date(selectedDancerFinances.registrationFeePaidAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {selectedDancerFinances.registrationFeeMasteryLevel && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Mastery Level:</span>
+                          <span className="text-sm text-gray-900">
+                            {selectedDancerFinances.registrationFeeMasteryLevel}
+                          </span>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-sm font-medium text-gray-700">Registration Fee Amount:</span>
+                        <span className={`text-sm font-bold ${
+                          selectedDancerFinances.registrationFeePaid ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {selectedDancerFinances.registrationFeePaid ? 'R0.00' : `R${EODSA_FEES.REGISTRATION.Nationals.toFixed(2)}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Event Entries Section */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="mr-2">🎭</span>
+                      Event Entries
+                    </h3>
+                    
+                    {selectedDancerFinances.eventEntries && selectedDancerFinances.eventEntries.length > 0 ? (
+                      <div className="space-y-3">
+                        {selectedDancerFinances.eventEntries.map((entry: any, index: number) => (
+                          <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{entry.itemName}</div>
+                                <div className="text-xs text-gray-500">{entry.eventName}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee?.toFixed(2) || '0.00'}</div>
+                                <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                                  entry.paymentStatus === 'paid' 
+                                    ? 'bg-green-100 text-green-800 border border-green-200'
+                                    : 'bg-red-100 text-red-800 border border-red-200'
+                                }`}>
+                                  {entry.paymentStatus?.toUpperCase() || 'PENDING'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <div className="text-gray-400 text-3xl mb-2">🎭</div>
+                        <p className="text-gray-600 text-sm">No event entries found</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Total Outstanding Section */}
+                  <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="mr-2">⚠️</span>
+                      Total Outstanding Balance
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Registration Fee:</span>
+                        <span className="text-sm font-medium text-red-600">
+                          {selectedDancerFinances.registrationFeePaid ? 'R0.00' : `R${EODSA_FEES.REGISTRATION.Nationals.toFixed(2)}`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Event Entries Outstanding:</span>
+                        <span className="text-sm font-medium text-red-600">
+                          R{selectedDancerFinances.totalOutstanding?.toFixed(2) || '0.00'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-red-200">
+                        <span className="text-base font-semibold text-gray-900">TOTAL OUTSTANDING:</span>
+                        <span className="text-lg font-bold text-red-600">
+                          R{(
+                            (selectedDancerFinances.registrationFeePaid ? 0 : EODSA_FEES.REGISTRATION.Nationals) + 
+                            (selectedDancerFinances.totalOutstanding || 0)
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="mr-2">⚡</span>
+                      Quick Actions
+                    </h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => {
+                          setShowFinancialModal(false);
+                          handleRegistrationFeeUpdate(selectedDancerFinances.id, !selectedDancerFinances.registrationFeePaid);
+                        }}
+                        className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          selectedDancerFinances.registrationFeePaid
+                            ? 'bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-200'
+                            : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-200'
+                        }`}
+                      >
+                        {selectedDancerFinances.registrationFeePaid ? 'Mark Registration Fee Unpaid' : 'Mark Registration Fee Paid'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

@@ -30,6 +30,8 @@ interface EventEntry {
   calculatedFee: number;
   paymentStatus: string;
   paymentMethod?: string;
+  paymentReference?: string;
+  paymentDate?: string;
   submittedAt: string;
   approved: boolean;
   qualifiedForNationals: boolean;
@@ -83,6 +85,11 @@ export default function EventParticipantsPage() {
   const [selectedPerformanceScores, setSelectedPerformanceScores] = useState<any>(null);
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [loadingScores, setLoadingScores] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [updatingPayment, setUpdatingPayment] = useState(false);
   const { showAlert } = useAlert();
 
   // Determine performance type from participant count
@@ -759,6 +766,80 @@ export default function EventParticipantsPage() {
     }
   };
 
+  // Payment management functions
+  const handlePaymentUpdate = (entry: EventEntry) => {
+    setSelectedEntry(entry);
+    setPaymentReference(entry.paymentReference || '');
+    setPaymentMethod(entry.paymentMethod || 'bank_transfer');
+    setShowPaymentModal(true);
+  };
+
+  const updatePaymentStatus = async (status: 'paid' | 'pending' | 'failed') => {
+    if (!selectedEntry) return;
+    
+    setUpdatingPayment(true);
+    
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        showAlert('Session expired. Please log in again.', 'error');
+        return;
+      }
+      
+      const adminData = JSON.parse(session);
+      
+      const response = await fetch(`/api/admin/entries/${selectedEntry.id}/payment`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentStatus: status,
+          paymentReference: status === 'paid' ? paymentReference : undefined,
+          paymentMethod: status === 'paid' ? paymentMethod : undefined,
+          adminId: adminData.id
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update local state
+        setEntries(prev => prev.map(entry => 
+          entry.id === selectedEntry.id 
+            ? { 
+                ...entry, 
+                paymentStatus: status,
+                paymentReference: status === 'paid' ? paymentReference : undefined,
+                paymentMethod: status === 'paid' ? paymentMethod : undefined,
+                paymentDate: status === 'paid' ? new Date().toISOString() : undefined
+              }
+            : entry
+        ));
+        
+        showAlert(result.message, 'success');
+        setShowPaymentModal(false);
+        
+        // Reset form
+        setPaymentReference('');
+        setPaymentMethod('bank_transfer');
+        setSelectedEntry(null);
+      } else {
+        const error = await response.json();
+        showAlert(`Failed to update payment: ${error.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      showAlert('Failed to update payment status', 'error');
+    } finally {
+      setUpdatingPayment(false);
+    }
+  };
+
+  const getOutstandingBalance = (entry: EventEntry) => {
+    return entry.paymentStatus === 'paid' ? 0 : entry.calculatedFee;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
@@ -1259,11 +1340,41 @@ export default function EventParticipantsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div>
-                          <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee.toFixed(2)}</div>
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entry.paymentStatus)}`}>
-                            {entry.paymentStatus.toUpperCase()}
-                          </span>
+                        <div className="space-y-2">
+                          <div className="flex flex-col">
+                            <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500">Total Fee</div>
+                          </div>
+                          
+                          <div className="flex flex-col">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entry.paymentStatus)}`}>
+                              {entry.paymentStatus.toUpperCase()}
+                            </span>
+                            {entry.paymentStatus === 'paid' && entry.paymentReference && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Ref: {entry.paymentReference}
+                              </div>
+                            )}
+                            {entry.paymentStatus === 'paid' && entry.paymentDate && (
+                              <div className="text-xs text-gray-500">
+                                Paid: {new Date(entry.paymentDate).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+
+                          {getOutstandingBalance(entry) > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded p-2">
+                              <div className="text-xs font-medium text-red-800">Outstanding</div>
+                              <div className="text-sm font-bold text-red-900">R{getOutstandingBalance(entry).toFixed(2)}</div>
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => handlePaymentUpdate(entry)}
+                            className="w-full px-3 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-colors"
+                          >
+                            Manage Payment
+                          </button>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 hidden md:table-cell">
@@ -1592,6 +1703,130 @@ export default function EventParticipantsPage() {
                 <p className="text-gray-600">Failed to load scores</p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Payment Management Modal */}
+    {showPaymentModal && selectedEntry && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                  <span className="text-white text-lg">💳</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Payment Management</h2>
+                  <p className="text-gray-600 text-sm">{selectedEntry.itemName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <span className="text-2xl">×</span>
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            {/* Current Payment Info */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Current Status</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Entry Fee:</span>
+                  <span className="text-sm font-medium text-gray-900">R{selectedEntry.calculatedFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Status:</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(selectedEntry.paymentStatus)}`}>
+                    {selectedEntry.paymentStatus.toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Outstanding:</span>
+                  <span className={`text-sm font-bold ${getOutstandingBalance(selectedEntry) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    R{getOutstandingBalance(selectedEntry).toFixed(2)}
+                  </span>
+                </div>
+                {selectedEntry.paymentReference && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Reference:</span>
+                    <span className="text-sm text-gray-900">{selectedEntry.paymentReference}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Form */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="credit_card">Credit Card</option>
+                  <option value="invoice">Invoice</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Reference</label>
+                <input
+                  type="text"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  placeholder="Transaction ID, Check number, etc."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter payment reference when marking as paid</p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col space-y-3">
+              <button
+                onClick={() => updatePaymentStatus('paid')}
+                disabled={updatingPayment}
+                className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium"
+              >
+                {updatingPayment ? 'Updating...' : 'Mark as Paid'}
+              </button>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => updatePaymentStatus('pending')}
+                  disabled={updatingPayment}
+                  className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  Mark Pending
+                </button>
+                
+                <button
+                  onClick={() => updatePaymentStatus('failed')}
+                  disabled={updatingPayment}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  Mark Failed
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>

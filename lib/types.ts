@@ -89,6 +89,8 @@ export interface EventEntry {
   calculatedFee: number;
   paymentStatus: 'pending' | 'paid' | 'failed';
   paymentMethod?: 'credit_card' | 'bank_transfer' | 'invoice';
+  paymentReference?: string; // Payment reference number/transaction ID
+  paymentDate?: string; // Date when payment was processed
   submittedAt: string;
   approved: boolean;
   qualifiedForNationals: boolean;
@@ -274,10 +276,11 @@ export const TIME_LIMITS = {
 
 // EODSA Fee Structure - Updated for Nationals 2024 (Water and Fire only)
 export const EODSA_FEES = {
-  // Registration fees per person - same for both Water and Fire
+  // Registration fees per person
   REGISTRATION: {
     'Water (Competitive)': 250,    // R250 PP for Water (Competition)
-    'Fire (Advanced)': 250         // R250 PP for Fire (Advanced)
+    'Fire (Advanced)': 250,        // R250 PP for Fire (Advanced)
+    'Nationals': 300               // R300 PP for Nationals entry
   },
   
   // Solo packages - same for both Water and Fire
