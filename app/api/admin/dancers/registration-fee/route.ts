@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { unifiedDb } from '@/lib/database';
+import { unifiedDb, db } from '@/lib/database';
 
 // Handle registration fee management for dancers
 export async function POST(request: NextRequest) {

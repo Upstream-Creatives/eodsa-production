@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/database';
+import { db, unifiedDb } from '@/lib/database';
 
 export async function PUT(
   request: Request,
@@ -7,7 +7,7 @@ export async function PUT(
 ) {
   try {
     // Before doing anything, ensure the payment reference columns exist
-    await db.addPaymentReferenceColumns();
+    await unifiedDb.addPaymentReferenceColumns();
     
     const { id } = await params;
     const entryId = id;
@@ -94,7 +94,7 @@ export async function GET(
 ) {
   try {
     // Ensure the payment reference columns exist
-    await db.addPaymentReferenceColumns();
+    await unifiedDb.addPaymentReferenceColumns();
     
     const { id } = await params;
     const entryId = id;
