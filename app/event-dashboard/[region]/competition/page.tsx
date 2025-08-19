@@ -677,7 +677,29 @@ export default function CompetitionEntryPage() {
   const previewFee = getPreviewFee();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 pb-safe-bottom">
+      {/* Add mobile-specific bottom padding to prevent iPhone search bar from covering buttons */}
+      <style jsx global>{`
+        @supports(padding: max(0px)) {
+          .pb-safe-bottom {
+            padding-bottom: max(env(safe-area-inset-bottom, 0px), 100px);
+          }
+        }
+        
+        /* Fallback for older browsers */
+        @media screen and (max-width: 640px) {
+          .pb-safe-bottom {
+            padding-bottom: 120px;
+          }
+        }
+        
+        /* iPhone specific adjustments */
+        @media screen and (max-width: 414px) and (min-height: 800px) {
+          .pb-safe-bottom {
+            padding-bottom: 140px;
+          }
+        }
+      `}</style>
       {/* Header */}
       <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-lg border-b border-slate-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -737,7 +759,7 @@ export default function CompetitionEntryPage() {
             {/* Performance Type Selection */}
             <div className="bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-6 mb-8">
               <h3 className="text-xl font-bold text-white mb-4">Add Performance Types</h3>
-                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {['Solo', 'Duet', 'Trio', 'Group'].map((type) => {
                   const isActive = showAddForm === type;
                   const soloCount = entries.filter(e => e.performanceType === 'Solo').length;
@@ -751,12 +773,12 @@ export default function CompetitionEntryPage() {
                       key={type}
                       onClick={() => !isDisabled && handleAddPerformanceType(type)}
                       disabled={isDisabled}
-                      className={`p-4 bg-gradient-to-r text-white rounded-lg transition-all duration-300 transform ${
+                      className={`p-4 sm:p-5 bg-gradient-to-r text-white rounded-xl transition-all duration-300 transform min-h-[120px] sm:min-h-[140px] ${
                         isDisabled 
                           ? 'from-gray-500 to-gray-600 cursor-not-allowed opacity-50' 
                           : isActive 
-                            ? 'from-emerald-600 to-blue-600 ring-2 ring-emerald-400 animate-pulse hover:scale-[1.02]' 
-                            : 'from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:scale-[1.02]'
+                            ? 'from-emerald-600 to-blue-600 ring-2 ring-emerald-400 animate-pulse hover:scale-[1.02] shadow-lg shadow-emerald-500/25' 
+                            : 'from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:scale-[1.02] shadow-lg hover:shadow-purple-500/25'
                       }`}
                     >
                        <div className="text-center">
@@ -839,133 +861,151 @@ export default function CompetitionEntryPage() {
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Item Name *</label>
-                    <input
-                      type="text"
-                      value={currentForm.itemName}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Prevent empty strings with just spaces and enforce minimum length
-                        if (value && value.trim().length > 0 && value.trim().length < 3) {
-                          validationError('Item name must be at least 3 characters long.');
-                        } else if (value && value.trim().length === 0) {
-                          validationError('Item name cannot be empty or contain only spaces.');
-                        }
-                        setCurrentForm({...currentForm, itemName: value});
-                      }}
-                      className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Choreographer *</label>
-                    <input
-                      type="text"
-                      value={currentForm.choreographer}
-                      onChange={(e) => {
-                        const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
-                        setCurrentForm({...currentForm, choreographer: cleanValue});
-                      }}
-                      className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Mastery Level</label>
-                    <select
-                      value={currentForm.mastery}
-                      onChange={(e) => setCurrentForm({...currentForm, mastery: e.target.value})}
-                      className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Select mastery level</option>
-                      {MASTERY_LEVELS.map((level) => (
-                        <option key={level} value={level}>{level}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Item Style *</label>
-                    <select
-                      value={currentForm.itemStyle}
-                      onChange={(e) => setCurrentForm({...currentForm, itemStyle: e.target.value})}
-                      className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      required
-                    >
-                      <option value="">Select item style</option>
-                      {ITEM_STYLES.map((style) => (
-                        <option key={style} value={style}>{style}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Estimated Duration - Maximum: {getMaxDurationDisplay(showAddForm || '')}
-                      <span className="text-xs text-slate-400 block mt-1">Read-only: Shows maximum time limit for {showAddForm}</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={getMaxDurationDisplay(showAddForm || '')}
-                      readOnly
-                      className="w-full p-3 bg-slate-600/50 border border-slate-500 rounded-lg text-slate-300 cursor-not-allowed"
-                      title="Maximum duration automatically set based on performance type"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Age Category
-                      <span className="text-xs text-slate-400 block mt-1">Read-only: Based on average age of participants</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={getCalculatedAgeCategory()}
-                      readOnly
-                      className="w-full p-3 bg-slate-600/50 border border-slate-500 rounded-lg text-slate-300 cursor-not-allowed"
-                      title="Age category automatically determined by average age of participants"
-                    />
-                    {currentForm.participantIds.length > 0 && availableDancers.length > 0 && (
-                      <div className="mt-2 p-2 bg-purple-900/20 border border-purple-500/30 rounded-lg">
-                        <div className="text-purple-300 text-sm">
-                          <strong>Participants:</strong> {
-                            availableDancers
-                              .filter(dancer => currentForm.participantIds.includes(dancer.id))
-                              .map(dancer => `${dancer.name} (${dancer.age}y)`)
-                              .join(', ')
+                <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">Item Name *</label>
+                      <input
+                        type="text"
+                        value={currentForm.itemName}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Prevent empty strings with just spaces and enforce minimum length
+                          if (value && value.trim().length > 0 && value.trim().length < 3) {
+                            validationError('Item name must be at least 3 characters long.');
+                          } else if (value && value.trim().length === 0) {
+                            validationError('Item name cannot be empty or contain only spaces.');
                           }
-                        </div>
-                        <div className="text-purple-200 text-xs mt-1">
-                          Average Age: {(() => {
-                            const selectedParticipants = availableDancers.filter(dancer => currentForm.participantIds.includes(dancer.id));
-                            const totalAge = selectedParticipants.reduce((sum, dancer) => sum + dancer.age, 0);
-                            return Math.round(totalAge / selectedParticipants.length);
-                          })()} years → Category: {getCalculatedAgeCategory()}
+                          setCurrentForm({...currentForm, itemName: value});
+                        }}
+                        className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base"
+                        placeholder="Enter your performance title"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">Choreographer *</label>
+                      <input
+                        type="text"
+                        value={currentForm.choreographer}
+                        onChange={(e) => {
+                          const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
+                          setCurrentForm({...currentForm, choreographer: cleanValue});
+                        }}
+                        className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base"
+                        placeholder="Who choreographed this piece?"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">Mastery Level</label>
+                      <select
+                        value={currentForm.mastery}
+                        onChange={(e) => setCurrentForm({...currentForm, mastery: e.target.value})}
+                        className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base"
+                      >
+                        <option value="">Select mastery level</option>
+                        {MASTERY_LEVELS.map((level) => (
+                          <option key={level} value={level}>{level}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">Item Style *</label>
+                      <select
+                        value={currentForm.itemStyle}
+                        onChange={(e) => setCurrentForm({...currentForm, itemStyle: e.target.value})}
+                        className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base"
+                        required
+                      >
+                        <option value="">Select item style</option>
+                        {ITEM_STYLES.map((style) => (
+                          <option key={style} value={style}>{style}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">
+                        ⏱️ Duration Limit: {getMaxDurationDisplay(showAddForm || '')}
+                        <span className="text-xs text-slate-400 block mt-1 font-normal">Maximum time allowed for {showAddForm} performances</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={getMaxDurationDisplay(showAddForm || '')}
+                          readOnly
+                          className="w-full p-4 bg-slate-600/30 border-2 border-slate-500/50 rounded-xl text-slate-300 cursor-not-allowed text-base"
+                          title="Maximum duration automatically set based on performance type"
+                        />
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <span className="text-slate-400">🔒</span>
                         </div>
                       </div>
-                    )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">
+                        👥 Age Category
+                        <span className="text-xs text-slate-400 block mt-1 font-normal">Calculated from participant ages</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={getCalculatedAgeCategory()}
+                          readOnly
+                          className="w-full p-4 bg-slate-600/30 border-2 border-slate-500/50 rounded-xl text-slate-300 cursor-not-allowed text-base"
+                          title="Age category automatically determined by average age of participants"
+                        />
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <span className="text-slate-400">🔒</span>
+                        </div>
+                      </div>
+                      {currentForm.participantIds.length > 0 && availableDancers.length > 0 && (
+                        <div className="mt-3 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg">
+                          <div className="text-purple-300 text-sm">
+                            <strong>🎭 Selected Participants:</strong> {
+                              availableDancers
+                                .filter(dancer => currentForm.participantIds.includes(dancer.id))
+                                .map(dancer => `${dancer.name} (${dancer.age}y)`)
+                                .join(', ')
+                            }
+                          </div>
+                          <div className="text-purple-200 text-xs mt-2">
+                            📊 Average Age: {(() => {
+                              const selectedParticipants = availableDancers.filter(dancer => currentForm.participantIds.includes(dancer.id));
+                              const totalAge = selectedParticipants.reduce((sum, dancer) => sum + dancer.age, 0);
+                              return Math.round(totalAge / selectedParticipants.length);
+                            })()} years → Category: <strong>{getCalculatedAgeCategory()}</strong>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* PHASE 2: Live vs Virtual Entry Toggle */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-3">Entry Type *</label>
-                    <div className="flex space-x-4">
+                    <label className="block text-sm font-semibold text-slate-300 mb-3">🎯 Entry Type *</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <button
                         type="button"
                         onClick={() => setCurrentForm({...currentForm, entryType: 'live', videoExternalUrl: '', musicFileUrl: currentForm.entryType === 'virtual' ? '' : currentForm.musicFileUrl})}
-                        className={`flex-1 p-4 rounded-lg border-2 transition-all duration-200 ${
+                        className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] min-h-[100px] sm:min-h-[120px] ${
                           currentForm.entryType === 'live'
-                            ? 'border-purple-500 bg-purple-500/20 text-purple-300'
-                            : 'border-slate-600 bg-slate-700/30 text-slate-400 hover:border-slate-500'
+                            ? 'border-purple-500 bg-purple-500/20 text-purple-300 ring-2 ring-purple-500/30 shadow-lg shadow-purple-500/25'
+                            : 'border-slate-600 bg-slate-700/30 text-slate-400 hover:border-purple-400 hover:bg-purple-500/10'
                         }`}
                       >
-                        <div className="flex flex-col items-center space-y-2">
-                          <span className="text-2xl">🎵</span>
-                          <span className="font-medium">Live Performance</span>
-                          <span className="text-xs text-center opacity-75">
-                            Upload music file for live performance
+                        <div className="flex flex-col items-center justify-center space-y-2 h-full">
+                          <span className="text-3xl">🎵</span>
+                          <span className="font-semibold text-base">Live Performance</span>
+                          <span className="text-xs text-center opacity-90 leading-relaxed">
+                            Upload music file for in-person performance
                           </span>
                         </div>
                       </button>
@@ -973,17 +1013,17 @@ export default function CompetitionEntryPage() {
                       <button
                         type="button"
                         onClick={() => setCurrentForm({...currentForm, entryType: 'virtual', musicFileUrl: '', musicFileName: ''})}
-                        className={`flex-1 p-4 rounded-lg border-2 transition-all duration-200 ${
+                        className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] min-h-[100px] sm:min-h-[120px] ${
                           currentForm.entryType === 'virtual'
-                            ? 'border-purple-500 bg-purple-500/20 text-purple-300'
-                            : 'border-slate-600 bg-slate-700/30 text-slate-400 hover:border-slate-500'
+                            ? 'border-purple-500 bg-purple-500/20 text-purple-300 ring-2 ring-purple-500/30 shadow-lg shadow-purple-500/25'
+                            : 'border-slate-600 bg-slate-700/30 text-slate-400 hover:border-purple-400 hover:bg-purple-500/10'
                         }`}
                       >
-                        <div className="flex flex-col items-center space-y-2">
-                          <span className="text-2xl">📹</span>
-                          <span className="font-medium">Virtual Performance</span>
-                          <span className="text-xs text-center opacity-75">
-                            Provide video URL (YouTube/Vimeo)
+                        <div className="flex flex-col items-center justify-center space-y-2 h-full">
+                          <span className="text-3xl">📹</span>
+                          <span className="font-semibold text-base">Virtual Performance</span>
+                          <span className="text-xs text-center opacity-90 leading-relaxed">
+                            Submit video URL (YouTube/Vimeo)
                           </span>
                         </div>
                       </button>
@@ -993,9 +1033,9 @@ export default function CompetitionEntryPage() {
                   {/* Conditional Fields Based on Entry Type */}
                   {currentForm.entryType === 'live' && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-3">
-                        Music File Upload *
-                        <span className="text-xs text-slate-400 block mt-1">Upload the music file for your live performance</span>
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">
+                        🎵 Music File Upload *
+                        <span className="text-xs text-slate-400 block mt-1 font-normal">Upload the music file for your live performance</span>
                       </label>
                       <MusicUpload
                         onUploadSuccess={(fileData) => {
@@ -1020,24 +1060,24 @@ export default function CompetitionEntryPage() {
                   {currentForm.entryType === 'virtual' && (
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Video Platform *
+                        <label className="block text-sm font-semibold text-slate-300 mb-3">
+                          📱 Video Platform *
                         </label>
                         <select
                           value={currentForm.videoExternalType}
                           onChange={(e) => setCurrentForm({...currentForm, videoExternalType: e.target.value as 'youtube' | 'vimeo' | 'other'})}
-                          className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base"
                         >
-                          <option value="youtube">YouTube</option>
-                          <option value="vimeo">Vimeo</option>
-                          <option value="other">Other</option>
+                          <option value="youtube">📺 YouTube</option>
+                          <option value="vimeo">🎬 Vimeo</option>
+                          <option value="other">🌐 Other Platform</option>
                         </select>
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Video URL *
-                          <span className="text-xs text-slate-400 block mt-1">
+                        <label className="block text-sm font-semibold text-slate-300 mb-3">
+                          🔗 Video URL *
+                          <span className="text-xs text-slate-400 block mt-1 font-normal">
                             Paste the full URL to your performance video
                           </span>
                         </label>
@@ -1052,20 +1092,23 @@ export default function CompetitionEntryPage() {
                               ? 'https://vimeo.com/...'
                               : 'https://...'
                           }
-                          className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base"
                         />
                         {currentForm.videoExternalUrl && (
-                          <div className="mt-2 p-2 bg-green-900/20 border border-green-500/30 rounded-lg">
-                            <div className="text-green-300 text-sm flex items-center space-x-2">
-                              <span>✅</span>
-                              <span>Video URL provided</span>
+                          <div className="mt-3 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+                            <div className="text-green-300 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                              <div className="flex items-center space-x-2">
+                                <span>✅</span>
+                                <span className="font-medium">Video URL provided</span>
+                              </div>
                               <a 
                                 href={currentForm.videoExternalUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-green-400 hover:text-green-300 underline"
+                                className="inline-flex items-center px-3 py-1 bg-green-500/20 text-green-400 hover:text-green-300 hover:bg-green-500/30 rounded-lg transition-all duration-200 text-sm font-medium border border-green-500/30"
                               >
-                                Preview
+                                <span className="mr-1">🔗</span>
+                                Preview Video
                               </a>
                             </div>
                           </div>
@@ -1212,7 +1255,7 @@ export default function CompetitionEntryPage() {
                    </div>
                  )}
                  
-                 <div className="mt-6 flex justify-end space-x-4">
+                 <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end">
                    <button
                      onClick={() => {
                        // Save current form state before closing
@@ -1222,7 +1265,7 @@ export default function CompetitionEntryPage() {
                        }));
                        setShowAddForm(null);
                      }}
-                     className="px-6 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"
+                     className="w-full sm:w-auto px-6 py-3 bg-slate-600 text-white rounded-xl hover:bg-slate-500 transition-all duration-300 font-medium text-base min-h-[48px] sm:min-h-auto order-2 sm:order-1"
                    >
                      Cancel
                    </button>
@@ -1236,7 +1279,7 @@ export default function CompetitionEntryPage() {
                        (currentForm.entryType === 'live' && !currentForm.musicFileUrl) ||
                        (currentForm.entryType === 'virtual' && !currentForm.videoExternalUrl)
                      }
-                     className={`px-6 py-2 text-white rounded-lg transition-all duration-300 ${
+                     className={`w-full sm:w-auto px-6 py-3 text-white rounded-xl transition-all duration-300 font-semibold text-base min-h-[48px] sm:min-h-auto order-1 sm:order-2 ${
                        !currentForm.itemName || 
                        currentForm.participantIds.length === 0 ||
                        currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
@@ -1244,18 +1287,18 @@ export default function CompetitionEntryPage() {
                        (currentForm.entryType === 'live' && !currentForm.musicFileUrl) ||
                        (currentForm.entryType === 'virtual' && !currentForm.videoExternalUrl)
                          ? 'bg-slate-500 cursor-not-allowed'
-                         : 'bg-purple-600 hover:bg-purple-500 hover:scale-105'
+                         : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:scale-105 shadow-lg hover:shadow-purple-500/25'
                      }`}
                    >
-                     {!currentForm.itemName ? 'Enter Item Name' :
-                      currentForm.participantIds.length === 0 ? 'Select Participants' :
+                     {!currentForm.itemName ? '📝 Enter Item Name' :
+                      currentForm.participantIds.length === 0 ? '👥 Select Participants' :
                       currentForm.participantIds.length < getParticipantLimits(showAddForm).min ? 
-                        `Need ${getParticipantLimits(showAddForm).min - currentForm.participantIds.length} More` :
+                        `➕ Need ${getParticipantLimits(showAddForm).min - currentForm.participantIds.length} More` :
                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max ? 
-                        `Remove ${currentForm.participantIds.length - getParticipantLimits(showAddForm).max}` :
-                      (currentForm.entryType === 'live' && !currentForm.musicFileUrl) ? 'Upload Music File' :
-                      (currentForm.entryType === 'virtual' && !currentForm.videoExternalUrl) ? 'Enter Video URL' :
-                      `Add Entry ${previewFee > 0 ? `(R${previewFee})` : ''}`}
+                        `➖ Remove ${currentForm.participantIds.length - getParticipantLimits(showAddForm).max}` :
+                      (currentForm.entryType === 'live' && !currentForm.musicFileUrl) ? '🎵 Upload Music File' :
+                      (currentForm.entryType === 'virtual' && !currentForm.videoExternalUrl) ? '📹 Enter Video URL' :
+                      `✅ Add Entry ${previewFee > 0 ? `(R${previewFee})` : ''}`}
                    </button>
                  </div>
               </div>
@@ -1372,7 +1415,7 @@ export default function CompetitionEntryPage() {
               <button
                 onClick={handleProceedToPayment}
                 disabled={entries.length === 0 || isSubmitting}
-                className={`w-full py-3 text-white rounded-lg font-semibold transition-all duration-300 ${
+                className={`w-full py-4 sm:py-3 text-white rounded-lg font-semibold transition-all duration-300 mb-4 sm:mb-0 text-lg sm:text-base min-h-[56px] sm:min-h-auto ${
                   isSubmitting 
                     ? 'bg-slate-500 cursor-not-allowed' 
                     : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:bg-slate-500 disabled:cursor-not-allowed'

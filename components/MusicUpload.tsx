@@ -124,24 +124,31 @@ export default function MusicUpload({
     <div className="space-y-4">
       {/* Current File Display */}
       {currentFile && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-green-900/30 border border-green-500/40 rounded-xl p-4 sm:p-6 backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-green-600">🎵</span>
+              <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                <span className="text-2xl">🎵</span>
               </div>
               <div>
-                <p className="font-medium text-green-800">Music File Uploaded</p>
-                <p className="text-sm text-green-600">{currentFile.filename}</p>
+                <p className="font-semibold text-green-300 text-base">✅ Music File Uploaded</p>
+                <p className="text-sm text-green-200 break-all">{currentFile.filename}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex justify-center sm:justify-end">
               <audio 
                 controls 
-                className="h-8"
-                style={{ width: '200px' }}
+                className="h-10 sm:h-8 rounded-lg bg-slate-800/60"
+                style={{ 
+                  width: '100%', 
+                  maxWidth: '280px',
+                  minWidth: '200px'
+                }}
+                preload="metadata"
               >
                 <source src={currentFile.url} type="audio/mpeg" />
+                <source src={currentFile.url} type="audio/wav" />
+                <source src={currentFile.url} type="audio/aac" />
                 Your browser does not support the audio element.
               </audio>
             </div>
@@ -151,57 +158,79 @@ export default function MusicUpload({
 
       {/* Upload Area */}
       <div
-        className={`relative border-2 border-dashed rounded-lg p-6 transition-all duration-200 ${
+        className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 transition-all duration-300 transform hover:scale-[1.01] ${
           dragActive
-            ? 'border-purple-400 bg-purple-50'
+            ? 'border-purple-400 bg-purple-500/10 scale-[1.02]'
             : disabled
-            ? 'border-gray-200 bg-gray-50'
-            : 'border-gray-300 hover:border-purple-400 hover:bg-purple-50'
+            ? 'border-slate-600 bg-slate-700/20 opacity-60 cursor-not-allowed'
+            : isUploading
+            ? 'border-blue-400 bg-blue-500/10'
+            : 'border-slate-500 bg-slate-700/30 hover:border-purple-400 hover:bg-purple-500/10'
         }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
         {isUploading ? (
-          <div className="text-center">
-            <div className="w-12 h-12 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+          <div className="text-center py-4">
+            <div className="w-16 h-16 mx-auto mb-6 bg-blue-500/20 rounded-full flex items-center justify-center border border-blue-500/30">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-transparent"></div>
             </div>
-            <p className="text-sm font-medium text-gray-900">Uploading music...</p>
-            <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+            <h4 className="text-lg font-semibold text-blue-300 mb-2">Uploading Music...</h4>
+            <div className="mt-4 w-full bg-slate-600/50 rounded-full h-3 border border-slate-500/50">
               <div 
-                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
-            <p className="text-xs text-gray-500 mt-1">{uploadProgress}% complete</p>
+            <p className="text-sm text-blue-200 mt-3 font-medium">{uploadProgress}% complete</p>
           </div>
         ) : (
-          <div className="text-center">
-            <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">🎵</span>
+          <div className="text-center py-4">
+            <div className={`w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+              dragActive 
+                ? 'bg-purple-500/20 border-purple-400 scale-110' 
+                : disabled
+                ? 'bg-slate-600/20 border-slate-500'
+                : 'bg-slate-600/30 border-slate-500 hover:border-purple-400 hover:bg-purple-500/20'
+            }`}>
+              <span className="text-3xl">{dragActive ? '🎯' : '🎵'}</span>
             </div>
-            <p className="text-sm font-medium text-gray-900">
-              {currentFile ? 'Replace music file' : 'Upload music file'}
+            
+            <h4 className={`text-lg font-semibold mb-2 ${
+              disabled ? 'text-slate-400' : 'text-slate-200'
+            }`}>
+              {currentFile ? '🔄 Replace Music File' : '📤 Upload Music File'}
+            </h4>
+            
+            <p className={`text-sm mb-2 ${
+              disabled ? 'text-slate-500' : 'text-slate-300'
+            }`}>
+              {dragActive 
+                ? '🎯 Drop your music file here!' 
+                : 'Drag and drop or click to select your music file'
+              }
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Drag and drop or click to select
-            </p>
-            <p className="text-xs text-gray-400 mt-2">
-              Supports: MP3, WAV, AAC, M4A (max 50MB)
-            </p>
+            
+            <div className={`text-xs mb-4 space-y-1 ${
+              disabled ? 'text-slate-500' : 'text-slate-400'
+            }`}>
+              <p>📀 <strong>Supports:</strong> MP3, WAV, AAC, M4A</p>
+              <p>📏 <strong>Max size:</strong> 50MB</p>
+              <p>⏱️ <strong>Recommended:</strong> 2-4 minute duration</p>
+            </div>
             
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className={`mt-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={`px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 transform ${
                 disabled
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                  ? 'bg-slate-600/50 text-slate-400 cursor-not-allowed border border-slate-500/50'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-500 hover:to-pink-500 hover:scale-105 shadow-lg hover:shadow-purple-500/25 border border-purple-500/30'
               }`}
             >
-              {currentFile ? 'Choose New File' : 'Choose File'}
+              {currentFile ? '🔄 Choose New File' : '📁 Choose File'}
             </button>
           </div>
         )}
@@ -216,11 +245,30 @@ export default function MusicUpload({
         />
       </div>
 
-      {/* Help Text */}
-      <div className="text-xs text-gray-500 space-y-1">
-        <p>• Music file will be used during live performances</p>
-        <p>• Judges can play and download the file during scoring</p>
-        <p>• Make sure the file is the correct version for your performance</p>
+      {/* Enhanced Help Text */}
+      <div className="bg-slate-800/40 border border-slate-600/50 rounded-lg p-4 space-y-2">
+        <h5 className="text-sm font-semibold text-slate-300 mb-3 flex items-center">
+          <span className="mr-2">💡</span>
+          Music Upload Guidelines
+        </h5>
+        <div className="text-xs text-slate-400 space-y-1.5">
+          <p className="flex items-start">
+            <span className="mr-2 text-green-400">✓</span>
+            <span>Music file will be played during your live performance</span>
+          </p>
+          <p className="flex items-start">
+            <span className="mr-2 text-blue-400">🎧</span>
+            <span>Judges can preview and download your music during scoring</span>
+          </p>
+          <p className="flex items-start">
+            <span className="mr-2 text-yellow-400">⚠️</span>
+            <span>Ensure this is the <strong>exact version</strong> for your performance</span>
+          </p>
+          <p className="flex items-start">
+            <span className="mr-2 text-purple-400">🔊</span>
+            <span>High-quality audio files provide better playback experience</span>
+          </p>
+        </div>
       </div>
     </div>
   );

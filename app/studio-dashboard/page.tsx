@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RecaptchaV2 } from '@/components/RecaptchaV2';
 import { MASTERY_LEVELS, ITEM_STYLES } from '@/lib/types';
+import MusicUpload from '@/components/MusicUpload';
 
 // Studio session interface
 interface StudioSession {
@@ -63,13 +64,40 @@ interface CompetitionEntry {
   itemStyle: string;
   estimatedDuration: number;
   createdAt: string;
+  entryType?: 'live' | 'virtual';
+  musicFileUrl?: string;
+  musicFileName?: string;
+}
+
+// Music entry interface for studio music uploads
+interface MusicEntry {
+  id: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+  venue: string;
+  contestantId: string;
+  contestantName: string;
+  eodsaId: string;
+  participantIds: string[];
+  participantNames: string[];
+  itemName: string;
+  choreographer: string;
+  mastery: string;
+  itemStyle: string;
+  estimatedDuration: number;
+  entryType: 'live' | 'virtual';
+  performanceType: string;
+  isGroupEntry: boolean;
+  submittedAt: string;
 }
 
 export default function StudioDashboardPage() {
   const [studioSession, setStudioSession] = useState<StudioSession | null>(null);
   const [acceptedDancers, setAcceptedDancers] = useState<AcceptedDancer[]>([]);
   const [competitionEntries, setCompetitionEntries] = useState<CompetitionEntry[]>([]);
-  const [activeTab, setActiveTab] = useState<'dancers' | 'entries'>('dancers');
+  const [musicEntries, setMusicEntries] = useState<MusicEntry[]>([]);
+  const [activeTab, setActiveTab] = useState<'dancers' | 'entries' | 'music'>('dancers');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddDancerModal, setShowAddDancerModal] = useState(false);
@@ -122,6 +150,9 @@ export default function StudioDashboardPage() {
   const [selectedDancerForActions, setSelectedDancerForActions] = useState<AcceptedDancer | null>(null);
   const [dancerSearchQuery, setDancerSearchQuery] = useState('');
   
+  // Music upload state
+  const [uploadingMusicForEntry, setUploadingMusicForEntry] = useState<string | null>(null);
+  
   // Pagination and filtering state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -158,14 +189,16 @@ export default function StudioDashboardPage() {
     try {
       setIsLoading(true);
       
-      // Load accepted dancers and competition entries
-      const [dancersResponse, entriesResponse] = await Promise.all([
+      // Load accepted dancers, competition entries, and music entries
+      const [dancersResponse, entriesResponse, musicEntriesResponse] = await Promise.all([
         fetch(`/api/studios/dancers-new?studioId=${studioId}`),
-        fetch(`/api/studios/entries?studioId=${studioId}`)
+        fetch(`/api/studios/entries?studioId=${studioId}`),
+        fetch(`/api/studios/music-entries?studioId=${studioId}`)
       ]);
 
       const dancersData = await dancersResponse.json();
       const entriesData = await entriesResponse.json();
+      const musicEntriesData = await musicEntriesResponse.json();
 
       if (dancersData.success) {
         setAcceptedDancers(dancersData.dancers);
@@ -178,6 +211,13 @@ export default function StudioDashboardPage() {
       } else {
         console.error('Failed to load entries:', entriesData.error);
         setCompetitionEntries([]);
+      }
+
+      if (musicEntriesData.success) {
+        setMusicEntries(musicEntriesData.entries);
+      } else {
+        console.error('Failed to load music entries:', musicEntriesData.error);
+        setMusicEntries([]);
       }
     } catch (error) {
       console.error('Load data error:', error);
@@ -503,6 +543,52 @@ export default function StudioDashboardPage() {
     router.push('/studio-login');
   };
 
+  // Handle music upload for studio entries
+  const handleMusicUpload = async (entryId: string, fileData: { url: string; originalFilename: string }) => {
+    if (!studioSession) return;
+
+    try {
+      setUploadingMusicForEntry(entryId);
+      setError('');
+
+      // Find the entry name for better feedback
+      const entry = musicEntries.find(e => e.id === entryId);
+      const entryName = entry?.itemName || 'entry';
+
+      const response = await fetch('/api/studios/upload-music', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studioId: studioSession.id,
+          entryId: entryId,
+          musicFileUrl: fileData.url,
+          musicFileName: fileData.originalFilename
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccessMessage(`🎵 Music uploaded successfully for "${entryName}"! The entry has been updated and is now ready for the live performance.`);
+        
+        // Reload data to reflect changes (entry should disappear from music uploads tab)
+        await loadData(studioSession.id);
+        
+        // Clear success message after 7 seconds (longer to read the full message)
+        setTimeout(() => setSuccessMessage(''), 7000);
+      } else {
+        setError(data.error || 'Failed to upload music');
+      }
+    } catch (error) {
+      console.error('Music upload error:', error);
+      setError('Failed to upload music');
+    } finally {
+      setUploadingMusicForEntry(null);
+    }
+  };
+
   // National ID validation handler
   const handleNationalIdChange = (value: string, setData: (prev: any) => void) => {
     // Remove any non-numeric characters
@@ -729,20 +815,32 @@ export default function StudioDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 pb-safe-bottom">
+      <style jsx global>{`
+        .pb-safe-bottom {
+          padding-bottom: max(env(safe-area-inset-bottom, 24px), 24px);
+        }
+        
+        @media screen and (max-width: 414px) and (min-height: 800px) {
+          .pb-safe-bottom {
+            padding-bottom: 140px;
+          }
+        }
+      `}</style>
+      
       {/* Header */}
       <div className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                 {studioSession.name}
               </h1>
-              <p className="text-gray-300 text-sm">
+              <p className="text-gray-300 text-xs sm:text-sm break-all">
                 Registration: {studioSession.registrationNumber} | Email: {studioSession.email}
               </p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Link
                 href="/"
                 className="px-4 py-2 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-700 transition-colors"
@@ -873,6 +971,16 @@ export default function StudioDashboardPage() {
               }`}
             >
               My Entries ({stats.totalEntries})
+            </button>
+            <button
+              onClick={() => setActiveTab('music')}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'music'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              🎵 Music Uploads ({musicEntries.length})
             </button>
           </div>
         </div>
@@ -1279,6 +1387,121 @@ export default function StudioDashboardPage() {
                         </button>
                         <div className="px-3 py-1 text-xs text-gray-400 italic bg-gray-800/50 rounded-lg border border-gray-700">
                           💡 Only admins can remove entries
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Music Uploads Tab */}
+        {activeTab === 'music' && (
+          <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-white">🎵 Music Uploads</h3>
+                  <p className="text-gray-400 text-sm mt-1">Upload music files for your dancers' live performance entries</p>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <span className="inline-flex items-center px-2 py-1 bg-blue-900/30 text-blue-300 rounded-full text-xs">
+                    💡 Studio managers can upload music on behalf of dancers
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {musicEntries.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                </div>
+                <p className="text-gray-400 mb-2">All entries have music uploaded</p>
+                <p className="text-gray-500 text-sm">Live performance entries that need music files will appear here</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-700">
+                {musicEntries.map((entry) => (
+                  <div key={entry.id} className="p-4 sm:p-6 hover:bg-gray-700/30 transition-colors">
+                    <div className="flex flex-col gap-6">
+                      <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                          <h4 className="text-lg font-semibold text-white">{entry.itemName}</h4>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium w-fit ${
+                            entry.isGroupEntry 
+                              ? 'bg-purple-900/30 text-purple-300' 
+                              : 'bg-blue-900/30 text-blue-300'
+                          }`}>
+                            {entry.isGroupEntry ? `👥 ${entry.performanceType}` : '🕺 Solo'}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm mb-4">
+                          <div className="bg-gray-800/40 p-3 rounded-lg">
+                            <span className="text-gray-400 block">Event:</span>
+                            <span className="text-white font-medium">{entry.eventName}</span>
+                          </div>
+                          <div className="bg-gray-800/40 p-3 rounded-lg">
+                            <span className="text-gray-400 block">Contestant:</span>
+                            <span className="text-white">{entry.contestantName}</span>
+                          </div>
+                          <div className="bg-gray-800/40 p-3 rounded-lg">
+                            <span className="text-gray-400 block">Style:</span>
+                            <span className="text-white">{entry.itemStyle}</span>
+                          </div>
+                          <div className="bg-gray-800/40 p-3 rounded-lg">
+                            <span className="text-gray-400 block">Choreographer:</span>
+                            <span className="text-white">{entry.choreographer}</span>
+                          </div>
+                          <div className="bg-gray-800/40 p-3 rounded-lg">
+                            <span className="text-gray-400 block">Mastery:</span>
+                            <span className="text-white">{entry.mastery}</span>
+                          </div>
+                          <div className="bg-gray-800/40 p-3 rounded-lg">
+                            <span className="text-gray-400 block">Duration:</span>
+                            <span className="text-white">{entry.estimatedDuration} min</span>
+                          </div>
+                        </div>
+
+                        {/* Group Information */}
+                        {entry.isGroupEntry && (
+                          <div className="mb-4 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg">
+                            <p className="text-purple-300 text-sm font-medium mb-2">
+                              🎭 Group Performance ({entry.participantIds.length} dancers)
+                            </p>
+                            <p className="text-purple-200 text-xs">
+                              As the studio manager, you can upload music for this group entry on behalf of all participants.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="w-full">
+                        <div className="bg-slate-800/60 rounded-xl p-4 border border-gray-600">
+                          <h5 className="text-white font-medium mb-4 flex items-center text-lg">
+                            🎵 Upload Music File
+                          </h5>
+                          <MusicUpload
+                            onUploadSuccess={(fileData) => handleMusicUpload(entry.id, fileData)}
+                            onUploadError={(error) => setError(error)}
+                            disabled={uploadingMusicForEntry === entry.id}
+                          />
+                          {uploadingMusicForEntry === entry.id && (
+                            <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                              <div className="flex items-center text-blue-400">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400 mr-3"></div>
+                                <span className="font-medium">Uploading music for "{entry.itemName}"...</span>
+                              </div>
+                              <p className="text-blue-300 text-sm mt-2">
+                                📱 Please wait while we save the music file to this entry. The page will refresh automatically when complete.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

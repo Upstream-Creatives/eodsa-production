@@ -488,6 +488,56 @@ export const db = {
       `;
     }
     
+    // PHASE 2: Handle music file updates
+    if (updates.musicFileUrl !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET music_file_url = ${updates.musicFileUrl}
+        WHERE id = ${id}
+      `;
+    }
+    
+    if (updates.musicFileName !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET music_file_name = ${updates.musicFileName}
+        WHERE id = ${id}
+      `;
+    }
+    
+    // Handle video file updates for virtual entries
+    if (updates.videoFileUrl !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET video_file_url = ${updates.videoFileUrl}
+        WHERE id = ${id}
+      `;
+    }
+    
+    if (updates.videoFileName !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET video_file_name = ${updates.videoFileName}
+        WHERE id = ${id}
+      `;
+    }
+    
+    if (updates.videoExternalUrl !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET video_external_url = ${updates.videoExternalUrl}
+        WHERE id = ${id}
+      `;
+    }
+    
+    if (updates.videoExternalType !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET video_external_type = ${updates.videoExternalType}
+        WHERE id = ${id}
+      `;
+    }
+    
     return updates;
   },
 
@@ -3391,14 +3441,10 @@ export const unifiedDb = {
     const dancerEodsaIds = studioDancers.map(d => d.eodsaId);
     const dancerIds = studioDancers.map(d => d.id);
     
-    if (dancerEodsaIds.length === 0) {
-      return [];
-    }
-    
-    // Get all event entries for these dancers (handles both old and new unified system)
+    // Get all event entries for these dancers AND entries created directly by the studio
     const result = await sqlClient`
       SELECT ee.*, e.name as event_name, e.region, e.event_date, e.venue, e.performance_type,
-             COALESCE(c.name, d.name) as contestant_name, 
+             COALESCE(c.name, d.name, 'Studio Entry') as contestant_name, 
              CASE 
                WHEN c.type IS NOT NULL THEN c.type 
                ELSE 'studio' 
@@ -3407,9 +3453,10 @@ export const unifiedDb = {
       JOIN events e ON ee.event_id = e.id
       LEFT JOIN contestants c ON ee.contestant_id = c.id
       LEFT JOIN dancers d ON ee.contestant_id = d.id
-      WHERE ee.eodsa_id = ANY(${dancerEodsaIds})
-         OR ee.contestant_id = ANY(${dancerIds})
-         OR ee.participant_ids::text LIKE ANY(${dancerIds.map(id => `%"${id}"%`)})
+      WHERE ee.eodsa_id = ${studioId}
+         OR (${dancerEodsaIds.length > 0} AND ee.eodsa_id = ANY(${dancerEodsaIds}))
+         OR (${dancerIds.length > 0} AND ee.contestant_id = ANY(${dancerIds}))
+         OR (${dancerIds.length > 0} AND ee.participant_ids::text LIKE ANY(${dancerIds.map(id => `%"${id}"%`)}))
       ORDER BY ee.submitted_at DESC
     ` as any[];
     
@@ -3459,7 +3506,15 @@ export const unifiedDb = {
             mastery: row.mastery,
             itemStyle: row.item_style,
             estimatedDuration: row.estimated_duration,
-            createdAt: row.created_at
+            createdAt: row.created_at,
+            // PHASE 2: Live vs Virtual Entry Support
+            entryType: row.entry_type || 'live',
+            musicFileUrl: row.music_file_url,
+            musicFileName: row.music_file_name,
+            videoFileUrl: row.video_file_url,
+            videoFileName: row.video_file_name,
+            videoExternalUrl: row.video_external_url,
+            videoExternalType: row.video_external_type
           };
         } catch (error) {
           console.error(`Error processing entry ${row.id}:`, error);
@@ -3479,20 +3534,16 @@ export const unifiedDb = {
     itemStyle?: string;
     estimatedDuration?: number;
     participantIds?: string[];
+    musicFileUrl?: string;
+    musicFileName?: string;
   }) {
     const sqlClient = getSql();
     
-    // First verify this entry belongs to a dancer from this studio
-    const entry = await sqlClient`
-      SELECT ee.*, sa.studio_id
-      FROM event_entries ee
-      JOIN dancers d ON ee.eodsa_id = d.eodsa_id
-      JOIN studio_applications sa ON d.id = sa.dancer_id
-      WHERE ee.id = ${entryId} AND sa.studio_id = ${studioId} AND sa.status = 'accepted'
-      LIMIT 1
-    ` as any[];
+    // Verify this entry belongs to this studio using the same logic as getStudioEntries
+    const allStudioEntries = await this.getStudioEntries(studioId);
+    const entry = allStudioEntries.find(e => e.id === entryId);
     
-    if (entry.length === 0) {
+    if (!entry) {
       throw new Error('Entry not found or not owned by this studio');
     }
     
@@ -3500,7 +3551,7 @@ export const unifiedDb = {
     const eventResult = await sqlClient`
       SELECT registration_deadline, event_date 
       FROM events 
-      WHERE id = ${entry[0].event_id}
+      WHERE id = ${entry.eventId}
     ` as any[];
     
     if (eventResult.length > 0) {
@@ -3559,6 +3610,14 @@ export const unifiedDb = {
     }
     if (updates.participantIds !== undefined) {
       await sqlClient`UPDATE event_entries SET participant_ids = ${JSON.stringify(updates.participantIds)} WHERE id = ${entryId}`;
+    }
+    
+    // PHASE 2: Handle music file updates for studio music uploads
+    if (updates.musicFileUrl !== undefined) {
+      await sqlClient`UPDATE event_entries SET music_file_url = ${updates.musicFileUrl} WHERE id = ${entryId}`;
+    }
+    if (updates.musicFileName !== undefined) {
+      await sqlClient`UPDATE event_entries SET music_file_name = ${updates.musicFileName} WHERE id = ${entryId}`;
     }
     
     return { success: true, message: 'Entry updated successfully' };

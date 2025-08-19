@@ -80,7 +80,29 @@ export default function AdminPortalPage() {
         </svg>
       </div>
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8">
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8 pb-safe-bottom">
+        {/* Add mobile-specific bottom padding to prevent iPhone search bar from covering buttons */}
+        <style jsx global>{`
+          @supports(padding: max(0px)) {
+            .pb-safe-bottom {
+              padding-bottom: max(env(safe-area-inset-bottom, 0px), 100px);
+            }
+          }
+          
+          /* Fallback for older browsers */
+          @media screen and (max-width: 640px) {
+            .pb-safe-bottom {
+              padding-bottom: 120px;
+            }
+          }
+          
+          /* iPhone specific adjustments */
+          @media screen and (max-width: 414px) and (min-height: 800px) {
+            .pb-safe-bottom {
+              padding-bottom: 140px;
+            }
+          }
+        `}</style>
         <div className="max-w-md w-full">
           {/* Logo Section */}
           <div className="text-center mb-8 sm:mb-12">

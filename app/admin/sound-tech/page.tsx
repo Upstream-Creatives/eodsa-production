@@ -52,6 +52,7 @@ export default function SoundTechPage() {
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [entryTypeFilter, setEntryTypeFilter] = useState<string>('live');
   const [searchTerm, setSearchTerm] = useState('');
+  const [removingMusic, setRemovingMusic] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Check admin authentication
@@ -129,6 +130,56 @@ export default function SoundTechPage() {
       }
     });
     success(`Started download of ${liveEntries.length} music files`);
+  };
+
+  const removeMusic = async (entryId: string, itemName: string) => {
+    if (removingMusic.has(entryId)) return;
+    
+    if (!confirm(`Remove music from "${itemName}"?\n\nThis will make the entry available for re-upload in the contestant's dashboard.`)) {
+      return;
+    }
+    
+    setRemovingMusic(prev => new Set(prev).add(entryId));
+    
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        error('Session expired. Please log in again.');
+        return;
+      }
+      
+      const adminData = JSON.parse(session);
+      
+      const response = await fetch(`/api/admin/entries/${entryId}/remove-music`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminId: adminData.id
+        }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        success(result.message);
+        
+        // Refresh the data to show updated state
+        await fetchData();
+      } else {
+        const errorResponse = await response.json();
+        error(`Failed to remove music: ${errorResponse.error}`);
+      }
+    } catch (err) {
+      console.error('Error removing music:', err);
+      error('Failed to remove music. Please try again.');
+    } finally {
+      setRemovingMusic(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(entryId);
+        return newSet;
+      });
+    }
   };
 
   if (isLoading) {
@@ -331,6 +382,23 @@ export default function SoundTechPage() {
                         }`}>
                           {entry.approved ? 'Approved' : 'Pending'}
                         </span>
+
+                        {/* Remove Music Button */}
+                        <button
+                          onClick={() => removeMusic(entry.id, entry.itemName)}
+                          disabled={removingMusic.has(entry.id)}
+                          className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Remove music file - contestant will be able to re-upload"
+                        >
+                          {removingMusic.has(entry.id) ? (
+                            <span className="flex items-center space-x-1">
+                              <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                              <span>Removing...</span>
+                            </span>
+                          ) : (
+                            '🗑️ Remove Music'
+                          )}
+                        </button>
                         
                         <div className="text-right text-xs text-black">
                           <div>Mastery: {entry.mastery}</div>
