@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAlert } from '@/components/ui/custom-alert';
 import MusicUpload from '@/components/MusicUpload';
 
 interface DancerSession {
@@ -16,17 +15,13 @@ interface DancerSession {
 
 interface StudioApplication {
   id: string;
-  studioId: string;
   studioName: string;
-  studioEmail: string;
   contactPerson: string;
   status: 'pending' | 'accepted' | 'rejected';
   appliedAt: string;
   respondedAt?: string;
   rejectionReason?: string;
 }
-
-
 
 // Music Upload Section Component
 function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession }) {
@@ -186,26 +181,25 @@ function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession })
                         </p>
                       </div>
                     )}
+                    
+                    <div className="border-t border-gray-600 pt-4 mt-4">
+                      <p className="text-sm text-gray-400 mb-3">Upload music file for this live performance:</p>
+                      <MusicUpload
+                        onUploadSuccess={(fileData) => handleMusicUpload(entry.id, fileData)}
+                        onUploadError={(error) => setError(error)}
+                        disabled={uploadingEntryId === entry.id}
+                      />
+                      {uploadingEntryId === entry.id && (
+                        <div className="mt-2 text-sm text-blue-400 flex items-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400 mr-2"></div>
+                          Saving music file...
+                        </div>
+                      )}
+                    </div>
                   </div>
+                </div>
               );
             })}
-
-                <div className="border-t border-gray-600 pt-4">
-                  <p className="text-sm text-gray-400 mb-3">Upload music file for this live performance:</p>
-                  <MusicUpload
-                    onUploadSuccess={(fileData) => handleMusicUpload(entry.id, fileData)}
-                    onUploadError={(error) => setError(error)}
-                    disabled={uploadingEntryId === entry.id}
-                  />
-                  {uploadingEntryId === entry.id && (
-                    <div className="mt-2 text-sm text-blue-400 flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400 mr-2"></div>
-                      Saving music file...
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}
@@ -217,11 +211,9 @@ export default function DancerDashboardPage() {
   const [dancerSession, setDancerSession] = useState<DancerSession | null>(null);
   const [applications, setApplications] = useState<StudioApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    // Check for dancer session
     const session = localStorage.getItem('dancerSession');
     if (!session) {
       router.push('/dancer-login');
@@ -239,26 +231,22 @@ export default function DancerDashboardPage() {
 
   const loadDancerData = async (dancerId: string) => {
     try {
-      // Load applications (showing existing studio relationships)
       const appsResponse = await fetch(`/api/dancers/applications?dancerId=${dancerId}`);
       const appsData = await appsResponse.json();
-      
+
       if (appsData.success) {
         setApplications(appsData.applications);
       }
     } catch (error) {
       console.error('Error loading dancer data:', error);
-      setError('Failed to load dancer information');
     } finally {
       setIsLoading(false);
     }
   };
 
-
-
   const handleLogout = () => {
     localStorage.removeItem('dancerSession');
-    router.push('/');
+    router.push('/dancer-login');
   };
 
   const getStatusBadge = (status: string) => {
@@ -300,80 +288,54 @@ export default function DancerDashboardPage() {
         }
         
         /* Fallback for older browsers */
-        @media screen and (max-width: 640px) {
-          .pb-safe-bottom {
-            padding-bottom: 120px;
-          }
+        .pb-safe-bottom {
+          padding-bottom: 100px;
         }
         
-        /* iPhone specific adjustments */
+        /* Specific adjustments for iPhone sizes */
         @media screen and (max-width: 414px) and (min-height: 800px) {
           .pb-safe-bottom {
             padding-bottom: 140px;
           }
         }
       `}</style>
+
       {/* Header */}
-      <header className="bg-gray-800/80 backdrop-blur-sm border-b border-gray-700/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+      <div className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Dancer Dashboard
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                {dancerSession.name}
               </h1>
-              <p className="text-gray-300">Welcome back, {dancerSession.name}</p>
+              <p className="text-gray-300 text-sm">
+                EODSA ID: {dancerSession.eodsaId} | Email: {dancerSession.email || 'Not provided'}
+              </p>
             </div>
             <div className="flex items-center space-x-4">
               <Link
-                href={`/event-dashboard?eodsaId=${dancerSession.eodsaId}`}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                href="/"
+                className="px-4 py-2 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-700 transition-colors"
               >
-                🎭 Compete
+                Home
               </Link>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Logout
               </button>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="bg-red-500/20 border border-red-500/30 text-red-200 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {/* Status Card */}
-        <div className="bg-gray-800/80 rounded-2xl p-6 border border-gray-700/20 mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white mb-2">Account Information</h2>
-              <p className="text-gray-300">EODSA ID: {dancerSession.eodsaId}</p>
-              <div className="flex items-center mt-2">
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-500/20 text-green-300">
-                  ✅ Active Account
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
-            <p className="text-green-200 text-sm">
-              🎉 Your account is active! You can participate in competitions and be added to studios. Welcome to EODSA!
-            </p>
-          </div>
-        </div>
-
-        {/* Applications Section */}
-        <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden mb-8">
+      <div className="container mx-auto p-4 space-y-6">
+        {/* Studio Applications Section */}
+        <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
           <div className="p-6 border-b border-gray-700">
-            <h3 className="text-xl font-bold text-white">My Studio Memberships</h3>
-            <p className="text-gray-400 text-sm mt-1">Studios you belong to</p>
+            <h3 className="text-xl font-bold text-white">Studio Applications</h3>
+            <p className="text-gray-400 text-sm mt-1">Manage your studio membership applications</p>
           </div>
 
           {applications.length === 0 ? (
@@ -381,45 +343,38 @@ export default function DancerDashboardPage() {
               <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">🏢</span>
               </div>
-              <p className="text-gray-400 mb-4">No studio memberships yet</p>
+              <p className="text-gray-400 mb-2">No studio applications</p>
               <p className="text-gray-500 text-sm">
-                Contact a dance studio head to be added to their studio.
+                You haven't applied to any studios yet, or your applications are still being processed.
               </p>
             </div>
           ) : (
-            <div className="p-6">
-              <div className="space-y-4">
-                {applications.map((application) => (
-                  <div key={application.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-lg font-semibold text-white">{application.studioName}</h4>
-                        <p className="text-gray-300 text-sm">Contact: {application.contactPerson}</p>
-                        <p className="text-gray-400 text-xs">Added: {new Date(application.appliedAt).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium text-white ${getStatusBadge(application.status)}`}>
-                          {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
-                        </span>
-                      </div>
+            <div className="divide-y divide-gray-700">
+              {applications.map((app) => (
+                <div key={app.id} className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold text-white">{app.studioName}</h4>
+                      <p className="text-gray-400 text-sm">Contact: {app.contactPerson}</p>
+                      <p className="text-gray-500 text-xs">Applied: {new Date(app.appliedAt).toLocaleDateString()}</p>
                     </div>
-                    {application.status === 'rejected' && application.rejectionReason && (
-                      <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded">
-                        <p className="text-red-200 text-sm">
-                          <strong>Reason:</strong> {application.rejectionReason}
+                    <div className="text-right">
+                      <span className={`inline-block w-3 h-3 rounded-full ${getStatusBadge(app.status)} mr-2`}></span>
+                      <span className="text-sm font-medium text-white capitalize">{app.status}</span>
+                      {app.respondedAt && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Responded: {new Date(app.respondedAt).toLocaleDateString()}
                         </p>
-                      </div>
-                    )}
-                    {application.status === 'accepted' && (
-                      <div className="mt-3 p-3 bg-green-900/20 border border-green-500/30 rounded">
-                        <p className="text-green-200 text-sm">
-                          🎉 Congratulations! You've been accepted to this studio and can now participate in competitions under their name.
+                      )}
+                      {app.rejectionReason && (
+                        <p className="text-xs text-red-400 mt-1 max-w-xs">
+                          {app.rejectionReason}
                         </p>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -430,4 +385,4 @@ export default function DancerDashboardPage() {
       </div>
     </div>
   );
-} 
+}
