@@ -13,19 +13,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav', 'audio/aac', 'audio/mp4'];
-    if (!allowedTypes.includes(file.type)) {
+    // Validate file type - check both MIME type and file extension for better browser compatibility
+    const allowedTypes = [
+      'audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav', 'audio/aac', 'audio/mp4', 
+      'audio/flac', 'audio/ogg', 'audio/x-ms-wma', 'audio/webm', 'audio/vnd.wav',
+      'audio/x-aac', 'audio/x-m4a', 'audio/x-flac', 'audio/mpeg3', 'audio/mp4a-latm',
+      'audio/x-audio', 'audio/basic', '' // Some browsers don't provide MIME type
+    ];
+    
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const allowedExtensions = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'wma', 'webm'];
+    
+    const isValidType = allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension || '');
+    
+    if (!isValidType) {
       return NextResponse.json(
-        { success: false, error: 'Invalid file type. Please upload MP3, WAV, AAC, or M4A files only.' },
+        { success: false, error: 'Invalid file type. Please upload audio files with extensions: MP3, WAV, AAC, M4A, FLAC, OGG, WMA, or WebM.' },
         { status: 400 }
       );
     }
 
-    // Validate file size (50MB limit)
-    if (file.size > 50000000) {
+    // Validate file size (200MB limit)
+    if (file.size > 200000000) {
       return NextResponse.json(
-        { success: false, error: 'File too large. Maximum size is 50MB.' },
+        { success: false, error: 'File too large. Maximum size is 200MB.' },
         { status: 400 }
       );
     }

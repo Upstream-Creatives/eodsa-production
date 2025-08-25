@@ -33,16 +33,27 @@ export default function MusicUpload({
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav', 'audio/aac', 'audio/mp4'];
-    if (!allowedTypes.includes(file.type)) {
-      onUploadError('Invalid file type. Please upload MP3, WAV, AAC, or M4A files only.');
+    // Validate file type - check both MIME type and file extension for better browser compatibility
+    const allowedTypes = [
+      'audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav', 'audio/aac', 'audio/mp4', 
+      'audio/flac', 'audio/ogg', 'audio/x-ms-wma', 'audio/webm', 'audio/vnd.wav',
+      'audio/x-aac', 'audio/x-m4a', 'audio/x-flac', 'audio/mpeg3', 'audio/mp4a-latm',
+      'audio/x-audio', 'audio/basic', '' // Some browsers don't provide MIME type
+    ];
+    
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const allowedExtensions = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'wma', 'webm'];
+    
+    const isValidType = allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension || '');
+    
+    if (!isValidType) {
+      onUploadError('Invalid file type. Please upload audio files with extensions: MP3, WAV, AAC, M4A, FLAC, OGG, WMA, or WebM.');
       return;
     }
 
-    // Validate file size (50MB)
-    if (file.size > 50000000) {
-      onUploadError('File too large. Maximum size is 50MB.');
+    // Validate file size (200MB)
+    if (file.size > 200000000) {
+      onUploadError('File too large. Maximum size is 200MB.');
       return;
     }
 
@@ -58,7 +69,18 @@ export default function MusicUpload({
         body: formData,
       });
 
-      const result = await response.json();
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse server response:', parseError);
+        throw new Error('Invalid server response. Please try again or contact support.');
+      }
 
       if (result.success) {
         onUploadSuccess(result.data);
@@ -66,9 +88,18 @@ export default function MusicUpload({
       } else {
         onUploadError(result.error || 'Upload failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      onUploadError('Upload failed. Please check your connection and try again.');
+      
+      if (error.message?.includes('Failed to fetch')) {
+        onUploadError('Network error. Please check your internet connection and try again.');
+      } else if (error.message?.includes('Invalid server response')) {
+        onUploadError('Server error. Please try again in a moment.');
+      } else if (error.message?.includes('Server error')) {
+        onUploadError(`Upload failed: ${error.message}`);
+      } else {
+        onUploadError('Upload failed. Please try again.');
+      }
     } finally {
       setIsUploading(false);
       setTimeout(() => setUploadProgress(0), 2000);
