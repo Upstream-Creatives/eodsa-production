@@ -1542,49 +1542,7 @@ export const db = {
     }));
   },
 
-  // NEW: Get performances by event ID
-  async getPerformancesByEvent(eventId: string) {
-    const sqlClient = getSql();
-    const result = await sqlClient`
-      SELECT 
-        p.*, 
-        c.name as contestant_name,
-        ee.entry_type,
-        ee.music_file_url,
-        ee.music_file_name,
-        ee.video_external_url,
-        ee.video_external_type
-      FROM performances p 
-      JOIN contestants c ON p.contestant_id = c.id 
-      LEFT JOIN event_entries ee ON p.event_entry_id = ee.id
-      WHERE p.event_id = ${eventId}
-      ORDER BY p.scheduled_time ASC
-    ` as any[];
-    
-    return result.map((row: any) => ({
-      id: row.id,
-      eventId: row.event_id,
-      eventEntryId: row.event_entry_id,
-      contestantId: row.contestant_id,
-      title: row.title,
-      participantNames: JSON.parse(row.participant_names),
-      duration: row.duration,
-      itemNumber: row.item_number,
-      withdrawnFromJudging: row.withdrawn_from_judging || false,
-      choreographer: row.choreographer,
-      mastery: row.mastery,
-      itemStyle: row.item_style,
-      scheduledTime: row.scheduled_time,
-      status: row.status,
-      contestantName: row.contestant_name,
-      // PHASE 2: Live vs Virtual Entry Support
-      entryType: row.entry_type || 'live',
-      musicFileUrl: row.music_file_url,
-      musicFileName: row.music_file_name,
-      videoExternalUrl: row.video_external_url,
-      videoExternalType: row.video_external_type
-    })) as (Performance & { contestantName: string })[];
-  },
+
 
   // Database cleaning - reset all data and create only main admin
   async cleanDatabase() {
@@ -2733,6 +2691,70 @@ export const db = {
       WHERE id = ${performanceId}
     `;
     return { success: true };
+  },
+
+  // Real-time performance status management
+  async updatePerformanceStatus(performanceId: string, status: string) {
+    const sqlClient = getSql();
+    await sqlClient`
+      UPDATE performances 
+      SET status = ${status}, 
+          updated_at = NOW()
+      WHERE id = ${performanceId}
+    `;
+    return { success: true };
+  },
+
+  async updatePerformanceDisplayOrder(performanceId: string, displayOrder: number) {
+    const sqlClient = getSql();
+    await sqlClient`
+      UPDATE performances 
+      SET display_order = ${displayOrder}
+      WHERE id = ${performanceId}
+    `;
+    return { success: true };
+  },
+
+  async getPerformancesByEvent(eventId: string) {
+    const sqlClient = getSql();
+    const rows = await sqlClient`
+      SELECT p.*, 
+             ee.item_name as title,
+             ee.contestant_id,
+             ee.estimated_duration as duration,
+             ee.entry_type,
+             ee.music_file_url,
+             ee.video_external_url,
+             c.name as contestant_name,
+             ee.participant_ids
+      FROM performances p
+      LEFT JOIN event_entries ee ON p.event_entry_id = ee.id
+      LEFT JOIN contestants c ON ee.contestant_id = c.id
+      WHERE p.event_id = ${eventId}
+      ORDER BY p.display_order ASC, p.item_number ASC, p.created_at ASC
+    `;
+    
+    return rows.map((row: any) => ({
+      id: row.id,
+      eventId: row.event_id,
+      eventEntryId: row.event_entry_id,
+      contestantId: row.contestant_id,
+      title: row.title || row.item_name,
+      contestantName: row.contestant_name,
+      participantNames: row.participant_ids ? JSON.parse(row.participant_ids) : [],
+      duration: row.duration || row.estimated_duration,
+      itemNumber: row.item_number,
+      displayOrder: row.display_order,
+      status: row.status || 'scheduled',
+      entryType: row.entry_type,
+      musicFileUrl: row.music_file_url,
+      videoExternalUrl: row.video_external_url,
+      choreographer: row.choreographer,
+      mastery: row.mastery,
+      itemStyle: row.item_style,
+      scheduledTime: row.scheduled_time,
+      withdrawnFromJudging: row.withdrawn_from_judging || false
+    }));
   }
 };
 

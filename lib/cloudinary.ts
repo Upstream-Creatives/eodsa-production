@@ -47,7 +47,6 @@ export function getDownloadUrl(publicId: string, filename?: string) {
 // Upload preset configuration for music files
 export const MUSIC_UPLOAD_PRESET = {
   resource_type: 'video' as const, // Audio files use video resource type
-  allowed_formats: ['mp3', 'wav', 'aac', 'm4a'],
   max_file_size: 50000000, // 50MB limit
   folder: 'eodsa/music',
   use_filename: true,

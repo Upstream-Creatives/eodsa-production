@@ -33,10 +33,9 @@ export default function MusicUpload({
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav', 'audio/aac', 'audio/mp4'];
-    if (!allowedTypes.includes(file.type)) {
-      onUploadError('Invalid file type. Please upload MP3, WAV, AAC, or M4A files only.');
+    // Validate file type - accept any audio format
+    if (!file.type.startsWith('audio/')) {
+      onUploadError('Please upload an audio file.');
       return;
     }
 

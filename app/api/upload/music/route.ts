@@ -13,11 +13,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav', 'audio/aac', 'audio/mp4'];
-    if (!allowedTypes.includes(file.type)) {
+    // Validate file type - accept any audio format
+    if (!file.type.startsWith('audio/')) {
       return NextResponse.json(
-        { success: false, error: 'Invalid file type. Please upload MP3, WAV, AAC, or M4A files only.' },
+        { success: false, error: 'Please upload an audio file.' },
         { status: 400 }
       );
     }

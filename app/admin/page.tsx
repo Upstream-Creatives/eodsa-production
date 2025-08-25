@@ -110,7 +110,7 @@ export default function AdminDashboard() {
   const [studioApplications, setStudioApplications] = useState<StudioApplication[]>([]);
   const [verificationDancers, setVerificationDancers] = useState<Dancer[]>([]);
   const [verificationStudios, setVerificationStudios] = useState<Studio[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'judges' | 'assignments' | 'dancers' | 'studios' | 'verification' | 'sound-tech'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'judges' | 'assignments' | 'dancers' | 'studios' | 'verification' | 'sound-tech' | 'backstage'>('events');
   const [isLoading, setIsLoading] = useState(true);
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
@@ -147,6 +147,7 @@ export default function AdminDashboard() {
   const [assignmentMessage, setAssignmentMessage] = useState('');
   const [reassigningJudges, setReassigningJudges] = useState<Set<string>>(new Set());
   const [unassigningJudges, setUnassigningJudges] = useState<Set<string>>(new Set());
+  const [deletingEvents, setDeletingEvents] = useState<Set<string>>(new Set());
 
   // Database cleaning state
   const [isCleaningDatabase, setIsCleaningDatabase] = useState(false);
@@ -296,6 +297,107 @@ export default function AdminDashboard() {
       setCreateEventMessage('Error creating event. Please check your connection and try again.');
     } finally {
       setIsCreatingEvent(false);
+    }
+  };
+
+  const handleDeleteEvent = (eventId: string, eventName: string) => {
+    if (deletingEvents.has(eventId)) return;
+
+    // Show confirmation dialog
+    showConfirm(
+      `Are you sure you want to delete "${eventName}"? This action cannot be undone. All entries, payments, and related data will be permanently deleted.`,
+      () => {
+        // User confirmed - proceed with deletion
+        performDeleteEvent(eventId, eventName);
+      },
+      () => {
+        // User cancelled - do nothing
+        console.log('Event deletion cancelled by user');
+      }
+    );
+  };
+
+  const performDeleteEvent = async (eventId: string, eventName: string) => {
+    setDeletingEvents(prev => new Set(prev).add(eventId));
+
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        error('Session expired. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`/api/events/${eventId}/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmed: true
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        success(`Event "${eventName}" deleted successfully`);
+        
+        // Remove event from local state
+        setEvents(prev => prev.filter(event => event.id !== eventId));
+        
+        // Also refresh data to be sure
+        fetchData();
+      } else {
+        if (data.details?.requiresConfirmation) {
+          // Show additional confirmation for events with entries/payments
+          showConfirm(
+            `"${eventName}" has ${data.details.entryCount} entries and ${data.details.paymentCount} payments. Are you absolutely sure you want to delete this event and ALL associated data?`,
+            async () => {
+              // User confirmed force deletion
+              try {
+                const forceResponse = await fetch(`/api/events/${eventId}/delete`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    confirmed: true,
+                    force: true
+                  }),
+                });
+
+                const forceData = await forceResponse.json();
+                
+                if (forceData.success) {
+                  success(`Event "${eventName}" and all associated data deleted successfully`);
+                  setEvents(prev => prev.filter(event => event.id !== eventId));
+                  fetchData();
+                } else {
+                  error(`Failed to delete event: ${forceData.error}`);
+                }
+              } catch (err) {
+                console.error('Error force deleting event:', err);
+                error('Failed to delete event. Please try again.');
+              }
+            },
+            () => {
+              // User cancelled force deletion
+              console.log('Force deletion cancelled by user');
+            }
+          );
+        } else {
+          error(`Failed to delete event: ${data.error}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting event:', err);
+      error('Failed to delete event. Please try again.');
+    } finally {
+      setDeletingEvents(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(eventId);
+        return newSet;
+      });
     }
   };
 
@@ -1188,7 +1290,8 @@ export default function AdminDashboard() {
               { id: 'dancers', label: 'Dancers', icon: '💃', color: 'rose' },
               { id: 'studios', label: 'Studios', icon: '🏢', color: 'orange' },
               { id: 'verification', label: 'Pending Verification', icon: '🔍', color: 'emerald' },
-              { id: 'sound-tech', label: 'Sound Tech', icon: '🎵', color: 'blue' }
+              { id: 'sound-tech', label: 'Sound Tech', icon: '🎵', color: 'blue' },
+              { id: 'backstage', label: 'Backstage Control', icon: '🎭', color: 'violet' }
             ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1320,7 +1423,7 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4">
-                <div className="flex items-center">
+                <div className="flex items-center space-x-2">
                               <Link
                                 href={`/admin/events/${event.id}`}
                                 className="text-indigo-500 hover:text-indigo-700 text-xs sm:text-sm font-medium"
@@ -1328,6 +1431,29 @@ export default function AdminDashboard() {
                                 <span className="hidden sm:inline">View Participants</span>
                                 <span className="sm:hidden">View</span>
                               </Link>
+                              
+                              <button
+                                onClick={() => handleDeleteEvent(event.id, event.name)}
+                                disabled={deletingEvents.has(event.id)}
+                                className={`text-xs sm:text-sm font-medium transition-colors ${
+                                  deletingEvents.has(event.id)
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-red-500 hover:text-red-700'
+                                }`}
+                                title={`Delete ${event.name}`}
+                              >
+                                {deletingEvents.has(event.id) ? (
+                                  <>
+                                    <span className="hidden sm:inline">Deleting...</span>
+                                    <span className="sm:hidden">⏳</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="hidden sm:inline">Delete</span>
+                                    <span className="sm:hidden">🗑️</span>
+                                  </>
+                                )}
+                              </button>
                   </div>
                           </td>
                         </tr>
@@ -2218,6 +2344,123 @@ export default function AdminDashboard() {
                     <p className="text-sm text-blue-700">
                       <strong>For Sound Techs:</strong> Use the full dashboard to access all music files, organize by performance order, 
                       and prepare audio for live events. Download all music files at once for offline preparation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Backstage Control Tab */}
+        {activeTab === 'backstage' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-violet-100">
+              <div className="px-6 py-4 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-b border-violet-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">🎭</span>
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900">Backstage Control Center</h2>
+                  </div>
+                  <button
+                    onClick={() => window.open('/admin/backstage', '_blank')}
+                    className="px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg hover:from-violet-600 hover:to-purple-700 transition-all duration-200 font-medium"
+                  >
+                    Open Backstage Control
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <span className="text-green-600 text-lg">🎯</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Live Event Control</p>
+                        <p className="text-2xl font-bold text-gray-900">Real-Time</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <span className="text-blue-600 text-lg">🔄</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Drag & Drop Reordering</p>
+                        <p className="text-2xl font-bold text-gray-900">Active</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <span className="text-purple-600 text-lg">⚡</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Instant Sync</p>
+                        <p className="text-2xl font-bold text-gray-900">Enabled</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-violet-50 border border-violet-200 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-violet-900 mb-3 flex items-center">
+                    <span className="mr-2">🎭</span>
+                    Backstage Features
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Select events to manage</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Drag and drop to reorder performances</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Real-time status updates</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Event control (start/pause/reset)</span>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Live sync across all dashboards</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Performance status tracking</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Item number management</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Mobile responsive interface</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 bg-white/70 rounded-lg p-4">
+                    <p className="text-sm text-violet-700 leading-relaxed">
+                      <strong>For Event Managers:</strong> Control the entire live event flow from one interface. 
+                      Reorder performances with drag-and-drop, track status in real-time, and ensure seamless coordination 
+                      across all teams (judges, sound tech, registration, announcer).
                     </p>
                   </div>
                 </div>

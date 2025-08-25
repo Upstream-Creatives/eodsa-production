@@ -573,60 +573,99 @@ export default function CompetitionEntryPage() {
     setIsSubmitting(true);
 
     try {
-      // Submit all entries to backend using regular event entries API
-      for (const entry of entries) {
-        const eventEntryData = {
-          eventId: eventId, // Use regular event ID
-          contestantId: isStudioMode ? studioInfo?.id : contestant?.id,
-          eodsaId: isStudioMode ? studioInfo?.registrationNumber : contestant?.eodsaId,
-          participantIds: entry.participantIds,
-          calculatedFee: entry.fee,
-          paymentStatus: 'pending',
-          paymentMethod: 'invoice',
-          approved: false,
-          qualifiedForNationals: true, // Mark as qualified for nationals
-          itemName: entry.itemName,
-          choreographer: entry.choreographer,
-          mastery: entry.mastery,
-          itemStyle: entry.itemStyle,
-          estimatedDuration: parseFloat(entry.estimatedDuration.replace(':', '.')) || 2,
-          // PHASE 2: Live vs Virtual Entry Support
-          entryType: entry.entryType,
-          musicFileUrl: entry.musicFileUrl || null,
-          musicFileName: entry.musicFileName || null,
-          videoExternalUrl: entry.videoExternalUrl || null,
-          videoExternalType: entry.videoExternalType || null
-        };
-
-        try {
-          const response = await fetch('/api/event-entries', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(eventEntryData),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Failed to submit ${entry.performanceType} entry: ${errorData.error || 'Unknown error'}`);
-          }
-        } catch (error: any) {
-          console.error(`Error submitting ${entry.performanceType} entry:`, error);
-          error(`Error submitting ${entry.performanceType} entry: ${error.message || 'Unknown error'}`);
-          return;
-        }
-      }
-
-      // Show success message
       const totalFee = calculateTotalFee().total;
+      
+      // For multiple entries, we'll create a batch payment
+      // First, store entry data temporarily and get payment URL
+      const batchEntryData = entries.map(entry => ({
+        eventId: eventId,
+        contestantId: isStudioMode ? studioInfo?.id : contestant?.id,
+        eodsaId: isStudioMode ? studioInfo?.registrationNumber : contestant?.eodsaId,
+        participantIds: entry.participantIds,
+        calculatedFee: entry.fee,
+        itemName: entry.itemName,
+        choreographer: entry.choreographer,
+        mastery: entry.mastery,
+        itemStyle: entry.itemStyle,
+        estimatedDuration: parseFloat(entry.estimatedDuration.replace(':', '.')) || 2,
+        entryType: entry.entryType,
+        musicFileUrl: entry.musicFileUrl || null,
+        musicFileName: entry.musicFileName || null,
+        videoExternalUrl: entry.videoExternalUrl || null,
+        videoExternalType: entry.videoExternalType || null,
+        performanceType: entry.performanceType
+      }));
+
+      // Store entry data in session storage for after payment
+      sessionStorage.setItem('pendingEntries', JSON.stringify(batchEntryData));
+      sessionStorage.setItem('paymentAmount', totalFee.toString());
+      sessionStorage.setItem('paymentEventId', eventId);
+      sessionStorage.setItem('paymentEventName', event?.name || 'Competition Entry');
+
+      // Create payment request
+      const firstEntry = entries[0];
+      const userName = isStudioMode ? 
+        (studioInfo?.name || 'Studio Manager') : 
+        (contestant?.name || 'Contestant');
+      
+      const [firstName, ...lastNameParts] = userName.split(' ');
+      const lastName = lastNameParts.join(' ') || 'User';
+      
+      const userEmail = isStudioMode ? 
+        (studioInfo?.email || 'studio@example.com') : 
+        (contestant?.email || 'contestant@example.com');
+
+      const paymentData = {
+        entryId: 'BATCH_' + Date.now(), // Temporary batch ID
+        eventId: eventId,
+        userId: isStudioMode ? studioInfo?.id : contestant?.id,
+        userFirstName: firstName,
+        userLastName: lastName,
+        userEmail: userEmail,
+        amount: totalFee,
+        itemName: `${entries.length} Competition Entries`,
+        itemDescription: entries.map(e => `${e.performanceType}: ${e.itemName}`).join(', '),
+        isBatchPayment: true // Flag to indicate this is for batch entries
+      };
+
+      console.log('🔄 Redirecting to payment for batch entries:', {
+        entriesCount: entries.length,
+        totalAmount: totalFee,
+        paymentData
+      });
+
+      // Redirect to payment processing
+      const response = await fetch('/api/payments/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentData),
+      });
+
+      if (response.ok) {
+        // Response should be HTML for PayFast redirect
+        const paymentHtml = await response.text();
+        
+        // Create a new window/tab with the payment form
+        const paymentWindow = window.open('', '_self');
+        if (paymentWindow) {
+          paymentWindow.document.write(paymentHtml);
+          paymentWindow.document.close();
+        } else {
+          throw new Error('Unable to open payment window. Please check your popup blocker.');
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate payment');
+      }
       setSubmissionResult({ entries: entries.length, totalFee });
       setShowSuccessModal(true);
       
       // Navigation is now handled by the modal buttons
-    } catch (error: any) {
-      console.error('Error during submission:', error);
-      error(`Error during submission: ${error.message || 'Unknown error'}`);
+    } catch (submitError: any) {
+      console.error('Error during submission:', submitError);
+      error(`Error during submission: ${submitError.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -1404,10 +1443,29 @@ export default function CompetitionEntryPage() {
                  
                  <div className="border-t border-slate-600 pt-2">
                    <div className="flex justify-between font-semibold text-lg text-emerald-400">
-                     <span>Total:</span>
+                     <span>Competition Total:</span>
                      <span className="transition-all duration-300 transform hover:scale-110">
                        R{feeCalculation.total}
                      </span>
+                   </div>
+                 </div>
+
+                 {/* PayFast Processing Fee Breakdown */}
+                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 mt-3">
+                   <div className="text-sm text-orange-300 font-medium mb-2">💳 Payment Processing</div>
+                   <div className="flex justify-between text-sm text-slate-300 mb-1">
+                     <span>Subtotal:</span>
+                     <span>R{feeCalculation.total}</span>
+                   </div>
+                   <div className="flex justify-between text-sm text-slate-300 mb-2">
+                     <span>PayFast Processing Fee (3.5%):</span>
+                     <span>R{Math.max(feeCalculation.total * 0.035, 2.00).toFixed(2)}</span>
+                   </div>
+                   <div className="border-t border-orange-500/20 pt-2">
+                     <div className="flex justify-between font-semibold text-white">
+                       <span>Final Payment Amount:</span>
+                       <span className="text-green-400">R{(feeCalculation.total + Math.max(feeCalculation.total * 0.035, 2.00)).toFixed(2)}</span>
+                     </div>
                    </div>
                  </div>
                </div>
