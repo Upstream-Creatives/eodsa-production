@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cloudinary, MUSIC_UPLOAD_PRESET } from '@/lib/cloudinary';
 
+// Note: In Next.js App Router, body size limits are configured in next.config.ts
+// This route handles file uploads up to 250MB
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();

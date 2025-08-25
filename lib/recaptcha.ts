@@ -65,6 +65,23 @@ export const verifyRecaptcha = async (token: string, ip?: string): Promise<{ suc
       return { success: false, error: 'reCAPTCHA not configured' };
     }
     
+    // Handle case where no token is provided (e.g., reCAPTCHA failed to load)
+    if (!token) {
+      console.warn('⚠️ No reCAPTCHA token provided - likely due to connectivity issues');
+      
+      // For geographic connectivity issues, we can be more lenient
+      const country = ip ? await getCountryFromIP(ip) : 'unknown';
+      console.log(`🌍 Missing reCAPTCHA token from country: ${country} (IP: ${ip || 'unknown'})`);
+      
+      // In development or for known connectivity issues, allow bypass
+      if (process.env.NODE_ENV === 'development' || country === 'ZA') {
+        console.warn('⚠️ Allowing request without reCAPTCHA due to geographic connectivity issues');
+        return { success: true, score: 0.5, error: 'bypassed_connectivity' };
+      }
+      
+      return { success: false, error: 'reCAPTCHA verification required but token missing' };
+    }
+    
     const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
       method: 'POST',
       headers: {
@@ -75,14 +92,37 @@ export const verifyRecaptcha = async (token: string, ip?: string): Promise<{ suc
         response: token,
         remoteip: ip || ''
       }),
+      // Add timeout for geographic connectivity issues
+      signal: AbortSignal.timeout(10000) // 10 second timeout
     });
+    
+    if (!response.ok) {
+      console.error(`❌ reCAPTCHA verification request failed: ${response.status}`);
+      
+      // For connectivity issues, be more lenient
+      if (response.status >= 500 || response.status === 0) {
+        console.warn('⚠️ reCAPTCHA service appears down - allowing request');
+        return { success: true, score: 0.5, error: 'service_unavailable' };
+      }
+      
+      return { success: false, error: 'reCAPTCHA verification request failed' };
+    }
     
     const data = await response.json();
     
     if (!data.success) {
+      const errorCodes = data['error-codes'] || [];
+      console.error(`❌ reCAPTCHA verification failed:`, errorCodes);
+      
+      // Handle specific error codes that might be geographic
+      if (errorCodes.includes('timeout-or-duplicate') || errorCodes.includes('bad-request')) {
+        console.warn('⚠️ Possible connectivity issue detected');
+        return { success: true, score: 0.3, error: 'connectivity_fallback' };
+      }
+      
       return { 
         success: false, 
-        error: `reCAPTCHA verification failed: ${data['error-codes']?.join(', ') || 'Unknown error'}` 
+        error: `reCAPTCHA verification failed: ${errorCodes.join(', ') || 'Unknown error'}` 
       };
     }
     
@@ -105,11 +145,31 @@ export const verifyRecaptcha = async (token: string, ip?: string): Promise<{ suc
       return { success: true };
     }
     
-  } catch (error) {
-    console.error('reCAPTCHA verification error:', error);
+  } catch (error: any) {
+    console.error('❌ reCAPTCHA verification error:', error);
+    
+    // Handle specific timeout or network errors
+    if (error.name === 'AbortError' || error.code === 'ECONNRESET' || error.code === 'ENOTFOUND') {
+      console.warn('⚠️ Network connectivity issue detected - allowing request');
+      return { success: true, score: 0.4, error: 'network_timeout' };
+    }
+    
     return { success: false, error: 'reCAPTCHA service unavailable' };
   }
 };
+
+// Helper function to get country from IP (basic implementation)
+async function getCountryFromIP(ip: string): Promise<string> {
+  try {
+    // This is a simple implementation - in production you might want to use a proper IP geolocation service
+    if (ip.startsWith('196.') || ip.startsWith('41.')) {
+      return 'ZA'; // Common South African IP ranges
+    }
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 // Get client IP address from request
 export const getClientIP = (request: any): string => {

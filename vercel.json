@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "app/api/upload/music/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/contestants/upload-music/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/studios/upload-music/route.ts": {
+      "maxDuration": 60
+    }
+  },
+  "regions": ["all"]
+}
