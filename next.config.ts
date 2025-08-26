@@ -1,12 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Increase server timeout for large file uploads
-  serverRuntimeConfig: {
-    bodyParser: {
-      sizeLimit: '250mb',
-    },
-  },
   // Add proper Content Security Policy headers
   async headers() {
     return [

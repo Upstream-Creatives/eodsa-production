@@ -1,13 +1,20 @@
 {
   "functions": {
     "app/api/upload/music/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024,
+      "maxRequestBodySize": "250mb"
     },
     "app/api/contestants/upload-music/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024
     },
     "app/api/studios/upload-music/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024
     }
-  }
+  },
+  "maxRequestBodySize": "250mb",
+  "regions": ["cpt1"],
+  "framework": "nextjs"
 }
