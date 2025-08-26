@@ -44,6 +44,14 @@ interface EventEntry {
   contestantName?: string;
   contestantEmail?: string;
   participantNames?: string[];
+  // Phase 2: Live/Virtual Entry Support
+  entryType: 'live' | 'virtual';
+  musicFileUrl?: string;
+  musicFileName?: string;
+  videoFileUrl?: string;
+  videoFileName?: string;
+  videoExternalUrl?: string;
+  videoExternalType?: 'youtube' | 'vimeo' | 'other';
 }
 
 interface Performance {
@@ -81,6 +89,7 @@ export default function EventParticipantsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [deletingEntries, setDeletingEntries] = useState<Set<string>>(new Set());
   const [performanceTypeFilter, setPerformanceTypeFilter] = useState<string>('all');
+  const [entryTypeFilter, setEntryTypeFilter] = useState<string>('all');
   const [withdrawingPerformances, setWithdrawingPerformances] = useState<Set<string>>(new Set());
   const [selectedPerformanceScores, setSelectedPerformanceScores] = useState<any>(null);
   const [showScoresModal, setShowScoresModal] = useState(false);
@@ -113,10 +122,14 @@ export default function EventParticipantsPage() {
     }
   };
 
-  // Filter entries by performance type
-  const filteredEntries = performanceTypeFilter === 'all' 
-    ? entries 
-    : entries.filter(entry => getPerformanceType(entry.participantIds).toLowerCase() === performanceTypeFilter);
+  // Filter entries by performance type and entry type
+  const filteredEntries = entries.filter(entry => {
+    const performanceTypeMatch = performanceTypeFilter === 'all' || 
+      getPerformanceType(entry.participantIds).toLowerCase() === performanceTypeFilter;
+    const entryTypeMatch = entryTypeFilter === 'all' || 
+      entry.entryType === entryTypeFilter;
+    return performanceTypeMatch && entryTypeMatch;
+  });
 
   // Get performance type statistics
   const getPerformanceStats = () => {
@@ -125,6 +138,8 @@ export default function EventParticipantsPage() {
       duet: entries.filter(e => getPerformanceType(e.participantIds) === 'Duet').length,
       trio: entries.filter(e => getPerformanceType(e.participantIds) === 'Trio').length,
       group: entries.filter(e => getPerformanceType(e.participantIds) === 'Group').length,
+      live: entries.filter(e => e.entryType === 'live').length,
+      virtual: entries.filter(e => e.entryType === 'virtual').length,
     };
     return stats;
   };
@@ -1088,11 +1103,16 @@ export default function EventParticipantsPage() {
                 <p className="font-semibold text-gray-700">Entries</p>
                 <p className="text-gray-700">{entries.length} total</p>
                 {entries.length > 0 && (
-                  <div className="text-xs text-gray-500 mt-1">
-                    {getPerformanceStats().solo > 0 && `${getPerformanceStats().solo} Solo`}
-                    {getPerformanceStats().duet > 0 && (getPerformanceStats().solo > 0 ? `, ${getPerformanceStats().duet} Duet` : `${getPerformanceStats().duet} Duet`)}
-                    {getPerformanceStats().trio > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 ? `, ${getPerformanceStats().trio} Trio` : `${getPerformanceStats().trio} Trio`)}
-                    {getPerformanceStats().group > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 || getPerformanceStats().trio > 0 ? `, ${getPerformanceStats().group} Group` : `${getPerformanceStats().group} Group`)}
+                  <div className="space-y-1">
+                    <div className="text-xs text-gray-500">
+                      {getPerformanceStats().solo > 0 && `${getPerformanceStats().solo} Solo`}
+                      {getPerformanceStats().duet > 0 && (getPerformanceStats().solo > 0 ? `, ${getPerformanceStats().duet} Duet` : `${getPerformanceStats().duet} Duet`)}
+                      {getPerformanceStats().trio > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 ? `, ${getPerformanceStats().trio} Trio` : `${getPerformanceStats().trio} Trio`)}
+                      {getPerformanceStats().group > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 || getPerformanceStats().trio > 0 ? `, ${getPerformanceStats().group} Group` : `${getPerformanceStats().group} Group`)}
+                    </div>
+                    <div className="text-xs text-emerald-600 font-medium">
+                      🎵 {getPerformanceStats().live} Live • 📹 {getPerformanceStats().virtual} Virtual
+                    </div>
                   </div>
                 )}
               </div>
@@ -1104,8 +1124,12 @@ export default function EventParticipantsPage() {
         {entries.length > 0 && (
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-indigo-100 mb-6">
             <div className="px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter by Performance Type</h3>
-              <div className="flex flex-wrap gap-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Entries</h3>
+              
+              {/* Performance Type Filters */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Performance Type:</h4>
+                <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setPerformanceTypeFilter('all')}
                   className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
@@ -1152,7 +1176,7 @@ export default function EventParticipantsPage() {
                     Trio ({getPerformanceStats().trio})
                   </button>
                 )}
-                {getPerformanceStats().group > 0 && (
+                                  {getPerformanceStats().group > 0 && (
                   <button
                     onClick={() => setPerformanceTypeFilter('group')}
                     className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
@@ -1164,6 +1188,48 @@ export default function EventParticipantsPage() {
                     Group ({getPerformanceStats().group})
                   </button>
                 )}
+                </div>
+              </div>
+              
+              {/* Entry Type Filters */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Entry Type:</h4>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setEntryTypeFilter('all')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      entryTypeFilter === 'all'
+                        ? 'bg-indigo-600 text-white shadow-lg'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All Types ({entries.length})
+                  </button>
+                  {getPerformanceStats().live > 0 && (
+                    <button
+                      onClick={() => setEntryTypeFilter('live')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                        entryTypeFilter === 'live'
+                          ? 'bg-emerald-600 text-white shadow-lg'
+                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                      }`}
+                    >
+                      🎵 Live ({getPerformanceStats().live})
+                    </button>
+                  )}
+                  {getPerformanceStats().virtual > 0 && (
+                    <button
+                      onClick={() => setEntryTypeFilter('virtual')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                        entryTypeFilter === 'virtual'
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                      }`}
+                    >
+                      📹 Virtual ({getPerformanceStats().virtual})
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1174,9 +1240,9 @@ export default function EventParticipantsPage() {
           <div className="px-6 py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b border-indigo-100">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">
-                {performanceTypeFilter === 'all' 
-                  ? 'All Participants & Entries' 
-                  : `${performanceTypeFilter.charAt(0).toUpperCase() + performanceTypeFilter.slice(1)} Entries`
+                {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
+                  ? 'All Participants & Entries'
+                  : `${performanceTypeFilter === 'all' ? 'All' : performanceTypeFilter.charAt(0).toUpperCase() + performanceTypeFilter.slice(1)} ${entryTypeFilter === 'all' ? '' : entryTypeFilter.charAt(0).toUpperCase() + entryTypeFilter.slice(1)} Entries`
                 }
               </h2>
               <div className="flex items-center space-x-3">
@@ -1199,15 +1265,15 @@ export default function EventParticipantsPage() {
                 <span className="text-2xl">📝</span>
               </div>
               <h3 className="text-lg font-medium mb-2">
-                {performanceTypeFilter === 'all' 
+                {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
                   ? 'No entries yet' 
-                  : `No ${performanceTypeFilter} entries`
+                  : `No ${performanceTypeFilter === 'all' ? '' : performanceTypeFilter + ' '}${entryTypeFilter === 'all' ? '' : entryTypeFilter + ' '}entries found`
                 }
               </h3>
               <p className="text-sm">
-                {performanceTypeFilter === 'all'
+                {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
                   ? 'Participants will appear here once they register for this event.'
-                  : `No ${performanceTypeFilter} entries found. Try selecting "All Entries" to see other performance types.`
+                  : 'Try adjusting your filters to see more entries.'
                 }
               </p>
             </div>
@@ -1293,11 +1359,22 @@ export default function EventParticipantsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${getPerformanceTypeColor(performanceType)}`}>
-                          {performanceType.toUpperCase()}
-                        </span>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {entry.participantIds.length} participant{entry.participantIds.length !== 1 ? 's' : ''}
+                        <div className="space-y-1">
+                          <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${getPerformanceTypeColor(performanceType)}`}>
+                            {performanceType.toUpperCase()}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${
+                              entry.entryType === 'live' 
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
+                                : 'bg-blue-100 text-blue-800 border-blue-200'
+                            }`}>
+                              {entry.entryType === 'live' ? '🎵 LIVE' : '📹 VIRTUAL'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {entry.participantIds.length} participant{entry.participantIds.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">

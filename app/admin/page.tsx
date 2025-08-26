@@ -781,20 +781,39 @@ export default function AdminDashboard() {
     setLoadingFinances(true);
     
     try {
-      // Fetch event entries for this dancer to calculate outstanding balances
+      // Fetch comprehensive financial data including group entries
       const response = await fetch(`/api/admin/dancers/${dancer.eodsaId}/finances`);
       if (response.ok) {
         const data = await response.json();
         setSelectedDancerFinances({
           ...dancer,
-          eventEntries: data.eventEntries || [],
-          totalOutstanding: data.totalOutstanding || 0,
-          registrationFeeAmount: data.registrationFeeAmount || 0
+          // New API structure
+          financial: data.financial,
+          entries: data.entries,
+          // Legacy support for existing modal code
+          eventEntries: data.entries.all || [],
+          totalOutstanding: data.financial.totalOutstanding || 0,
+          registrationFeeAmount: data.financial.registrationFeeAmount || 0
         });
       } else {
-        // If API doesn't exist yet, just show basic info
+        // Fallback to basic info
         setSelectedDancerFinances({
           ...dancer,
+          financial: {
+            registrationFeeAmount: 0,
+            registrationFeeOutstanding: 0,
+            totalEntryOutstanding: 0,
+            totalOutstanding: 0,
+            totalPaid: 0
+          },
+          entries: {
+            all: [],
+            solo: [],
+            group: [],
+            totalEntries: 0,
+            soloCount: 0,
+            groupCount: 0
+          },
           eventEntries: [],
           totalOutstanding: 0,
           registrationFeeAmount: 0
@@ -805,6 +824,21 @@ export default function AdminDashboard() {
       // Fallback to basic info
       setSelectedDancerFinances({
         ...dancer,
+        financial: {
+          registrationFeeAmount: 0,
+          registrationFeeOutstanding: 0,
+          totalEntryOutstanding: 0,
+          totalOutstanding: 0,
+          totalPaid: 0
+        },
+        entries: {
+          all: [],
+          solo: [],
+          group: [],
+          totalEntries: 0,
+          soloCount: 0,
+          groupCount: 0
+        },
         eventEntries: [],
         totalOutstanding: 0,
         registrationFeeAmount: 0
@@ -2793,23 +2827,45 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Event Entries Section */}
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  {/* Enhanced Balance Overview */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                      <span className="mr-2">🎭</span>
-                      Event Entries
+                      <span className="mr-2">💰</span>
+                      Financial Summary
                     </h3>
-                    
-                    {selectedDancerFinances.eventEntries && selectedDancerFinances.eventEntries.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white rounded-lg p-3">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Paid</div>
+                        <div className="text-lg font-bold text-green-600">
+                          R{selectedDancerFinances.financial?.totalPaid?.toFixed(2) || '0.00'}
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</div>
+                        <div className="text-lg font-bold text-red-600">
+                          R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Solo Entries Section */}
+                  {selectedDancerFinances.entries?.soloCount > 0 && (
+                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <span className="mr-2">🕺</span>
+                        Solo Entries ({selectedDancerFinances.entries.soloCount})
+                      </h3>
                       <div className="space-y-3">
-                        {selectedDancerFinances.eventEntries.map((entry: any, index: number) => (
+                        {selectedDancerFinances.entries.solo.map((entry: any, index: number) => (
                           <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
                             <div className="flex justify-between items-start">
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{entry.itemName}</div>
+                              <div className="flex-1">
+                                <div className="text-sm font-bold text-gray-900">{entry.itemName}</div>
                                 <div className="text-xs text-gray-500">{entry.eventName}</div>
+                                <div className="text-xs text-purple-600 font-medium mt-1">Solo Performance</div>
                               </div>
-                              <div className="text-right">
+                              <div className="text-right ml-4">
                                 <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee?.toFixed(2) || '0.00'}</div>
                                 <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
                                   entry.paymentStatus === 'paid' 
@@ -2823,42 +2879,154 @@ export default function AdminDashboard() {
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <div className="text-gray-400 text-3xl mb-2">🎭</div>
-                        <p className="text-gray-600 text-sm">No event entries found</p>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Total Outstanding Section */}
+                  {/* Group Entries Section */}
+                  {selectedDancerFinances.entries?.groupCount > 0 && (
+                    <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <span className="mr-2">👥</span>
+                        Group Entries ({selectedDancerFinances.entries.groupCount})
+                      </h3>
+                      <div className="space-y-4">
+                        {selectedDancerFinances.entries.group.map((entry: any, index: number) => (
+                          <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1">
+                                <div className="text-sm font-bold text-gray-900">{entry.itemName}</div>
+                                <div className="text-xs text-gray-500">{entry.eventName}</div>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                                    entry.participationRole === 'duet' ? 'bg-blue-100 text-blue-800' :
+                                    entry.participationRole === 'trio' ? 'bg-green-100 text-green-800' :
+                                    'bg-orange-100 text-orange-800'
+                                  }`}>
+                                    {entry.participationRole.toUpperCase()}
+                                  </span>
+                                  {entry.isMainContestant && (
+                                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                      MAIN CONTESTANT
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right ml-4">
+                                <div className="text-xs text-gray-500 mb-1">
+                                  {entry.isMainContestant ? 'Full Fee' : 'Your Share'}
+                                </div>
+                                <div className="text-sm font-bold text-gray-900">
+                                  R{entry.dancerShare?.toFixed(2) || '0.00'}
+                                </div>
+                                {!entry.isMainContestant && (
+                                  <div className="text-xs text-gray-400">
+                                    of R{entry.calculatedFee?.toFixed(2) || '0.00'}
+                                  </div>
+                                )}
+                                <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full mt-1 ${
+                                  entry.paymentStatus === 'paid' 
+                                    ? 'bg-green-100 text-green-800 border border-green-200'
+                                    : 'bg-red-100 text-red-800 border border-red-200'
+                                }`}>
+                                  {entry.paymentStatus?.toUpperCase() || 'PENDING'}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Group Members List */}
+                            <div className="border-t border-gray-100 pt-3">
+                              <div className="text-xs font-medium text-gray-600 mb-2">Group Members:</div>
+                              <div className="flex flex-wrap gap-1">
+                                {entry.participantNames?.map((name: string, nameIndex: number) => (
+                                  <span key={nameIndex} className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                                    name === selectedDancerFinances.name 
+                                      ? 'bg-blue-100 text-blue-800 font-medium border border-blue-200' 
+                                      : 'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {name === selectedDancerFinances.name ? `${name} (You)` : name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Entries State */}
+                  {(!selectedDancerFinances.entries?.totalEntries || selectedDancerFinances.entries.totalEntries === 0) && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="text-center py-6">
+                        <div className="text-gray-400 text-4xl mb-3">🎭</div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Event Entries</h3>
+                        <p className="text-gray-600 text-sm">This dancer hasn't registered for any competitions yet.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Detailed Outstanding Breakdown */}
                   <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                       <span className="mr-2">⚠️</span>
-                      Total Outstanding Balance
+                      Outstanding Balance Breakdown
                     </h3>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
+                      {/* Registration Fee */}
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Registration Fee:</span>
                         <span className="text-sm font-medium text-red-600">
-                          {selectedDancerFinances.registrationFeePaid ? 'R0.00' : `R${EODSA_FEES.REGISTRATION.Nationals.toFixed(2)}`}
+                          R{selectedDancerFinances.financial?.registrationFeeOutstanding?.toFixed(2) || '0.00'}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Event Entries Outstanding:</span>
-                        <span className="text-sm font-medium text-red-600">
-                          R{selectedDancerFinances.totalOutstanding?.toFixed(2) || '0.00'}
+                      
+                      {/* Entry Fees Breakdown */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Solo Entries Outstanding:</span>
+                          <span className="text-sm font-medium text-red-600">
+                            R{(selectedDancerFinances.entries?.solo?.filter((e: any) => e.paymentStatus !== 'paid')
+                              .reduce((sum: number, entry: any) => sum + (entry.calculatedFee || 0), 0) || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Group Entries Outstanding:</span>
+                          <span className="text-sm font-medium text-red-600">
+                            R{(selectedDancerFinances.entries?.group?.filter((e: any) => e.paymentStatus !== 'paid')
+                              .reduce((sum: number, entry: any) => sum + (entry.dancerShare || 0), 0) || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Total */}
+                      <div className="flex justify-between items-center pt-3 border-t border-red-200">
+                        <span className="text-base font-bold text-gray-900">TOTAL OUTSTANDING:</span>
+                        <span className="text-xl font-bold text-red-600">
+                          R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-red-200">
-                        <span className="text-base font-semibold text-gray-900">TOTAL OUTSTANDING:</span>
-                        <span className="text-lg font-bold text-red-600">
-                          R{(
-                            (selectedDancerFinances.registrationFeePaid ? 0 : EODSA_FEES.REGISTRATION.Nationals) + 
-                            (selectedDancerFinances.totalOutstanding || 0)
-                          ).toFixed(2)}
-                        </span>
-                      </div>
+                      
+                      {/* Payment Progress */}
+                      {selectedDancerFinances.entries?.totalEntries > 0 && (
+                        <div className="pt-3 border-t border-red-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-medium text-gray-600">Payment Progress:</span>
+                            <span className="text-xs text-gray-500">
+                              {selectedDancerFinances.entries.all?.filter((e: any) => e.paymentStatus === 'paid').length || 0} of {selectedDancerFinances.entries.totalEntries} entries paid
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                              style={{
+                                width: `${selectedDancerFinances.entries.totalEntries > 0 
+                                  ? ((selectedDancerFinances.entries.all?.filter((e: any) => e.paymentStatus === 'paid').length || 0) / selectedDancerFinances.entries.totalEntries) * 100 
+                                  : 0}%`
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
