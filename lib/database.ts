@@ -2734,7 +2734,7 @@ export const db = {
       ORDER BY p.display_order ASC, p.item_number ASC, p.created_at ASC
     `;
     
-    return rows.map((row: any) => ({
+    return (rows as any[]).map((row: any) => ({
       id: row.id,
       eventId: row.event_id,
       eventEntryId: row.event_entry_id,

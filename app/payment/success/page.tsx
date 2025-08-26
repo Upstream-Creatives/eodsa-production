@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
 
 interface PaymentDetails {
   payment_id: string;
@@ -15,7 +18,7 @@ interface PaymentDetails {
   paid_at: string;
 }
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
@@ -46,7 +49,8 @@ export default function PaymentSuccessPage() {
           event_name: sessionEventName || 'Competition Entry',
           entry_title: 'Competition Entries',
           amount: parseFloat(sessionPaymentAmount),
-          status: 'pending_verification'
+          status: 'pending_verification',
+          paid_at: new Date().toISOString()
         });
         setIsLoading(false);
         
@@ -344,5 +348,22 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-green-400 to-blue-600 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-500 border-t-transparent mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-800">Loading payment details...</h2>
+          </div>
+        </div>
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

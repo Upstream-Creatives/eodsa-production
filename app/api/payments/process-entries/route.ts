@@ -101,7 +101,9 @@ export async function POST(request: NextRequest) {
           videoFileUrl: null,
           videoFileName: null,
           videoExternalUrl: entry.videoExternalUrl || null,
-          videoExternalType: entry.videoExternalType || null
+          videoExternalType: (entry.videoExternalType && ['youtube', 'vimeo', 'other'].includes(entry.videoExternalType)) 
+            ? entry.videoExternalType as 'youtube' | 'vimeo' | 'other' 
+            : null
         });
 
         // Update the entry with payment ID

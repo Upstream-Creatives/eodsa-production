@@ -88,13 +88,13 @@ export interface EventEntry {
   participantIds: string[]; // E-O-D-S-A-IDs of participating dancers
   calculatedFee: number;
   paymentStatus: 'pending' | 'paid' | 'failed';
-  paymentMethod?: 'credit_card' | 'bank_transfer' | 'invoice';
+  paymentMethod?: 'credit_card' | 'bank_transfer' | 'invoice' | 'payfast';
   paymentReference?: string; // Payment reference number/transaction ID
   paymentDate?: string; // Date when payment was processed
   submittedAt: string;
   approved: boolean;
   qualifiedForNationals: boolean;
-  itemNumber?: number; // NEW: Item Number for program order
+  itemNumber?: number | null; // NEW: Item Number for program order
   // EODSA Nationals Entry Form fields
   itemName: string;
   choreographer: string;
@@ -104,13 +104,13 @@ export interface EventEntry {
   // PHASE 2: Live vs Virtual Entry Support
   entryType: 'live' | 'virtual';
   // For Live entries - music file
-  musicFileUrl?: string; // Cloudinary URL for MP3/WAV files
-  musicFileName?: string;
+  musicFileUrl?: string | null; // Cloudinary URL for MP3/WAV files
+  musicFileName?: string | null;
   // For Virtual entries - video file or URL
-  videoFileUrl?: string; // Cloudinary URL for video files
-  videoFileName?: string;
-  videoExternalUrl?: string; // YouTube/Vimeo URL
-  videoExternalType?: 'youtube' | 'vimeo' | 'other';
+  videoFileUrl?: string | null; // Cloudinary URL for video files
+  videoFileName?: string | null;
+  videoExternalUrl?: string | null; // YouTube/Vimeo URL
+  videoExternalType?: 'youtube' | 'vimeo' | 'other' | null;
 }
 
 export interface Performance {
@@ -121,7 +121,7 @@ export interface Performance {
   title: string; // This maps to itemName
   participantNames: string[];
   duration: number; // in minutes (maps to estimatedDuration)
-  itemNumber?: number; // NEW: Item Number for program order
+  itemNumber?: number | null; // NEW: Item Number for program order
   scheduledTime?: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   withdrawnFromJudging?: boolean; // NEW: Admin can withdraw items from judging

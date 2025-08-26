@@ -28,7 +28,67 @@ export async function POST(request: NextRequest) {
     const webhookData: Partial<PayFastWebhookData> = {};
     
     formData.forEach((value, key) => {
-      webhookData[key as keyof PayFastWebhookData] = value.toString();
+      const stringValue = value.toString();
+      
+      // Type-safe assignment for webhook data
+      switch (key) {
+        case 'payment_status':
+          if (['COMPLETE', 'FAILED', 'CANCELLED'].includes(stringValue)) {
+            webhookData.payment_status = stringValue as 'COMPLETE' | 'FAILED' | 'CANCELLED';
+          }
+          break;
+        case 'm_payment_id':
+          webhookData.m_payment_id = stringValue;
+          break;
+        case 'pf_payment_id':
+          webhookData.pf_payment_id = stringValue;
+          break;
+        case 'signature':
+          webhookData.signature = stringValue;
+          break;
+        case 'item_name':
+          webhookData.item_name = stringValue;
+          break;
+        case 'item_description':
+          webhookData.item_description = stringValue;
+          break;
+        case 'amount_gross':
+          webhookData.amount_gross = stringValue;
+          break;
+        case 'amount_fee':
+          webhookData.amount_fee = stringValue;
+          break;
+        case 'amount_net':
+          webhookData.amount_net = stringValue;
+          break;
+        case 'custom_str1':
+          webhookData.custom_str1 = stringValue;
+          break;
+        case 'custom_str2':
+          webhookData.custom_str2 = stringValue;
+          break;
+        case 'custom_str3':
+          webhookData.custom_str3 = stringValue;
+          break;
+        case 'custom_int1':
+          webhookData.custom_int1 = stringValue;
+          break;
+        case 'name_first':
+          webhookData.name_first = stringValue;
+          break;
+        case 'name_last':
+          webhookData.name_last = stringValue;
+          break;
+        case 'email_address':
+          webhookData.email_address = stringValue;
+          break;
+        case 'merchant_id':
+          webhookData.merchant_id = stringValue;
+          break;
+        default:
+          // Ignore unknown fields
+          break;
+      }
     });
 
     console.log('📝 PayFast webhook data:', webhookData);

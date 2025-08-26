@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
 
 interface PaymentDetails {
   payment_id: string;
@@ -15,7 +18,7 @@ interface PaymentDetails {
   created_at: string;
 }
 
-export default function PaymentCancelledPage() {
+function PaymentCancelledContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
@@ -198,5 +201,22 @@ export default function PaymentCancelledPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentCancelledPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-800">Loading payment details...</h2>
+          </div>
+        </div>
+      </div>
+    }>
+      <PaymentCancelledContent />
+    </Suspense>
   );
 }
