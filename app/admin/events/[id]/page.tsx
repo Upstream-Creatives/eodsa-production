@@ -44,14 +44,6 @@ interface EventEntry {
   contestantName?: string;
   contestantEmail?: string;
   participantNames?: string[];
-  // Phase 2: Live/Virtual Entry Support
-  entryType: 'live' | 'virtual';
-  musicFileUrl?: string;
-  musicFileName?: string;
-  videoFileUrl?: string;
-  videoFileName?: string;
-  videoExternalUrl?: string;
-  videoExternalType?: 'youtube' | 'vimeo' | 'other';
 }
 
 interface Performance {
@@ -89,7 +81,6 @@ export default function EventParticipantsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [deletingEntries, setDeletingEntries] = useState<Set<string>>(new Set());
   const [performanceTypeFilter, setPerformanceTypeFilter] = useState<string>('all');
-  const [entryTypeFilter, setEntryTypeFilter] = useState<string>('all');
   const [withdrawingPerformances, setWithdrawingPerformances] = useState<Set<string>>(new Set());
   const [selectedPerformanceScores, setSelectedPerformanceScores] = useState<any>(null);
   const [showScoresModal, setShowScoresModal] = useState(false);
@@ -122,14 +113,10 @@ export default function EventParticipantsPage() {
     }
   };
 
-  // Filter entries by performance type and entry type
-  const filteredEntries = entries.filter(entry => {
-    const performanceTypeMatch = performanceTypeFilter === 'all' || 
-      getPerformanceType(entry.participantIds).toLowerCase() === performanceTypeFilter;
-    const entryTypeMatch = entryTypeFilter === 'all' || 
-      entry.entryType === entryTypeFilter;
-    return performanceTypeMatch && entryTypeMatch;
-  });
+  // Filter entries by performance type
+  const filteredEntries = performanceTypeFilter === 'all' 
+    ? entries 
+    : entries.filter(entry => getPerformanceType(entry.participantIds).toLowerCase() === performanceTypeFilter);
 
   // Get performance type statistics
   const getPerformanceStats = () => {
@@ -138,8 +125,6 @@ export default function EventParticipantsPage() {
       duet: entries.filter(e => getPerformanceType(e.participantIds) === 'Duet').length,
       trio: entries.filter(e => getPerformanceType(e.participantIds) === 'Trio').length,
       group: entries.filter(e => getPerformanceType(e.participantIds) === 'Group').length,
-      live: entries.filter(e => e.entryType === 'live').length,
-      virtual: entries.filter(e => e.entryType === 'virtual').length,
     };
     return stats;
   };
@@ -789,6 +774,55 @@ export default function EventParticipantsPage() {
     setShowPaymentModal(true);
   };
 
+  // Test payment function - initiates real R5 payment for testing
+  const handleTestPayment = async (entry: EventEntry) => {
+    try {
+      showAlert('Initiating test payment of R5...', 'info');
+      
+      const testPaymentData = {
+        entryId: entry.id,
+        eventId: eventId,
+        userId: 'test-admin',
+        userFirstName: 'Test',
+        userLastName: 'Admin',
+        userEmail: 'testadmin@eodsa.test',
+        amount: 5.00, // Fixed R5 for testing
+        itemName: `TEST PAYMENT - ${entry.itemName}`,
+        itemDescription: `Test payment for entry: ${entry.itemName}`,
+        isBatchPayment: false
+      };
+
+      const response = await fetch('/api/payments/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testPaymentData),
+      });
+
+      if (response.ok) {
+        // Response should be HTML for PayFast redirect
+        const paymentHtml = await response.text();
+        
+        // Create a new window/tab with the payment form
+        const paymentWindow = window.open('', '_blank');
+        if (paymentWindow) {
+          paymentWindow.document.write(paymentHtml);
+          paymentWindow.document.close();
+          showAlert('Test payment initiated! Complete the payment in the new window.', 'success');
+        } else {
+          throw new Error('Unable to open payment window. Please check your popup blocker.');
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate test payment');
+      }
+    } catch (error: any) {
+      console.error('Test payment error:', error);
+      showAlert(`Failed to initiate test payment: ${error.message}`, 'error');
+    }
+  };
+
   const updatePaymentStatus = async (status: 'paid' | 'pending' | 'failed') => {
     if (!selectedEntry) return;
     
@@ -1103,16 +1137,11 @@ export default function EventParticipantsPage() {
                 <p className="font-semibold text-gray-700">Entries</p>
                 <p className="text-gray-700">{entries.length} total</p>
                 {entries.length > 0 && (
-                  <div className="space-y-1">
-                    <div className="text-xs text-gray-500">
-                      {getPerformanceStats().solo > 0 && `${getPerformanceStats().solo} Solo`}
-                      {getPerformanceStats().duet > 0 && (getPerformanceStats().solo > 0 ? `, ${getPerformanceStats().duet} Duet` : `${getPerformanceStats().duet} Duet`)}
-                      {getPerformanceStats().trio > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 ? `, ${getPerformanceStats().trio} Trio` : `${getPerformanceStats().trio} Trio`)}
-                      {getPerformanceStats().group > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 || getPerformanceStats().trio > 0 ? `, ${getPerformanceStats().group} Group` : `${getPerformanceStats().group} Group`)}
-                    </div>
-                    <div className="text-xs text-emerald-600 font-medium">
-                      🎵 {getPerformanceStats().live} Live • 📹 {getPerformanceStats().virtual} Virtual
-                    </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {getPerformanceStats().solo > 0 && `${getPerformanceStats().solo} Solo`}
+                    {getPerformanceStats().duet > 0 && (getPerformanceStats().solo > 0 ? `, ${getPerformanceStats().duet} Duet` : `${getPerformanceStats().duet} Duet`)}
+                    {getPerformanceStats().trio > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 ? `, ${getPerformanceStats().trio} Trio` : `${getPerformanceStats().trio} Trio`)}
+                    {getPerformanceStats().group > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 || getPerformanceStats().trio > 0 ? `, ${getPerformanceStats().group} Group` : `${getPerformanceStats().group} Group`)}
                   </div>
                 )}
               </div>
@@ -1124,12 +1153,8 @@ export default function EventParticipantsPage() {
         {entries.length > 0 && (
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-indigo-100 mb-6">
             <div className="px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Entries</h3>
-              
-              {/* Performance Type Filters */}
-              <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Performance Type:</h4>
-                <div className="flex flex-wrap gap-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter by Performance Type</h3>
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setPerformanceTypeFilter('all')}
                   className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
@@ -1176,7 +1201,7 @@ export default function EventParticipantsPage() {
                     Trio ({getPerformanceStats().trio})
                   </button>
                 )}
-                                  {getPerformanceStats().group > 0 && (
+                {getPerformanceStats().group > 0 && (
                   <button
                     onClick={() => setPerformanceTypeFilter('group')}
                     className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
@@ -1188,48 +1213,6 @@ export default function EventParticipantsPage() {
                     Group ({getPerformanceStats().group})
                   </button>
                 )}
-                </div>
-              </div>
-              
-              {/* Entry Type Filters */}
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Entry Type:</h4>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setEntryTypeFilter('all')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      entryTypeFilter === 'all'
-                        ? 'bg-indigo-600 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    All Types ({entries.length})
-                  </button>
-                  {getPerformanceStats().live > 0 && (
-                    <button
-                      onClick={() => setEntryTypeFilter('live')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                        entryTypeFilter === 'live'
-                          ? 'bg-emerald-600 text-white shadow-lg'
-                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                      }`}
-                    >
-                      🎵 Live ({getPerformanceStats().live})
-                    </button>
-                  )}
-                  {getPerformanceStats().virtual > 0 && (
-                    <button
-                      onClick={() => setEntryTypeFilter('virtual')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                        entryTypeFilter === 'virtual'
-                          ? 'bg-blue-600 text-white shadow-lg'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                      }`}
-                    >
-                      📹 Virtual ({getPerformanceStats().virtual})
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -1240,9 +1223,9 @@ export default function EventParticipantsPage() {
           <div className="px-6 py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b border-indigo-100">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">
-                {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
-                  ? 'All Participants & Entries'
-                  : `${performanceTypeFilter === 'all' ? 'All' : performanceTypeFilter.charAt(0).toUpperCase() + performanceTypeFilter.slice(1)} ${entryTypeFilter === 'all' ? '' : entryTypeFilter.charAt(0).toUpperCase() + entryTypeFilter.slice(1)} Entries`
+                {performanceTypeFilter === 'all' 
+                  ? 'All Participants & Entries' 
+                  : `${performanceTypeFilter.charAt(0).toUpperCase() + performanceTypeFilter.slice(1)} Entries`
                 }
               </h2>
               <div className="flex items-center space-x-3">
@@ -1265,15 +1248,15 @@ export default function EventParticipantsPage() {
                 <span className="text-2xl">📝</span>
               </div>
               <h3 className="text-lg font-medium mb-2">
-                {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
+                {performanceTypeFilter === 'all' 
                   ? 'No entries yet' 
-                  : `No ${performanceTypeFilter === 'all' ? '' : performanceTypeFilter + ' '}${entryTypeFilter === 'all' ? '' : entryTypeFilter + ' '}entries found`
+                  : `No ${performanceTypeFilter} entries`
                 }
               </h3>
               <p className="text-sm">
-                {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
+                {performanceTypeFilter === 'all'
                   ? 'Participants will appear here once they register for this event.'
-                  : 'Try adjusting your filters to see more entries.'
+                  : `No ${performanceTypeFilter} entries found. Try selecting "All Entries" to see other performance types.`
                 }
               </p>
             </div>
@@ -1359,22 +1342,11 @@ export default function EventParticipantsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="space-y-1">
-                          <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${getPerformanceTypeColor(performanceType)}`}>
-                            {performanceType.toUpperCase()}
-                          </span>
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${
-                              entry.entryType === 'live' 
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
-                                : 'bg-blue-100 text-blue-800 border-blue-200'
-                            }`}>
-                              {entry.entryType === 'live' ? '🎵 LIVE' : '📹 VIRTUAL'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {entry.participantIds.length} participant{entry.participantIds.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
+                        <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${getPerformanceTypeColor(performanceType)}`}>
+                          {performanceType.toUpperCase()}
+                        </span>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {entry.participantIds.length} participant{entry.participantIds.length !== 1 ? 's' : ''}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -1451,6 +1423,13 @@ export default function EventParticipantsPage() {
                             className="w-full px-3 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-colors"
                           >
                             Manage Payment
+                          </button>
+                          
+                          <button
+                            onClick={() => handleTestPayment(entry)}
+                            className="w-full px-3 py-1 text-xs font-medium rounded-lg bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-200 transition-colors"
+                          >
+                            🧪 Test Payment (R5)
                           </button>
                         </div>
                       </td>
@@ -1796,13 +1775,13 @@ export default function EventParticipantsPage() {
                   <span className="text-white text-lg">💳</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-black">Payment Management</h2>
-                  <p className="text-black text-sm font-bold">{selectedEntry.itemName}</p>
+                  <h2 className="text-xl font-bold text-gray-900">Payment Management</h2>
+                  <p className="text-gray-600 text-sm">{selectedEntry.itemName}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="text-black hover:text-black p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <span className="text-2xl">×</span>
               </button>
@@ -1812,28 +1791,28 @@ export default function EventParticipantsPage() {
           <div className="p-6 space-y-6">
             {/* Current Payment Info */}
             <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-bold text-black mb-3">Current Status</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Current Status</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm font-bold text-black">Entry Fee:</span>
-                  <span className="text-sm font-bold text-black">R{selectedEntry.calculatedFee.toFixed(2)}</span>
+                  <span className="text-sm text-gray-600">Entry Fee:</span>
+                  <span className="text-sm font-medium text-gray-900">R{selectedEntry.calculatedFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm font-bold text-black">Status:</span>
+                  <span className="text-sm text-gray-600">Status:</span>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(selectedEntry.paymentStatus)}`}>
                     {selectedEntry.paymentStatus.toUpperCase()}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm font-bold text-black">Outstanding:</span>
+                  <span className="text-sm text-gray-600">Outstanding:</span>
                   <span className={`text-sm font-bold ${getOutstandingBalance(selectedEntry) > 0 ? 'text-red-600' : 'text-green-600'}`}>
                     R{getOutstandingBalance(selectedEntry).toFixed(2)}
                   </span>
                 </div>
                 {selectedEntry.paymentReference && (
                   <div className="flex justify-between">
-                    <span className="text-sm font-bold text-black">Reference:</span>
-                    <span className="text-sm font-bold text-black">{selectedEntry.paymentReference}</span>
+                    <span className="text-sm text-gray-600">Reference:</span>
+                    <span className="text-sm text-gray-900">{selectedEntry.paymentReference}</span>
                   </div>
                 )}
               </div>
@@ -1842,7 +1821,7 @@ export default function EventParticipantsPage() {
             {/* Payment Form */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-black mb-2">Payment Method</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
@@ -1855,7 +1834,7 @@ export default function EventParticipantsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-black mb-2">Payment Reference</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Reference</label>
                 <input
                   type="text"
                   value={paymentReference}
@@ -1863,7 +1842,7 @@ export default function EventParticipantsPage() {
                   placeholder="Transaction ID, Check number, etc."
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 />
-                <p className="text-xs text-black mt-1">Enter payment reference when marking as paid</p>
+                <p className="text-xs text-gray-500 mt-1">Enter payment reference when marking as paid</p>
               </div>
             </div>
 
@@ -1899,7 +1878,7 @@ export default function EventParticipantsPage() {
             <div className="pt-4 border-t border-gray-200">
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="w-full px-4 py-2 text-black hover:text-black transition-colors font-bold"
+                className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors font-medium"
               >
                 Cancel
               </button>

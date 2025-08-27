@@ -33,27 +33,15 @@ export default function MusicUpload({
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
-    // Validate file type - check both MIME type and file extension for better browser compatibility
-    const allowedTypes = [
-      'audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav', 'audio/aac', 'audio/mp4', 
-      'audio/flac', 'audio/ogg', 'audio/x-ms-wma', 'audio/webm', 'audio/vnd.wav',
-      'audio/x-aac', 'audio/x-m4a', 'audio/x-flac', 'audio/mpeg3', 'audio/mp4a-latm',
-      'audio/x-audio', 'audio/basic', '' // Some browsers don't provide MIME type
-    ];
-    
-    const fileExtension = file.name.toLowerCase().split('.').pop();
-    const allowedExtensions = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'wma', 'webm'];
-    
-    const isValidType = allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension || '');
-    
-    if (!isValidType) {
-      onUploadError('Invalid file type. Please upload audio files with extensions: MP3, WAV, AAC, M4A, FLAC, OGG, WMA, or WebM.');
+    // Validate file type - accept any audio format
+    if (!file.type.startsWith('audio/')) {
+      onUploadError('Please upload an audio file.');
       return;
     }
 
-    // Validate file size (200MB)
-    if (file.size > 200000000) {
-      onUploadError('File too large. Maximum size is 200MB.');
+    // Validate file size (50MB)
+    if (file.size > 50000000) {
+      onUploadError('File too large. Maximum size is 50MB.');
       return;
     }
 
@@ -61,105 +49,25 @@ export default function MusicUpload({
     setUploadProgress(0);
 
     try {
-      // Step 1: Get signature from our endpoint
-      const signatureResponse = await fetch('/api/upload/music', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: file.name,
-          fileSize: file.size
-        }),
-      });
-
-      if (!signatureResponse.ok) {
-        throw new Error(`Signature error: ${signatureResponse.status}`);
-      }
-
-      const signatureData = await signatureResponse.json();
-      
-      if (!signatureData.success) {
-        throw new Error(signatureData.error || 'Failed to get upload signature');
-      }
-
-      console.log('📝 Signature data received:', signatureData.data);
-      setUploadProgress(10);
-
-      // Step 2: Upload directly to Cloudinary
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('api_key', signatureData.data.api_key);
-      formData.append('timestamp', signatureData.data.timestamp.toString());
-      formData.append('signature', signatureData.data.signature);
-      formData.append('public_id', signatureData.data.public_id);
 
-      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.data.cloud_name}/${signatureData.data.resource_type}/upload`;
-      console.log('🌐 Uploading to:', cloudinaryUrl);
-      console.log('📤 Form data keys:', Array.from(formData.keys()));
-
-      // Create XMLHttpRequest for progress tracking
-      const uploadPromise = new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const progress = 10 + Math.round((e.loaded / e.total) * 80); // 10-90%
-            setUploadProgress(progress);
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status === 200) {
-            try {
-              const result = JSON.parse(xhr.responseText);
-              resolve(result);
-            } catch (e) {
-              reject(new Error('Invalid response from Cloudinary'));
-            }
-          } else {
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          reject(new Error('Network error during upload'));
-        });
-
-        xhr.open('POST', cloudinaryUrl);
-        xhr.send(formData);
+      const response = await fetch('/api/upload/music', {
+        method: 'POST',
+        body: formData,
       });
 
-      const cloudinaryResult = await uploadPromise as any;
-      setUploadProgress(95);
+      const result = await response.json();
 
-      // Step 3: Format response to match expected structure
-      const result = {
-        publicId: cloudinaryResult.public_id,
-        url: cloudinaryResult.secure_url,
-        originalFilename: file.name,
-        fileSize: file.size,
-        duration: cloudinaryResult.duration, // Duration in seconds
-        format: cloudinaryResult.format,
-        resourceType: cloudinaryResult.resource_type,
-        createdAt: cloudinaryResult.created_at
-      };
-
-      onUploadSuccess(result);
-      setUploadProgress(100);
-
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      
-      if (error.message?.includes('Network error')) {
-        onUploadError('Network error. Please check your internet connection and try again.');
-      } else if (error.message?.includes('Signature error')) {
-        onUploadError('Upload validation failed. Please try again.');
-      } else if (error.message?.includes('Upload failed')) {
-        onUploadError(`Upload failed: ${error.message}`);
+      if (result.success) {
+        onUploadSuccess(result.data);
+        setUploadProgress(100);
       } else {
-        onUploadError('Upload failed. Please try again.');
+        onUploadError(result.error || 'Upload failed');
       }
+    } catch (error) {
+      console.error('Upload error:', error);
+      onUploadError('Upload failed. Please check your connection and try again.');
     } finally {
       setIsUploading(false);
       setTimeout(() => setUploadProgress(0), 2000);

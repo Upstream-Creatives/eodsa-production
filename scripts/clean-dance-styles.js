@@ -5,7 +5,6 @@ const VALID_STYLES = [
   'Ballet Repertoire', 
   'Lyrical',
   'Contemporary',
-  'Modern',
   'Jazz',
   'Hip-Hop',
   'Freestyle/Disco',
@@ -26,6 +25,7 @@ const STYLE_MAPPING = {
   
   'contemporary': 'Contemporary',
   'Contemporary Modern': 'Contemporary',
+  'Modern': 'Contemporary',
   'Lyrical Contemporary': 'Contemporary',
   
   'jazz': 'Jazz',

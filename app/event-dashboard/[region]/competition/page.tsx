@@ -344,24 +344,24 @@ export default function CompetitionEntryPage() {
 
   const getStartingFee = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 400; // R400 for 1 solo (plus R300 registration)
+      return 5; // R5 for 1 solo (TESTING - plus R5 registration)
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return 280; // R280 per person (plus R300 registration each)
+      return 280; // R280 per person (plus R5 registration each)
     } else if (performanceType === 'Group') {
-      return 220; // R220 per person for small groups (plus R300 registration each)
+      return 220; // R220 per person for small groups (plus R5 registration each)
     }
     return 0;
   };
 
   const getFeeExplanation = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE. Plus R300 registration.';
+      return 'Solo packages (TESTING): 1 solo R5, 2 solos R10, 3 solos R15, 4 solos R20, 5th FREE. Plus R5 registration.';
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return 'R280 per person + R300 registration each';
+      return 'R280 per person + R5 registration each';
     } else if (performanceType === 'Group') {
-      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R300 registration each.';
+      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R5 registration each.';
     }
-    return 'Per person + R300 registration each';
+    return 'Per person + R5 registration each';
   };
 
   // NEW: Helper function to get maximum duration display for performance type
@@ -412,21 +412,21 @@ export default function CompetitionEntryPage() {
       case 'Solo': return { min: 1, max: 1 };
       case 'Duet': return { min: 2, max: 2 };
       case 'Trio': return { min: 3, max: 3 };
-      case 'Group': return { min: 4, max: 30 };
-      default: return { min: 1, max: 30 };
+      case 'Group': return { min: 4, max: 10 };
+      default: return { min: 1, max: 10 };
     }
   };
 
   const calculateEntryFee = (performanceType: string, participantCount: number) => {
     if (performanceType === 'Solo') {
-      // Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE
+      // Solo packages: 1 solo R5 (TESTING), 2 solos R10, 3 solos R15, 4 solos R20, 5th FREE
       const soloCount = entries.filter(entry => entry.performanceType === 'Solo').length + 1; // +1 for current entry
-      if (soloCount === 1) return 400;
-      if (soloCount === 2) return 750 - 400; // R350 for 2nd solo (total R750)
-      if (soloCount === 3) return 1000 - 750; // R250 for 3rd solo (total R1000)
-      if (soloCount === 4) return 1200 - 1000; // R200 for 4th solo (total R1200)
+      if (soloCount === 1) return 5; // TESTING: Changed from R400 to R5
+      if (soloCount === 2) return 10 - 5; // R5 for 2nd solo (total R10)
+      if (soloCount === 3) return 15 - 10; // R5 for 3rd solo (total R15)
+      if (soloCount === 4) return 20 - 15; // R5 for 4th solo (total R20)
       if (soloCount >= 5) return 0; // 5th solo is FREE
-      return 400;
+      return 5; // TESTING: Changed from R400 to R5
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
       return 280 * participantCount;
     } else if (performanceType === 'Group') {
@@ -533,10 +533,10 @@ export default function CompetitionEntryPage() {
         // Recalculate solo fees based on new positioning
         soloEntries.forEach((entry, index) => {
           const soloCount = index + 1;
-          if (soloCount === 1) entry.fee = 400;
-          else if (soloCount === 2) entry.fee = 750 - 400; // R350 for 2nd solo
-          else if (soloCount === 3) entry.fee = 1000 - 750; // R250 for 3rd solo
-          else if (soloCount === 4) entry.fee = 1200 - 1000; // R200 for 4th solo
+          if (soloCount === 1) entry.fee = 5; // TESTING: Changed from 400 to 5
+          else if (soloCount === 2) entry.fee = 10 - 5; // R5 for 2nd solo (TESTING)
+          else if (soloCount === 3) entry.fee = 15 - 10; // R5 for 3rd solo (TESTING)
+          else if (soloCount === 4) entry.fee = 20 - 15; // R5 for 4th solo (TESTING)
           else if (soloCount >= 5) entry.fee = 0; // 5th+ solo is FREE
         });
       }
@@ -551,7 +551,7 @@ export default function CompetitionEntryPage() {
     entries.forEach(entry => {
       entry.participantIds.forEach(id => uniqueParticipants.add(id));
     });
-    const registrationFee = uniqueParticipants.size * 300;
+    const registrationFee = uniqueParticipants.size * 5; // TESTING: Changed from 300 to 5
     return { performanceFee, registrationFee, total: performanceFee + registrationFee };
   };
 
@@ -567,66 +567,250 @@ export default function CompetitionEntryPage() {
     return calculateEntryFee(showAddForm, currentForm.participantIds.length);
   };
 
+  // Test payment function - creates a real test entry then initiates R5 payment
+  const handleTestPayment = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      success('Creating test entry and initiating R5 payment...');
+      
+      // Debug logging
+      console.log('🔍 Debug data:', {
+        isStudioMode,
+        studioInfo,
+        contestant,
+        availableDancers,
+        eventId
+      });
+      
+      // Step 1: Get valid participant IDs (dancers)
+      let validParticipantIds: string[] = [];
+      let participantName = 'Test Participant';
+      
+      if (isStudioMode && availableDancers && availableDancers.length > 0) {
+        // Use the first available dancer from the studio
+        const dancer = availableDancers[0];
+        if (dancer && dancer.id) {
+          validParticipantIds = [dancer.id];
+          participantName = dancer.name || 'Studio Dancer';
+          console.log('✅ Using studio dancer:', dancer);
+        } else {
+          throw new Error('Studio dancer data is invalid - missing ID');
+        }
+      } else if (!isStudioMode && contestant?.dancers && contestant.dancers.length > 0) {
+        // Use the first dancer from the contestant
+        const dancer = contestant.dancers[0];
+        if (dancer && dancer.id) {
+          validParticipantIds = [dancer.id];
+          participantName = dancer.name || 'Individual Dancer';
+          console.log('✅ Using contestant dancer:', dancer);
+        } else {
+          throw new Error('Contestant dancer data is invalid - missing ID');
+        }
+      } else if (!isStudioMode && contestant && contestant.id) {
+        // For individual contestants without separate dancer entries, use contestant as participant
+        validParticipantIds = [contestant.id];
+        participantName = contestant.name || 'Individual Contestant';
+        console.log('✅ Using contestant as participant:', contestant);
+      } else {
+        // No valid dancers available
+        console.error('❌ No valid dancers found:', {
+          isStudioMode,
+          availableDancers,
+          contestant,
+          availableDancersCount: availableDancers?.length || 0,
+          contestantDancersCount: contestant?.dancers?.length || 0
+        });
+        throw new Error('No dancers available for test entry. Please ensure you have dancers registered.');
+      }
+      
+      // Step 2: Create a real test entry
+      const testEntryData = {
+        eventId: eventId,
+        contestantId: isStudioMode ? studioInfo?.id : contestant?.id,
+        eodsaId: isStudioMode ? studioInfo?.registrationNumber : contestant?.eodsaId,
+        participantIds: validParticipantIds, // Use actual dancer IDs
+        calculatedFee: 5.00, // R5 test fee
+        itemName: `🧪 TEST ENTRY - ${participantName} - R5 Payment Test`,
+        choreographer: 'Test Choreographer',
+        mastery: 'Water (Competitive)',
+        itemStyle: 'Test Style',
+        estimatedDuration: 2,
+        entryType: 'live' as const,
+        musicFileUrl: null,
+        musicFileName: null,
+        videoExternalUrl: null,
+        videoExternalType: null,
+        performanceType: 'Solo'
+      };
+      
+      console.log('📝 Creating test entry with data:', testEntryData);
+
+      // Create the test entry first
+      const createEntryResponse = await fetch('/api/event-entries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testEntryData),
+      });
+
+      if (!createEntryResponse.ok) {
+        const errorData = await createEntryResponse.json();
+        throw new Error(errorData.error || 'Failed to create test entry');
+      }
+
+      const { eventEntry } = await createEntryResponse.json();
+      success(`Test entry created: ${eventEntry.id}`);
+
+      // Step 2: Initiate payment for the real entry
+      const testPaymentData = {
+        entryId: eventEntry.id, // Use the real entry ID
+        eventId: eventId,
+        userId: isStudioMode ? studioInfo?.id : contestant?.id,
+        userFirstName: isStudioMode ? 'Test Studio' : (contestant?.name?.split(' ')[0] || 'Test'),
+        userLastName: isStudioMode ? 'Payment' : (contestant?.name?.split(' ').slice(1).join(' ') || 'User'),
+        userEmail: isStudioMode ? (studioInfo?.email || 'teststudio@eodsa.test') : (contestant?.email || 'testuser@eodsa.test'),
+        amount: 5.00, // Fixed R5 for testing
+        itemName: 'TEST PAYMENT - Competition Entry',
+        itemDescription: `Test payment for entry: ${eventEntry.itemName}`,
+        isBatchPayment: false // This is now a real entry payment
+      };
+
+      const paymentResponse = await fetch('/api/payments/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testPaymentData),
+      });
+
+      if (paymentResponse.ok) {
+        // Response should be HTML for PayFast redirect
+        const paymentHtml = await paymentResponse.text();
+        
+        // Create a new window/tab with the payment form
+        const paymentWindow = window.open('', '_blank');
+        if (paymentWindow) {
+          paymentWindow.document.write(paymentHtml);
+          paymentWindow.document.close();
+          success('Test entry created and payment initiated! Complete the payment in the new window.');
+        } else {
+          throw new Error('Unable to open payment window. Please check your popup blocker.');
+        }
+      } else {
+        const errorData = await paymentResponse.json();
+        throw new Error(errorData.error || 'Failed to initiate test payment');
+      }
+    } catch (testError: any) {
+      console.error('Test payment error:', testError);
+      error(`Failed to create test entry or initiate payment: ${testError.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleProceedToPayment = async () => {
     if (entries.length === 0 || isSubmitting) return;
 
     setIsSubmitting(true);
 
     try {
-      // Submit all entries to backend using regular event entries API
-      for (const entry of entries) {
-        const eventEntryData = {
-          eventId: eventId, // Use regular event ID
-          contestantId: isStudioMode ? studioInfo?.id : contestant?.id,
-          eodsaId: isStudioMode ? studioInfo?.registrationNumber : contestant?.eodsaId,
-          participantIds: entry.participantIds,
-          calculatedFee: entry.fee,
-          paymentStatus: 'pending',
-          paymentMethod: 'invoice',
-          approved: false,
-          qualifiedForNationals: true, // Mark as qualified for nationals
-          itemName: entry.itemName,
-          choreographer: entry.choreographer,
-          mastery: entry.mastery,
-          itemStyle: entry.itemStyle,
-          estimatedDuration: parseFloat(entry.estimatedDuration.replace(':', '.')) || 2,
-          // PHASE 2: Live vs Virtual Entry Support
-          entryType: entry.entryType,
-          musicFileUrl: entry.musicFileUrl || null,
-          musicFileName: entry.musicFileName || null,
-          videoExternalUrl: entry.videoExternalUrl || null,
-          videoExternalType: entry.videoExternalType || null
-        };
-
-        try {
-          const response = await fetch('/api/event-entries', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(eventEntryData),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Failed to submit ${entry.performanceType} entry: ${errorData.error || 'Unknown error'}`);
-          }
-        } catch (error: any) {
-          console.error(`Error submitting ${entry.performanceType} entry:`, error);
-          error(`Error submitting ${entry.performanceType} entry: ${error.message || 'Unknown error'}`);
-          return;
-        }
-      }
-
-      // Show success message
       const totalFee = calculateTotalFee().total;
+      
+      // For multiple entries, we'll create a batch payment
+      // First, store entry data temporarily and get payment URL
+      const batchEntryData = entries.map(entry => ({
+        eventId: eventId,
+        contestantId: isStudioMode ? studioInfo?.id : contestant?.id,
+        eodsaId: isStudioMode ? studioInfo?.registrationNumber : contestant?.eodsaId,
+        participantIds: entry.participantIds,
+        calculatedFee: entry.fee,
+        itemName: entry.itemName,
+        choreographer: entry.choreographer,
+        mastery: entry.mastery,
+        itemStyle: entry.itemStyle,
+        estimatedDuration: parseFloat(entry.estimatedDuration.replace(':', '.')) || 2,
+        entryType: entry.entryType,
+        musicFileUrl: entry.musicFileUrl || null,
+        musicFileName: entry.musicFileName || null,
+        videoExternalUrl: entry.videoExternalUrl || null,
+        videoExternalType: entry.videoExternalType || null,
+        performanceType: entry.performanceType
+      }));
+
+      // Store entry data in session storage for after payment
+      sessionStorage.setItem('pendingEntries', JSON.stringify(batchEntryData));
+      sessionStorage.setItem('paymentAmount', totalFee.toString());
+      sessionStorage.setItem('paymentEventId', eventId);
+      sessionStorage.setItem('paymentEventName', event?.name || 'Competition Entry');
+
+      // Create payment request
+      const firstEntry = entries[0];
+      const userName = isStudioMode ? 
+        (studioInfo?.name || 'Studio Manager') : 
+        (contestant?.name || 'Contestant');
+      
+      const [firstName, ...lastNameParts] = userName.split(' ');
+      const lastName = lastNameParts.join(' ') || 'User';
+      
+      const userEmail = isStudioMode ? 
+        (studioInfo?.email || 'studio@example.com') : 
+        (contestant?.email || 'contestant@example.com');
+
+      const paymentData = {
+        entryId: 'BATCH_' + Date.now(), // Temporary batch ID
+        eventId: eventId,
+        userId: isStudioMode ? studioInfo?.id : contestant?.id,
+        userFirstName: firstName,
+        userLastName: lastName,
+        userEmail: userEmail,
+        amount: totalFee,
+        itemName: `${entries.length} Competition Entries`,
+        itemDescription: entries.map(e => `${e.performanceType}: ${e.itemName}`).join(', '),
+        isBatchPayment: true // Flag to indicate this is for batch entries
+      };
+
+      console.log('🔄 Redirecting to payment for batch entries:', {
+        entriesCount: entries.length,
+        totalAmount: totalFee,
+        paymentData
+      });
+
+      // Redirect to payment processing
+      const response = await fetch('/api/payments/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentData),
+      });
+
+      if (response.ok) {
+        // Response should be HTML for PayFast redirect
+        const paymentHtml = await response.text();
+        
+        // Create a new window/tab with the payment form
+        const paymentWindow = window.open('', '_self');
+        if (paymentWindow) {
+          paymentWindow.document.write(paymentHtml);
+          paymentWindow.document.close();
+        } else {
+          throw new Error('Unable to open payment window. Please check your popup blocker.');
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate payment');
+      }
       setSubmissionResult({ entries: entries.length, totalFee });
       setShowSuccessModal(true);
       
       // Navigation is now handled by the modal buttons
-    } catch (error: any) {
-      console.error('Error during submission:', error);
-      error(`Error during submission: ${error.message || 'Unknown error'}`);
+    } catch (submitError: any) {
+      console.error('Error during submission:', submitError);
+      error(`Error during submission: ${submitError.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -1240,10 +1424,10 @@ export default function CompetitionEntryPage() {
                      </div>
                      {showAddForm === 'Solo' && previewFee > 0 && (
                        <div className="text-xs text-slate-400 mt-1">
-                         {entries.filter(e => e.performanceType === 'Solo').length === 0 && '1st Solo: R400'}
-                         {entries.filter(e => e.performanceType === 'Solo').length === 1 && '2nd Solo: R350 (Package: R750 total)'}
-                         {entries.filter(e => e.performanceType === 'Solo').length === 2 && '3rd Solo: R250 (Package: R1000 total)'}
-                         {entries.filter(e => e.performanceType === 'Solo').length === 3 && '4th Solo: R200 (Package: R1200 total)'}
+                         {entries.filter(e => e.performanceType === 'Solo').length === 0 && '1st Solo: R5 (TESTING)'}
+                         {entries.filter(e => e.performanceType === 'Solo').length === 1 && '2nd Solo: R5 (Package: R10 total) - TESTING'}
+                         {entries.filter(e => e.performanceType === 'Solo').length === 2 && '3rd Solo: R5 (Package: R15 total) - TESTING'}
+                         {entries.filter(e => e.performanceType === 'Solo').length === 3 && '4th Solo: R5 (Package: R20 total) - TESTING'}
                          {entries.filter(e => e.performanceType === 'Solo').length >= 4 && '5th+ Solo: FREE!'}
                        </div>
                      )}
@@ -1389,7 +1573,7 @@ export default function CompetitionEntryPage() {
                    <span>R{feeCalculation.registrationFee}</span>
                  </div>
                  <div className="text-xs text-slate-400">
-                   ({new Set(entries.flatMap(e => e.participantIds)).size} unique participants × R300)
+                   ({new Set(entries.flatMap(e => e.participantIds)).size} unique participants × R5) - TESTING
                  </div>
                  
                  {/* Preview total with pending entry */}
@@ -1404,32 +1588,61 @@ export default function CompetitionEntryPage() {
                  
                  <div className="border-t border-slate-600 pt-2">
                    <div className="flex justify-between font-semibold text-lg text-emerald-400">
-                     <span>Total:</span>
+                     <span>Competition Total:</span>
                      <span className="transition-all duration-300 transform hover:scale-110">
                        R{feeCalculation.total}
                      </span>
                    </div>
                  </div>
+
+                 {/* PayFast Processing Fee Breakdown */}
+                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 mt-3">
+                   <div className="text-sm text-orange-300 font-medium mb-2">💳 Payment Processing</div>
+                   <div className="flex justify-between text-sm text-slate-300 mb-1">
+                     <span>Subtotal:</span>
+                     <span>R{feeCalculation.total}</span>
+                   </div>
+                   <div className="flex justify-between text-sm text-slate-300 mb-2">
+                     <span>PayFast Processing Fee (3.5%):</span>
+                     <span>R{Math.max(feeCalculation.total * 0.035, 2.00).toFixed(2)}</span>
+                   </div>
+                   <div className="border-t border-orange-500/20 pt-2">
+                     <div className="flex justify-between font-semibold text-white">
+                       <span>Final Payment Amount:</span>
+                       <span className="text-green-400">R{(feeCalculation.total + Math.max(feeCalculation.total * 0.035, 2.00)).toFixed(2)}</span>
+                     </div>
+                   </div>
+                 </div>
                </div>
 
-              <button
-                onClick={handleProceedToPayment}
-                disabled={entries.length === 0 || isSubmitting}
-                className={`w-full py-4 sm:py-3 text-white rounded-lg font-semibold transition-all duration-300 mb-4 sm:mb-0 text-lg sm:text-base min-h-[56px] sm:min-h-auto ${
-                  isSubmitting 
-                    ? 'bg-slate-500 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:bg-slate-500 disabled:cursor-not-allowed'
-                }`}
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Submitting Entries...</span>
-                  </div>
-                ) : (
-                  'Proceed to Payment'
-                )}
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={handleProceedToPayment}
+                  disabled={entries.length === 0 || isSubmitting}
+                  className={`w-full py-4 sm:py-3 text-white rounded-lg font-semibold transition-all duration-300 text-lg sm:text-base min-h-[56px] sm:min-h-auto ${
+                    isSubmitting 
+                      ? 'bg-slate-500 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:bg-slate-500 disabled:cursor-not-allowed'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Submitting Entries...</span>
+                    </div>
+                  ) : (
+                    'Proceed to Payment'
+                  )}
+                </button>
+                
+                <button
+                  onClick={handleTestPayment}
+                  disabled={isSubmitting}
+                  className="w-full py-3 text-white rounded-lg font-semibold transition-all duration-300 text-sm bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 disabled:bg-slate-500 disabled:cursor-not-allowed"
+                >
+                  🧪 Test Payment (R5) - For Testing Only
+                </button>
+              </div>
             </div>
 
             {/* Event Details */}
