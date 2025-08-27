@@ -199,24 +199,24 @@ export default function NationalsEventsPage() {
   const getStartingFee = (performanceType: string) => {
     // Use the Nationals fee structure
     if (performanceType === 'Solo') {
-      return 400; // R400 for 1 solo (plus R300 registration)
+      return 5; // TESTING: R5 for 1 solo (plus R5 registration)
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return 280; // R280 per person (plus R300 registration each)
+      return 280; // R280 per person (plus R5 registration each)
     } else if (performanceType === 'Group') {
-      return 220; // R220 per person for small groups (plus R300 registration each)
+      return 220; // R220 per person for small groups (plus R5 registration each)
     }
     return 0; // Default case
   };
 
   const getFeeExplanation = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE. Plus R300 registration.';
+      return 'Solo packages (TESTING): 1 solo R5, 2 solos R10, 3 solos R15, 4 solos R20, 5th FREE. Plus R5 registration.';
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return 'R280 per person + R300 registration each';
+      return 'R280 per person + R5 registration each';
     } else if (performanceType === 'Group') {
-      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R300 registration each.';
+      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R5 registration each.';
     }
-    return 'Per person + R300 registration each';
+    return 'Per person + R5 registration each';
   };
 
   if (!region || (!eodsaId && !studioId)) {

@@ -110,7 +110,7 @@ export default function AdminDashboard() {
   const [studioApplications, setStudioApplications] = useState<StudioApplication[]>([]);
   const [verificationDancers, setVerificationDancers] = useState<Dancer[]>([]);
   const [verificationStudios, setVerificationStudios] = useState<Studio[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'judges' | 'assignments' | 'dancers' | 'studios' | 'verification' | 'sound-tech'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'judges' | 'assignments' | 'dancers' | 'studios' | 'verification' | 'sound-tech' | 'backstage'>('events');
   const [isLoading, setIsLoading] = useState(true);
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
@@ -147,6 +147,7 @@ export default function AdminDashboard() {
   const [assignmentMessage, setAssignmentMessage] = useState('');
   const [reassigningJudges, setReassigningJudges] = useState<Set<string>>(new Set());
   const [unassigningJudges, setUnassigningJudges] = useState<Set<string>>(new Set());
+  const [deletingEvents, setDeletingEvents] = useState<Set<string>>(new Set());
 
   // Database cleaning state
   const [isCleaningDatabase, setIsCleaningDatabase] = useState(false);
@@ -296,6 +297,107 @@ export default function AdminDashboard() {
       setCreateEventMessage('Error creating event. Please check your connection and try again.');
     } finally {
       setIsCreatingEvent(false);
+    }
+  };
+
+  const handleDeleteEvent = (eventId: string, eventName: string) => {
+    if (deletingEvents.has(eventId)) return;
+
+    // Show confirmation dialog
+    showConfirm(
+      `Are you sure you want to delete "${eventName}"? This action cannot be undone. All entries, payments, and related data will be permanently deleted.`,
+      () => {
+        // User confirmed - proceed with deletion
+        performDeleteEvent(eventId, eventName);
+      },
+      () => {
+        // User cancelled - do nothing
+        console.log('Event deletion cancelled by user');
+      }
+    );
+  };
+
+  const performDeleteEvent = async (eventId: string, eventName: string) => {
+    setDeletingEvents(prev => new Set(prev).add(eventId));
+
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        error('Session expired. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`/api/events/${eventId}/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmed: true
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        success(`Event "${eventName}" deleted successfully`);
+        
+        // Remove event from local state
+        setEvents(prev => prev.filter(event => event.id !== eventId));
+        
+        // Also refresh data to be sure
+        fetchData();
+      } else {
+        if (data.details?.requiresConfirmation) {
+          // Show additional confirmation for events with entries/payments
+          showConfirm(
+            `"${eventName}" has ${data.details.entryCount} entries and ${data.details.paymentCount} payments. Are you absolutely sure you want to delete this event and ALL associated data?`,
+            async () => {
+              // User confirmed force deletion
+              try {
+                const forceResponse = await fetch(`/api/events/${eventId}/delete`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    confirmed: true,
+                    force: true
+                  }),
+                });
+
+                const forceData = await forceResponse.json();
+                
+                if (forceData.success) {
+                  success(`Event "${eventName}" and all associated data deleted successfully`);
+                  setEvents(prev => prev.filter(event => event.id !== eventId));
+                  fetchData();
+                } else {
+                  error(`Failed to delete event: ${forceData.error}`);
+                }
+              } catch (err) {
+                console.error('Error force deleting event:', err);
+                error('Failed to delete event. Please try again.');
+              }
+            },
+            () => {
+              // User cancelled force deletion
+              console.log('Force deletion cancelled by user');
+            }
+          );
+        } else {
+          error(`Failed to delete event: ${data.error}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting event:', err);
+      error('Failed to delete event. Please try again.');
+    } finally {
+      setDeletingEvents(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(eventId);
+        return newSet;
+      });
     }
   };
 
@@ -781,39 +883,20 @@ export default function AdminDashboard() {
     setLoadingFinances(true);
     
     try {
-      // Fetch comprehensive financial data including group entries
+      // Fetch event entries for this dancer to calculate outstanding balances
       const response = await fetch(`/api/admin/dancers/${dancer.eodsaId}/finances`);
       if (response.ok) {
         const data = await response.json();
         setSelectedDancerFinances({
           ...dancer,
-          // New API structure
-          financial: data.financial,
-          entries: data.entries,
-          // Legacy support for existing modal code
-          eventEntries: data.entries.all || [],
-          totalOutstanding: data.financial.totalOutstanding || 0,
-          registrationFeeAmount: data.financial.registrationFeeAmount || 0
+          eventEntries: data.eventEntries || [],
+          totalOutstanding: data.totalOutstanding || 0,
+          registrationFeeAmount: data.registrationFeeAmount || 0
         });
       } else {
-        // Fallback to basic info
+        // If API doesn't exist yet, just show basic info
         setSelectedDancerFinances({
           ...dancer,
-          financial: {
-            registrationFeeAmount: 0,
-            registrationFeeOutstanding: 0,
-            totalEntryOutstanding: 0,
-            totalOutstanding: 0,
-            totalPaid: 0
-          },
-          entries: {
-            all: [],
-            solo: [],
-            group: [],
-            totalEntries: 0,
-            soloCount: 0,
-            groupCount: 0
-          },
           eventEntries: [],
           totalOutstanding: 0,
           registrationFeeAmount: 0
@@ -824,21 +907,6 @@ export default function AdminDashboard() {
       // Fallback to basic info
       setSelectedDancerFinances({
         ...dancer,
-        financial: {
-          registrationFeeAmount: 0,
-          registrationFeeOutstanding: 0,
-          totalEntryOutstanding: 0,
-          totalOutstanding: 0,
-          totalPaid: 0
-        },
-        entries: {
-          all: [],
-          solo: [],
-          group: [],
-          totalEntries: 0,
-          soloCount: 0,
-          groupCount: 0
-        },
         eventEntries: [],
         totalOutstanding: 0,
         registrationFeeAmount: 0
@@ -1222,7 +1290,8 @@ export default function AdminDashboard() {
               { id: 'dancers', label: 'Dancers', icon: '💃', color: 'rose' },
               { id: 'studios', label: 'Studios', icon: '🏢', color: 'orange' },
               { id: 'verification', label: 'Pending Verification', icon: '🔍', color: 'emerald' },
-              { id: 'sound-tech', label: 'Sound Tech', icon: '🎵', color: 'blue' }
+              { id: 'sound-tech', label: 'Sound Tech', icon: '🎵', color: 'blue' },
+              { id: 'backstage', label: 'Backstage Control', icon: '🎭', color: 'violet' }
             ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1354,7 +1423,7 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4">
-                <div className="flex items-center">
+                <div className="flex items-center space-x-2">
                               <Link
                                 href={`/admin/events/${event.id}`}
                                 className="text-indigo-500 hover:text-indigo-700 text-xs sm:text-sm font-medium"
@@ -1362,6 +1431,29 @@ export default function AdminDashboard() {
                                 <span className="hidden sm:inline">View Participants</span>
                                 <span className="sm:hidden">View</span>
                               </Link>
+                              
+                              <button
+                                onClick={() => handleDeleteEvent(event.id, event.name)}
+                                disabled={deletingEvents.has(event.id)}
+                                className={`text-xs sm:text-sm font-medium transition-colors ${
+                                  deletingEvents.has(event.id)
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-red-500 hover:text-red-700'
+                                }`}
+                                title={`Delete ${event.name}`}
+                              >
+                                {deletingEvents.has(event.id) ? (
+                                  <>
+                                    <span className="hidden sm:inline">Deleting...</span>
+                                    <span className="sm:hidden">⏳</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="hidden sm:inline">Delete</span>
+                                    <span className="sm:hidden">🗑️</span>
+                                  </>
+                                )}
+                              </button>
                   </div>
                           </td>
                         </tr>
@@ -2260,6 +2352,123 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Backstage Control Tab */}
+        {activeTab === 'backstage' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-violet-100">
+              <div className="px-6 py-4 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-b border-violet-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">🎭</span>
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900">Backstage Control Center</h2>
+                  </div>
+                  <button
+                    onClick={() => window.open('/admin/backstage', '_blank')}
+                    className="px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg hover:from-violet-600 hover:to-purple-700 transition-all duration-200 font-medium"
+                  >
+                    Open Backstage Control
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <span className="text-green-600 text-lg">🎯</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Live Event Control</p>
+                        <p className="text-2xl font-bold text-gray-900">Real-Time</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <span className="text-blue-600 text-lg">🔄</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Drag & Drop Reordering</p>
+                        <p className="text-2xl font-bold text-gray-900">Active</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <span className="text-purple-600 text-lg">⚡</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Instant Sync</p>
+                        <p className="text-2xl font-bold text-gray-900">Enabled</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-violet-50 border border-violet-200 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-violet-900 mb-3 flex items-center">
+                    <span className="mr-2">🎭</span>
+                    Backstage Features
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Select events to manage</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Drag and drop to reorder performances</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Real-time status updates</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Event control (start/pause/reset)</span>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Live sync across all dashboards</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Performance status tracking</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Item number management</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className="text-sm text-violet-800">Mobile responsive interface</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 bg-white/70 rounded-lg p-4">
+                    <p className="text-sm text-violet-700 leading-relaxed">
+                      <strong>For Event Managers:</strong> Control the entire live event flow from one interface. 
+                      Reorder performances with drag-and-drop, track status in real-time, and ensure seamless coordination 
+                      across all teams (judges, sound tech, registration, announcer).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Modal Components */}
@@ -2827,45 +3036,23 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Enhanced Balance Overview */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                  {/* Event Entries Section */}
+                  <div className="bg-gray-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                      <span className="mr-2">💰</span>
-                      Financial Summary
+                      <span className="mr-2">🎭</span>
+                      Event Entries
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white rounded-lg p-3">
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Paid</div>
-                        <div className="text-lg font-bold text-green-600">
-                          R{selectedDancerFinances.financial?.totalPaid?.toFixed(2) || '0.00'}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg p-3">
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</div>
-                        <div className="text-lg font-bold text-red-600">
-                          R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Solo Entries Section */}
-                  {selectedDancerFinances.entries?.soloCount > 0 && (
-                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                        <span className="mr-2">🕺</span>
-                        Solo Entries ({selectedDancerFinances.entries.soloCount})
-                      </h3>
+                    
+                    {selectedDancerFinances.eventEntries && selectedDancerFinances.eventEntries.length > 0 ? (
                       <div className="space-y-3">
-                        {selectedDancerFinances.entries.solo.map((entry: any, index: number) => (
+                        {selectedDancerFinances.eventEntries.map((entry: any, index: number) => (
                           <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
                             <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="text-sm font-bold text-gray-900">{entry.itemName}</div>
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{entry.itemName}</div>
                                 <div className="text-xs text-gray-500">{entry.eventName}</div>
-                                <div className="text-xs text-purple-600 font-medium mt-1">Solo Performance</div>
                               </div>
-                              <div className="text-right ml-4">
+                              <div className="text-right">
                                 <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee?.toFixed(2) || '0.00'}</div>
                                 <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
                                   entry.paymentStatus === 'paid' 
@@ -2879,154 +3066,42 @@ export default function AdminDashboard() {
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Group Entries Section */}
-                  {selectedDancerFinances.entries?.groupCount > 0 && (
-                    <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                        <span className="mr-2">👥</span>
-                        Group Entries ({selectedDancerFinances.entries.groupCount})
-                      </h3>
-                      <div className="space-y-4">
-                        {selectedDancerFinances.entries.group.map((entry: any, index: number) => (
-                          <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex-1">
-                                <div className="text-sm font-bold text-gray-900">{entry.itemName}</div>
-                                <div className="text-xs text-gray-500">{entry.eventName}</div>
-                                <div className="flex items-center space-x-2 mt-1">
-                                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                                    entry.participationRole === 'duet' ? 'bg-blue-100 text-blue-800' :
-                                    entry.participationRole === 'trio' ? 'bg-green-100 text-green-800' :
-                                    'bg-orange-100 text-orange-800'
-                                  }`}>
-                                    {entry.participationRole.toUpperCase()}
-                                  </span>
-                                  {entry.isMainContestant && (
-                                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                                      MAIN CONTESTANT
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-right ml-4">
-                                <div className="text-xs text-gray-500 mb-1">
-                                  {entry.isMainContestant ? 'Full Fee' : 'Your Share'}
-                                </div>
-                                <div className="text-sm font-bold text-gray-900">
-                                  R{entry.dancerShare?.toFixed(2) || '0.00'}
-                                </div>
-                                {!entry.isMainContestant && (
-                                  <div className="text-xs text-gray-400">
-                                    of R{entry.calculatedFee?.toFixed(2) || '0.00'}
-                                  </div>
-                                )}
-                                <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full mt-1 ${
-                                  entry.paymentStatus === 'paid' 
-                                    ? 'bg-green-100 text-green-800 border border-green-200'
-                                    : 'bg-red-100 text-red-800 border border-red-200'
-                                }`}>
-                                  {entry.paymentStatus?.toUpperCase() || 'PENDING'}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {/* Group Members List */}
-                            <div className="border-t border-gray-100 pt-3">
-                              <div className="text-xs font-medium text-gray-600 mb-2">Group Members:</div>
-                              <div className="flex flex-wrap gap-1">
-                                {entry.participantNames?.map((name: string, nameIndex: number) => (
-                                  <span key={nameIndex} className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                                    name === selectedDancerFinances.name 
-                                      ? 'bg-blue-100 text-blue-800 font-medium border border-blue-200' 
-                                      : 'bg-gray-100 text-gray-700'
-                                  }`}>
-                                    {name === selectedDancerFinances.name ? `${name} (You)` : name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                    ) : (
+                      <div className="text-center py-4">
+                        <div className="text-gray-400 text-3xl mb-2">🎭</div>
+                        <p className="text-gray-600 text-sm">No event entries found</p>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {/* No Entries State */}
-                  {(!selectedDancerFinances.entries?.totalEntries || selectedDancerFinances.entries.totalEntries === 0) && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-center py-6">
-                        <div className="text-gray-400 text-4xl mb-3">🎭</div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Event Entries</h3>
-                        <p className="text-gray-600 text-sm">This dancer hasn't registered for any competitions yet.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Detailed Outstanding Breakdown */}
+                  {/* Total Outstanding Section */}
                   <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                       <span className="mr-2">⚠️</span>
-                      Outstanding Balance Breakdown
+                      Total Outstanding Balance
                     </h3>
-                    <div className="space-y-3">
-                      {/* Registration Fee */}
+                    <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Registration Fee:</span>
                         <span className="text-sm font-medium text-red-600">
-                          R{selectedDancerFinances.financial?.registrationFeeOutstanding?.toFixed(2) || '0.00'}
+                          {selectedDancerFinances.registrationFeePaid ? 'R0.00' : `R${EODSA_FEES.REGISTRATION.Nationals.toFixed(2)}`}
                         </span>
                       </div>
-                      
-                      {/* Entry Fees Breakdown */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Solo Entries Outstanding:</span>
-                          <span className="text-sm font-medium text-red-600">
-                            R{(selectedDancerFinances.entries?.solo?.filter((e: any) => e.paymentStatus !== 'paid')
-                              .reduce((sum: number, entry: any) => sum + (entry.calculatedFee || 0), 0) || 0).toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Group Entries Outstanding:</span>
-                          <span className="text-sm font-medium text-red-600">
-                            R{(selectedDancerFinances.entries?.group?.filter((e: any) => e.paymentStatus !== 'paid')
-                              .reduce((sum: number, entry: any) => sum + (entry.dancerShare || 0), 0) || 0).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Total */}
-                      <div className="flex justify-between items-center pt-3 border-t border-red-200">
-                        <span className="text-base font-bold text-gray-900">TOTAL OUTSTANDING:</span>
-                        <span className="text-xl font-bold text-red-600">
-                          R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Event Entries Outstanding:</span>
+                        <span className="text-sm font-medium text-red-600">
+                          R{selectedDancerFinances.totalOutstanding?.toFixed(2) || '0.00'}
                         </span>
                       </div>
-                      
-                      {/* Payment Progress */}
-                      {selectedDancerFinances.entries?.totalEntries > 0 && (
-                        <div className="pt-3 border-t border-red-200">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-medium text-gray-600">Payment Progress:</span>
-                            <span className="text-xs text-gray-500">
-                              {selectedDancerFinances.entries.all?.filter((e: any) => e.paymentStatus === 'paid').length || 0} of {selectedDancerFinances.entries.totalEntries} entries paid
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-green-500 h-2 rounded-full transition-all duration-300" 
-                              style={{
-                                width: `${selectedDancerFinances.entries.totalEntries > 0 
-                                  ? ((selectedDancerFinances.entries.all?.filter((e: any) => e.paymentStatus === 'paid').length || 0) / selectedDancerFinances.entries.totalEntries) * 100 
-                                  : 0}%`
-                              }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center pt-2 border-t border-red-200">
+                        <span className="text-base font-semibold text-gray-900">TOTAL OUTSTANDING:</span>
+                        <span className="text-lg font-bold text-red-600">
+                          R{(
+                            (selectedDancerFinances.registrationFeePaid ? 0 : EODSA_FEES.REGISTRATION.Nationals) + 
+                            (selectedDancerFinances.totalOutstanding || 0)
+                          ).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
