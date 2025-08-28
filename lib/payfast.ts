@@ -6,17 +6,28 @@ import { v4 as uuidv4 } from 'uuid';
 
 // PayFast configuration from environment
 export const PAYFAST_CONFIG = {
-  merchantId: process.env.PAYFAST_MERCHANT_ID!,
-  merchantKey: process.env.PAYFAST_MERCHANT_KEY!,
-  passphrase: process.env.PAYFAST_PASSPHRASE!,
+  merchantId: process.env.PAYFAST_MERCHANT_ID || '10000100',
+  merchantKey: process.env.PAYFAST_MERCHANT_KEY || '46f0cd694581a',
+  passphrase: process.env.PAYFAST_PASSPHRASE || 'jt7NOE43FZPn',
   sandbox: process.env.PAYFAST_SANDBOX === 'true',
   url: process.env.PAYFAST_SANDBOX === 'true' 
     ? 'https://sandbox.payfast.co.za/eng/process'
     : 'https://www.payfast.co.za/eng/process',
-  returnUrl: process.env.PAYFAST_RETURN_URL!,
-  cancelUrl: process.env.PAYFAST_CANCEL_URL!,
-  notifyUrl: process.env.PAYFAST_NOTIFY_URL!,
+  returnUrl: process.env.PAYFAST_RETURN_URL || 'https://www.avalondance.co.za/payment/success',
+  cancelUrl: process.env.PAYFAST_CANCEL_URL || 'https://www.avalondance.co.za/payment/cancelled',
+  notifyUrl: process.env.PAYFAST_NOTIFY_URL || 'https://www.avalondance.co.za/api/payments/payfast/webhook',
 };
+
+// Validate PayFast configuration
+if (!process.env.PAYFAST_MERCHANT_ID) {
+  console.warn('⚠️ PAYFAST_MERCHANT_ID not set, using sandbox default');
+}
+if (!process.env.PAYFAST_MERCHANT_KEY) {
+  console.warn('⚠️ PAYFAST_MERCHANT_KEY not set, using sandbox default');
+}
+if (!process.env.PAYFAST_RETURN_URL) {
+  console.warn('⚠️ PAYFAST_RETURN_URL not set, using default');
+}
 
 export interface PaymentData {
   merchant_id: string;

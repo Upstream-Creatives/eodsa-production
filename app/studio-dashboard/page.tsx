@@ -163,6 +163,19 @@ export default function StudioDashboardPage() {
   
   const router = useRouter();
 
+  // Calculate age properly accounting for birthday
+  const calculateAge = (dateOfBirth: string): number => {
+    if (!dateOfBirth) return 0;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
   useEffect(() => {
     // Check for studio session
     const session = localStorage.getItem('studioSession');
@@ -284,7 +297,7 @@ export default function StudioDashboardPage() {
     }
 
     // Calculate age to check requirements
-    const age = new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear();
+    const age = calculateAge(registerDancerData.dateOfBirth);
     
     // Check email and phone requirements for adults
     if (age >= 18) {
@@ -1643,7 +1656,7 @@ export default function StudioDashboardPage() {
               </div>
               
               <div>
-                <label className="block text-gray-300 text-sm font-medium mb-1">Email {new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() >= 18 && '*'}</label>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Email {calculateAge(registerDancerData.dateOfBirth) >= 18 && '*'}</label>
                 <input
                   type="email"
                   value={registerDancerData.email}
@@ -1653,7 +1666,7 @@ export default function StudioDashboardPage() {
               </div>
               
               <div>
-                <label className="block text-gray-300 text-sm font-medium mb-1">Phone {new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() >= 18 && '*'}</label>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Phone {calculateAge(registerDancerData.dateOfBirth) >= 18 && '*'}</label>
                 <input
                   type="tel"
                   value={registerDancerData.phone}
@@ -1664,7 +1677,7 @@ export default function StudioDashboardPage() {
                 />
               </div>
               
-              {registerDancerData.dateOfBirth && new Date().getFullYear() - new Date(registerDancerData.dateOfBirth).getFullYear() < 18 && (
+              {registerDancerData.dateOfBirth && calculateAge(registerDancerData.dateOfBirth) < 18 && (
                 <>
                   <div className="border-t border-gray-700 pt-4">
                     <h4 className="text-lg font-semibold text-white mb-2">Guardian Information (Required for minors)</h4>
