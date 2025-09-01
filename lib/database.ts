@@ -679,6 +679,16 @@ export const db = {
     return true;
   },
 
+  async updatePerformanceStatus(performanceId: string, status: string) {
+    const sqlClient = getSql();
+    await sqlClient`
+      UPDATE performances 
+      SET status = ${status}
+      WHERE id = ${performanceId}
+    `;
+    return true;
+  },
+
   // Rankings and Tabulation
   async calculateNationalsRankings(eventIds?: string[]) {
     const sqlClient = getSql();
