@@ -6,11 +6,12 @@
 import React, { useState, useEffect } from 'react';
 import { useJudgeSocket } from '@/hooks/useSocket';
 import RealtimeUpdates from '@/components/RealtimeUpdates';
+import { Performance } from '@/lib/types';
 
 // ... other imports and interfaces ...
 
 export default function JudgeDashboardWithRealtime() {
-  const [performances, setPerformances] = useState([]);
+  const [performances, setPerformances] = useState<Performance[]>([]);
   const [currentEventId, setCurrentEventId] = useState('');
   const [judgeId, setJudgeId] = useState('');
   
@@ -18,7 +19,7 @@ export default function JudgeDashboardWithRealtime() {
   const socket = useJudgeSocket(currentEventId, judgeId);
 
   // Handle real-time performance reordering
-  const handlePerformanceReorder = (reorderedPerformances: any[]) => {
+  const handlePerformanceReorder = (reorderedPerformances: Array<{id: string; itemNumber: number}>) => {
     setPerformances(prev => {
       // Update the order based on new item numbers
       const updated = [...prev];

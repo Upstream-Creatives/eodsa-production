@@ -72,7 +72,7 @@ class SocketClient {
     }
     
     this.eventListeners.get(event)!.push(callback);
-    this.socket?.on(event, callback);
+    this.socket?.on(event as any, callback as any);
   }
 
   // Remove event listeners
@@ -81,7 +81,7 @@ class SocketClient {
     callback?: (data: SocketEvents[T]) => void
   ) {
     if (callback) {
-      this.socket?.off(event, callback);
+      this.socket?.off(event as any, callback as any);
       
       const listeners = this.eventListeners.get(event) || [];
       const index = listeners.indexOf(callback);
@@ -89,7 +89,7 @@ class SocketClient {
         listeners.splice(index, 1);
       }
     } else {
-      this.socket?.off(event);
+      this.socket?.off(event as any);
       this.eventListeners.delete(event);
     }
   }
