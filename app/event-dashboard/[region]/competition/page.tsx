@@ -63,6 +63,8 @@ interface PerformanceEntry {
   entryType: 'live' | 'virtual';
   musicFileUrl?: string;
   musicFileName?: string;
+  videoFileUrl?: string;
+  videoFileName?: string;
   videoExternalUrl?: string;
   videoExternalType?: 'youtube' | 'vimeo' | 'other';
 }
@@ -607,10 +609,12 @@ export default function CompetitionEntryPage() {
         itemStyle: entry.itemStyle,
         estimatedDuration: parseFloat(entry.estimatedDuration.replace(':', '.')) || 2,
         entryType: entry.entryType,
-        musicFileUrl: entry.musicFileUrl || undefined,
-        musicFileName: entry.musicFileName || undefined,
-        videoExternalUrl: entry.videoExternalUrl || undefined,
-        videoExternalType: entry.videoExternalType || undefined,
+        musicFileUrl: entry.musicFileUrl || null,
+        musicFileName: entry.musicFileName || null,
+        videoFileUrl: entry.videoFileUrl || null,
+        videoFileName: entry.videoFileName || null,
+        videoExternalUrl: entry.videoExternalUrl || null,
+        videoExternalType: entry.videoExternalType || null,
         performanceType: entry.performanceType
       }));
 
@@ -712,10 +716,12 @@ export default function CompetitionEntryPage() {
         itemStyle: entry.itemStyle,
         estimatedDuration: parseFloat(entry.estimatedDuration.replace(':', '.')) || 2,
         entryType: entry.entryType,
-        musicFileUrl: entry.musicFileUrl || undefined,
-        musicFileName: entry.musicFileName || undefined,
-        videoExternalUrl: entry.videoExternalUrl || undefined,
-        videoExternalType: entry.videoExternalType || undefined,
+        musicFileUrl: entry.musicFileUrl || null,
+        musicFileName: entry.musicFileName || null,
+        videoFileUrl: entry.videoFileUrl || null,
+        videoFileName: entry.videoFileName || null,
+        videoExternalUrl: entry.videoExternalUrl || null,
+        videoExternalType: entry.videoExternalType || null,
         performanceType: entry.performanceType
       }));
 
