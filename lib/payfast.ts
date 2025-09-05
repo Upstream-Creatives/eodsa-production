@@ -70,18 +70,16 @@ export interface PayFastWebhookData {
 
 /**
  * Generates PayFast signature for payment data
- * EXACTLY as shown in PayFast main documentation - EXCLUDES empty values
+ * INCLUDES empty values - PayFast actual behavior (not what docs say!)
  */
 export function generatePayFastSignature(data: Record<string, string | undefined>): string {
-  // Create parameter string - EXACTLY as PayFast docs show
+  // Create parameter string - INCLUDE empty values (PayFast actual behavior)
   let pfOutput = "";
   for (let key in data) {
-    if (data.hasOwnProperty(key)) {
+    if (data.hasOwnProperty(key) && key !== 'signature') {
       const value = data[key];
-      // EXCLUDE empty values - exactly as docs: if (data[key] !== "")
-      if (value !== "" && key !== 'signature') {
-        pfOutput += `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, "+")}&`;
-      }
+      // INCLUDE empty values - PayFast actual behavior despite docs
+      pfOutput += `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, "+")}&`;
     }
   }
 
