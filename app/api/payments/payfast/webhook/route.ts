@@ -175,8 +175,7 @@ export async function POST(request: NextRequest) {
       await sql`
         UPDATE event_entries SET
           payment_status = ${entryPaymentStatus},
-          approved = true,
-          approved_at = CURRENT_TIMESTAMP
+          approved = true
         WHERE payment_id = ${webhookData.m_payment_id}
       `;
     } else {
