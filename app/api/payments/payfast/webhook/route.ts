@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
         signature = ${webhookData.signature},
         raw_response = ${JSON.stringify(webhookData)},
         updated_at = CURRENT_TIMESTAMP,
-        paid_at = ${updatedStatus === 'completed' ? 'CURRENT_TIMESTAMP' : null}
+        paid_at = ${updatedStatus === 'completed' ? new Date() : null}
       WHERE payment_id = ${webhookData.m_payment_id}
     `;
 
