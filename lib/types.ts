@@ -123,7 +123,7 @@ export interface Performance {
   duration: number; // in minutes (maps to estimatedDuration)
   itemNumber?: number; // NEW: Item Number for program order
   scheduledTime?: string;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'ready' | 'hold' | 'in_progress' | 'completed' | 'cancelled';
   withdrawnFromJudging?: boolean; // NEW: Admin can withdraw items from judging
   // EODSA Nationals Entry Form fields
   choreographer: string;
@@ -137,6 +137,7 @@ export interface Judge {
   email: string;
   password: string; // hashed
   isAdmin: boolean;
+  role: 'judge' | 'admin' | 'backstage_manager' | 'announcer' | 'registration' | 'media';
   specialization?: string[];
   createdAt: string;
 }
@@ -189,6 +190,29 @@ export interface Ranking {
   averageScore: number;
   rank: number;
   calculatedAt: string;
+}
+
+// NEW: Performance presence status
+export interface PerformancePresence {
+  id: string;
+  performanceId: string;
+  eventId: string;
+  present: boolean;
+  checkedInBy: string; // user ID who checked them in
+  checkedInAt: string;
+}
+
+// NEW: Score approval system
+export interface ScoreApproval {
+  id: string;
+  performanceId: string;
+  judgeId: string;
+  scoreId: string;
+  approvedBy?: string; // admin ID who approved
+  approvedAt?: string;
+  rejected?: boolean;
+  rejectionReason?: string;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 // UPDATED: Age categories to match EODSA requirements exactly

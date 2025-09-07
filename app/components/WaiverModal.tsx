@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface WaiverModalProps {
   isOpen: boolean;
@@ -25,6 +25,20 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
 
   const signatureInputRef = useRef<HTMLInputElement>(null);
   const idInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle keyboard shortcuts for modal closing
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -202,19 +216,33 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-white">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
+      }}
+    >
+      <div className="bg-gray-800 rounded-lg sm:rounded-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Fixed */}
+        <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
+          <h3 className="text-lg sm:text-xl font-bold text-white truncate pr-4">
             Parent/Guardian Waiver Required
           </h3>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-white"
+            className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Close modal"
           >
-            ✕
+            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
+        
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
         <div className="mb-6">
           <div className="bg-yellow-900 border border-yellow-600 text-yellow-100 p-4 rounded-lg mb-4">
@@ -230,26 +258,27 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
           </div>
 
           {/* Progress Steps */}
-          <div className="flex items-center justify-center mb-6">
+          <div className="flex items-center justify-center mb-4 sm:mb-6 px-2">
             <div className={`flex items-center ${step >= 1 ? 'text-green-400' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 1 ? 'border-green-400 bg-green-400 text-black' : 'border-gray-400'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${step >= 1 ? 'border-green-400 bg-green-400 text-black' : 'border-gray-400'}`}>
                 1
               </div>
-              <span className="ml-2 text-sm">Parent Info</span>
+              <span className="ml-1 sm:ml-2 text-xs sm:text-sm hidden sm:inline">Parent Info</span>
+              <span className="ml-1 sm:ml-2 text-xs sm:text-sm sm:hidden">Info</span>
             </div>
-            <div className="mx-4 h-px w-8 bg-gray-600"></div>
+            <div className="mx-2 sm:mx-4 h-px w-4 sm:w-8 bg-gray-600"></div>
             <div className={`flex items-center ${step >= 2 ? 'text-green-400' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 2 ? 'border-green-400 bg-green-400 text-black' : 'border-gray-400'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${step >= 2 ? 'border-green-400 bg-green-400 text-black' : 'border-gray-400'}`}>
                 2
               </div>
-              <span className="ml-2 text-sm">Documents</span>
+              <span className="ml-1 sm:ml-2 text-xs sm:text-sm">Documents</span>
             </div>
-            <div className="mx-4 h-px w-8 bg-gray-600"></div>
+            <div className="mx-2 sm:mx-4 h-px w-4 sm:w-8 bg-gray-600"></div>
             <div className={`flex items-center ${step >= 3 ? 'text-green-400' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 3 ? 'border-green-400 bg-green-400 text-black' : 'border-gray-400'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${step >= 3 ? 'border-green-400 bg-green-400 text-black' : 'border-gray-400'}`}>
                 3
               </div>
-              <span className="ml-2 text-sm">Review</span>
+              <span className="ml-1 sm:ml-2 text-xs sm:text-sm">Review</span>
             </div>
           </div>
         </div>
@@ -432,22 +461,22 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between mt-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between gap-3 sm:gap-0 mt-4 sm:mt-6 pt-4 border-t border-gray-700 bg-gray-800 sticky bottom-0">
           <div>
             {step > 1 && (
               <button
                 onClick={prevStep}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
               >
                 Previous
               </button>
             )}
           </div>
           
-          <div className="space-x-2">
+          <div className="flex gap-2 sm:space-x-2">
             <button
               onClick={handleClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="flex-1 sm:flex-none px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
               Cancel
             </button>
@@ -455,7 +484,7 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
             {step < 3 ? (
               <button
                 onClick={nextStep}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
               >
                 Next
               </button>
@@ -463,12 +492,13 @@ export default function WaiverModal({ isOpen, onClose, dancerId, dancerName, onW
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 sm:flex-none px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Waiver'}
               </button>
             )}
           </div>
+        </div>
         </div>
       </div>
     </div>

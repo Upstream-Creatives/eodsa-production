@@ -647,7 +647,8 @@ export default function CompetitionEntryPage() {
         amount: totalFee,
         itemName: `${entries.length} Competition Entries`,
         itemDescription: entries.map(e => `${e.performanceType}: ${e.itemName}`).join(', '),
-        isBatchPayment: true // Flag to indicate this is for batch entries
+        isBatchPayment: true, // Flag to indicate this is for batch entries
+        pendingEntries: batchEntryData // Include entry data for webhook auto-creation
       };
 
       console.log('🔄 Redirecting to payment for batch entries:', {

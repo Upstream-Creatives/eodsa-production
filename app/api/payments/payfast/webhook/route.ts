@@ -3,7 +3,8 @@
 // Handles PayFast payment notifications (ITN - Instant Transaction Notification)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyPayFastSignature, validatePayFastHost, PayFastWebhookData } from '@/lib/payfast';
+import { validatePayFastHost, PayFastWebhookData, PAYFAST_CONFIG } from '@/lib/payfast';
+import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -21,6 +22,29 @@ export async function POST(request: NextRequest) {
     if (!await validatePayFastHost(clientIP)) {
       console.warn(`⚠️ Invalid PayFast host: ${clientIP}`);
       return NextResponse.json({ error: 'Invalid host' }, { status: 403 });
+    }
+
+    // Compute signature from RAW body to preserve exact param order and encoding
+    const rawClone = request.clone();
+    const rawBody = await rawClone.text();
+
+    // Extract received signature and rebuild the parameter string WITHOUT the signature
+    const receivedSignature = (new URLSearchParams(rawBody)).get('signature') || '';
+    const pfParamString = rawBody
+      .split('&')
+      .filter(pair => !pair.toLowerCase().startsWith('signature='))
+      .join('&');
+
+    // Append passphrase if configured
+    const stringToHash = PAYFAST_CONFIG.passphrase
+      ? `${pfParamString}&passphrase=${encodeURIComponent(PAYFAST_CONFIG.passphrase.trim()).replace(/%20/g, '+')}`
+      : pfParamString;
+    const calculatedSignature = crypto.createHash('md5').update(stringToHash).digest('hex');
+
+    // Early reject if signature doesn't match
+    if (calculatedSignature !== receivedSignature) {
+      console.error('❌ Invalid PayFast signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
     }
 
     // Parse form data from PayFast
@@ -99,22 +123,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Verify PayFast signature
-    if (!verifyPayFastSignature(webhookData as PayFastWebhookData)) {
-      console.error('❌ Invalid PayFast signature');
-      
-      // Log failed verification attempt
-      await sql`
-        INSERT INTO payment_logs (payment_id, event_type, event_data, ip_address, user_agent)
-        VALUES (
-          ${webhookData.m_payment_id}, 'verification_failed',
-          ${JSON.stringify({ error: 'Invalid signature', webhookData })},
-          ${clientIP}, ${request.headers.get('user-agent') || 'unknown'}
-        )
-      `;
-      
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
-    }
+    // Signature already validated using raw body above
 
     // Find the payment record
     const [payment] = await sql`
@@ -152,7 +161,7 @@ export async function POST(request: NextRequest) {
         signature = ${webhookData.signature},
         raw_response = ${JSON.stringify(webhookData)},
         updated_at = CURRENT_TIMESTAMP,
-        paid_at = ${updatedStatus === 'completed' ? 'CURRENT_TIMESTAMP' : null}
+        paid_at = ${updatedStatus === 'completed' ? new Date() : null}
       WHERE payment_id = ${webhookData.m_payment_id}
     `;
 
@@ -166,8 +175,7 @@ export async function POST(request: NextRequest) {
       await sql`
         UPDATE event_entries SET
           payment_status = ${entryPaymentStatus},
-          approved = true,
-          approved_at = CURRENT_TIMESTAMP
+          approved = true
         WHERE payment_id = ${webhookData.m_payment_id}
       `;
     } else {
@@ -198,7 +206,116 @@ export async function POST(request: NextRequest) {
       console.log(`✅ Payment completed: ${webhookData.m_payment_id}`);
       console.log(`🎯 Auto-approving entries for payment: ${webhookData.m_payment_id}`);
       
-      // You can add additional logic here:
+      // Check if this is a batch payment with pending entries that need to be created
+      const pendingEntries = await sql`
+        SELECT pending_entries_data FROM payments 
+        WHERE payment_id = ${webhookData.m_payment_id} 
+        AND pending_entries_data IS NOT NULL
+      `;
+
+      if (pendingEntries.length > 0 && pendingEntries[0].pending_entries_data) {
+        console.log(`🔄 Creating entries automatically for batch payment: ${webhookData.m_payment_id}`);
+        
+        try {
+          const rawPending = pendingEntries[0].pending_entries_data as any;
+          const entriesData = typeof rawPending === 'string' ? JSON.parse(rawPending) : rawPending;
+          if (!Array.isArray(entriesData)) {
+            throw new Error('pending_entries_data is not an array');
+          }
+          
+          // Import the database module to create entries
+          const { db } = await import('@/lib/database');
+          
+          const createdEntries = [];
+          
+          // Create each entry
+          for (let i = 0; i < entriesData.length; i++) {
+            const entry = entriesData[i];
+            
+            try {
+              console.log(`📝 Auto-creating entry ${i + 1}/${entriesData.length}: ${entry.itemName}`);
+              
+              // Create event entry with payment reference
+              const eventEntry = await db.createEventEntry({
+                eventId: entry.eventId,
+                contestantId: entry.contestantId,
+                eodsaId: entry.eodsaId,
+                participantIds: entry.participantIds,
+                calculatedFee: entry.calculatedFee,
+                paymentStatus: 'paid', // Mark as paid since payment was successful
+                paymentMethod: 'payfast',
+                approved: true, // AUTO-APPROVE: Entries are automatically approved after successful payment
+                qualifiedForNationals: true,
+                itemNumber: undefined,
+                itemName: entry.itemName,
+                choreographer: entry.choreographer,
+                mastery: entry.mastery,
+                itemStyle: entry.itemStyle,
+                estimatedDuration: entry.estimatedDuration,
+                entryType: entry.entryType || 'live',
+                musicFileUrl: entry.musicFileUrl || undefined,
+                musicFileName: entry.musicFileName || undefined,
+                videoFileUrl: undefined,
+                videoFileName: undefined,
+                videoExternalUrl: entry.videoExternalUrl || undefined,
+                videoExternalType: (entry.videoExternalType && ['youtube', 'vimeo', 'other'].includes(entry.videoExternalType)) 
+                  ? entry.videoExternalType as 'youtube' | 'vimeo' | 'other' 
+                  : undefined
+              });
+
+              // Update the entry with payment ID
+              await sql`
+                UPDATE event_entries 
+                SET payment_id = ${webhookData.m_payment_id}
+                WHERE id = ${eventEntry.id}
+              `;
+
+              createdEntries.push({
+                entryId: eventEntry.id,
+                itemName: entry.itemName,
+                performanceType: entry.performanceType,
+                fee: entry.calculatedFee
+              });
+              
+              console.log(`✅ Auto-created entry ${eventEntry.id} successfully`);
+              
+            } catch (error: any) {
+              console.error(`❌ Error auto-creating entry ${i + 1}:`, error);
+            }
+          }
+          
+          // Log the automatic entry creation
+          await sql`
+            INSERT INTO payment_logs (payment_id, event_type, event_data, ip_address, user_agent)
+            VALUES (
+              ${webhookData.m_payment_id}, 'auto_entries_created',
+              ${JSON.stringify({
+                created_count: createdEntries.length,
+                entries: createdEntries,
+                source: 'webhook_auto_creation'
+              })},
+              ${clientIP}, ${request.headers.get('user-agent') || 'webhook'}
+            )
+          `;
+          
+          console.log(`🎉 Successfully auto-created ${createdEntries.length} entries for payment ${webhookData.m_payment_id}`);
+          
+        } catch (error) {
+          console.error(`💥 Failed to auto-create entries for payment ${webhookData.m_payment_id}:`, error);
+          
+          // Log the error
+          await sql`
+            INSERT INTO payment_logs (payment_id, event_type, event_data, ip_address, user_agent)
+            VALUES (
+              ${webhookData.m_payment_id}, 'auto_creation_failed',
+              ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })},
+              ${clientIP}, ${request.headers.get('user-agent') || 'webhook'}
+            )
+          `;
+        }
+      }
+      
+      // Additional logic:
       // - Send confirmation email
       // - Trigger entry confirmation
       // - Update contestant status

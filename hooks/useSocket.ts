@@ -6,7 +6,7 @@ import { SocketEvents } from '@/lib/socket-events';
 
 interface UseSocketOptions {
   eventId?: string;
-  role?: 'judge' | 'sound' | 'backstage' | 'general';
+  role?: 'judge' | 'sound' | 'backstage' | 'announcer' | 'registration' | 'media' | 'general';
   judgeId?: string;
   autoConnect?: boolean;
 }
@@ -43,6 +43,15 @@ export function useSocket(options: UseSocketOptions = {}) {
             break;
           case 'backstage':
             socketClient.joinAsBackstage(eventId);
+            break;
+          case 'announcer':
+            socketClient.joinAsAnnouncer(eventId);
+            break;
+          case 'registration':
+            socketClient.joinAsRegistration(eventId);
+            break;
+          case 'media':
+            socketClient.joinAsMedia(eventId);
             break;
         }
       }
@@ -127,6 +136,18 @@ export function useSoundSocket(eventId: string) {
 
 export function useBackstageSocket(eventId: string) {
   return useSocket({ eventId, role: 'backstage' });
+}
+
+export function useAnnouncerSocket(eventId: string) {
+  return useSocket({ eventId, role: 'announcer' });
+}
+
+export function useRegistrationSocket(eventId: string) {
+  return useSocket({ eventId, role: 'registration' });
+}
+
+export function useMediaSocket(eventId: string) {
+  return useSocket({ eventId, role: 'media' });
 }
 
 // Hook for listening to specific events with easy cleanup

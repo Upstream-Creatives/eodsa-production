@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       email: email.toLowerCase().trim(),
       password: hashedPassword,
       isAdmin: Boolean(isAdmin),
+      role: Boolean(isAdmin) ? 'admin' : 'judge',
       specialization: []
     });
 

@@ -15,7 +15,7 @@ export interface SocketEvents {
   'performance:status': {
     performanceId: string;
     eventId: string;
-    status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+    status: 'scheduled' | 'ready' | 'hold' | 'in_progress' | 'completed' | 'cancelled';
     timestamp: string;
   };
 

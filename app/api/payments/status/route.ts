@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get payment details with entry and event information
+    // Get payment details with entry and event information (aligning with current schema)
     const [paymentData] = await sql`
       SELECT 
         p.payment_id,
@@ -32,16 +32,14 @@ export async function GET(request: NextRequest) {
         p.paid_at,
         p.updated_at,
         
-        -- Entry details
-        ee.title as entry_title,
-        ee.performance_type,
+        -- Entry details (aligned to schema)
+        ee.item_name as entry_title,
+        ee.entry_type as performance_type,
         ee.payment_status as entry_payment_status,
         
-        -- Event details
+        -- Event details (safe subset)
         e.name as event_name,
         e.entry_fee,
-        e.event_date,
-        e.venue,
         
         -- PayFast details
         p.pf_payment_id,
@@ -96,8 +94,6 @@ export async function GET(request: NextRequest) {
         
         // Event information
         event_name: paymentData.event_name,
-        event_date: paymentData.event_date,
-        venue: paymentData.venue,
         
         // Timestamps
         created_at: paymentData.created_at,

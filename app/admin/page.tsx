@@ -175,12 +175,29 @@ export default function AdminDashboard() {
 
   // Modal states
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
   const [showCreateJudgeModal, setShowCreateJudgeModal] = useState(false);
   const [showFinancialModal, setShowFinancialModal] = useState(false);
   const [selectedDancerFinances, setSelectedDancerFinances] = useState<any>(null);
   const [loadingFinances, setLoadingFinances] = useState(false);
   const [showAssignJudgeModal, setShowAssignJudgeModal] = useState(false);
   const [showEmailTestModal, setShowEmailTestModal] = useState(false);
+
+  // Edit event state
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editEventData, setEditEventData] = useState({
+    name: '',
+    description: '',
+    region: 'Nationals',
+    eventDate: '',
+    eventEndDate: '',
+    registrationDeadline: '',
+    venue: '',
+    status: 'upcoming'
+  });
+  const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
+  const [updateEventMessage, setUpdateEventMessage] = useState('');
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
 
   const router = useRouter();
 
@@ -301,6 +318,140 @@ export default function AdminDashboard() {
     } finally {
       setIsCreatingEvent(false);
     }
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setEditEventData({
+      name: event.name,
+      description: event.description,
+      region: event.region,
+      eventDate: event.eventDate,
+      eventEndDate: event.eventEndDate || '',
+      registrationDeadline: event.registrationDeadline,
+      venue: event.venue,
+      status: event.status
+    });
+    setUpdateEventMessage('');
+    setShowEditEventModal(true);
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingEvent || isUpdatingEvent) {
+      return;
+    }
+
+    setIsUpdatingEvent(true);
+    setUpdateEventMessage('');
+
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        setUpdateEventMessage('Error: Session expired. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`/api/events/${editingEvent.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...editEventData,
+          adminSession: session
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUpdateEventMessage('✅ Event updated successfully!');
+        fetchData();
+        setTimeout(() => {
+          setShowEditEventModal(false);
+          setEditingEvent(null);
+          setUpdateEventMessage('');
+        }, 1500);
+      } else {
+        setUpdateEventMessage(`❌ Failed to update event. Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating event:', error);
+      setUpdateEventMessage('Error updating event. Please check your connection and try again.');
+    } finally {
+      setIsUpdatingEvent(false);
+    }
+  };
+
+  const handleDeleteEvent = async (event: Event) => {
+    showConfirm(
+      `Are you sure you want to delete "${event.name}"? This action cannot be undone and will remove all associated entries, payments, and data.`,
+      async () => {
+        setIsDeletingEvent(true);
+
+        try {
+          const session = localStorage.getItem('adminSession');
+          if (!session) {
+            error('Session expired. Please log in again.');
+            return;
+          }
+
+          const response = await fetch(`/api/events/${event.id}/delete`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              confirmed: true,
+              adminSession: session
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            success(`Event "${event.name}" deleted successfully`);
+            fetchData();
+          } else {
+            if (data.details?.requiresConfirmation) {
+              showConfirm(
+                `"${event.name}" has ${data.details.entryCount} entries and ${data.details.paymentCount} payments. Are you absolutely sure you want to delete it?`,
+                async () => {
+                  const forceResponse = await fetch(`/api/events/${event.id}/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                      confirmed: true, 
+                      force: true,
+                      adminSession: session
+                    }),
+                  });
+
+                  const forceData = await forceResponse.json();
+                  if (forceData.success) {
+                    success(`Event "${event.name}" force deleted successfully`);
+                    fetchData();
+                  } else {
+                    error(`Failed to delete event: ${forceData.error}`);
+                  }
+                }
+              );
+            } else {
+              error(`Failed to delete event: ${data.error}`);
+            }
+          }
+        } catch (deleteError) {
+          console.error('Error deleting event:', deleteError);
+          error('Error deleting event. Please check your connection and try again.');
+        } finally {
+          setIsDeletingEvent(false);
+        }
+      }
+    );
   };
 
   const handleCreateJudge = async (e: React.FormEvent) => {
@@ -1359,15 +1510,31 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4">
-                <div className="flex items-center">
+                            <div className="flex items-center space-x-2">
                               <Link
                                 href={`/admin/events/${event.id}`}
                                 className="text-indigo-500 hover:text-indigo-700 text-xs sm:text-sm font-medium"
                               >
-                                <span className="hidden sm:inline">View Participants</span>
-                                <span className="sm:hidden">View</span>
+                                <span className="hidden sm:inline">👥 View</span>
+                                <span className="sm:hidden">👥</span>
                               </Link>
-                  </div>
+                              <button
+                                onClick={() => handleEditEvent(event)}
+                                className="text-blue-500 hover:text-blue-700 text-xs sm:text-sm font-medium transition-colors"
+                                title="Edit Event"
+                              >
+                                <span className="hidden sm:inline">✏️ Edit</span>
+                                <span className="sm:hidden">✏️</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteEvent(event)}
+                                className="text-red-500 hover:text-red-700 text-xs sm:text-sm font-medium transition-colors"
+                                title="Delete Event"
+                              >
+                                <span className="hidden sm:inline">🗑️ Delete</span>
+                                <span className="sm:hidden">🗑️</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -2438,6 +2605,185 @@ export default function AdminDashboard() {
                     <>
                       <span>✨</span>
                       <span>Create Event</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      {showEditEventModal && editingEvent && (
+        <div className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/30">
+            <div className="p-6 border-b border-gray-200/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <span className="text-white text-lg">✏️</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">Edit Event</h2>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowEditEventModal(false);
+                    setEditingEvent(null);
+                    setUpdateEventMessage('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                >
+                  <span className="text-2xl">×</span>
+                </button>
+              </div>
+            </div>
+            
+            <form onSubmit={handleUpdateEvent} className="p-6">
+              <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <h3 className="text-sm font-semibold text-blue-800 mb-2">📝 Update Event Details:</h3>
+                <p className="text-sm text-blue-700">Modify the event information below. This will update the event for all judges and participants.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Event Name *</label>
+                  <input
+                    type="text"
+                    value={editEventData.name}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Region *</label>
+                  <select
+                    value={editEventData.region}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, region: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    required
+                  >
+                    <option value="Nationals">Nationals</option>
+                    <option value="Gauteng">Gauteng</option>
+                    <option value="Free State">Free State</option>
+                    <option value="Mpumalanga">Mpumalanga</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
+                  <input
+                    type="date"
+                    value={editEventData.eventDate}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, eventDate: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Date</label>
+                  <input
+                    type="date"
+                    value={editEventData.eventEndDate}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, eventEndDate: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Registration Deadline *</label>
+                  <input
+                    type="date"
+                    value={editEventData.registrationDeadline}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, registrationDeadline: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                  <select
+                    value={editEventData.status}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                  >
+                    <option value="upcoming">Upcoming</option>
+                    <option value="registration_open">Registration Open</option>
+                    <option value="registration_closed">Registration Closed</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Venue *</label>
+                  <input
+                    type="text"
+                    value={editEventData.venue}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, venue: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    required
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                  <textarea
+                    value={editEventData.description}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    placeholder="Event description (optional)"
+                  />
+                </div>
+              </div>
+
+              {updateEventMessage && (
+                <div className={`mt-6 p-4 rounded-xl font-medium animate-slideIn ${
+                  updateEventMessage.includes('Error') 
+                    ? 'bg-red-50 text-red-700 border border-red-200' 
+                    : 'bg-green-50 text-green-700 border border-green-200'
+                }`}>
+                  <div className="flex items-center space-x-2">
+                    <span>{updateEventMessage.includes('Error') ? '❌' : '✅'}</span>
+                    <span>{updateEventMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditEventModal(false);
+                    setEditingEvent(null);
+                    setUpdateEventMessage('');
+                  }}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingEvent}
+                  className="inline-flex items-center space-x-3 px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
+                >
+                  {isUpdatingEvent ? (
+                    <>
+                      <div className="relative w-5 h-5">
+                        <div className="absolute inset-0 border-2 border-white/30 rounded-full"></div>
+                        <div className="absolute inset-0 border-t-2 border-white rounded-full animate-spin"></div>
+                      </div>
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>✨</span>
+                      <span>Update Event</span>
                     </>
                   )}
                 </button>

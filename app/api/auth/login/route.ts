@@ -15,17 +15,27 @@ export async function POST(request: Request) {
     }
 
     // Find judge by email using database
+    console.log('🌍 DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+    
     const judge = await db.getJudgeByEmail(email);
+    console.log('🔍 Login attempt:', { email, foundUser: !!judge });
+    
     if (!judge) {
+      console.log('❌ User not found:', email);
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
+    console.log('👤 Found user:', { id: judge.id, email: judge.email, hasPassword: !!judge.password });
+
     // Verify password
     const isValidPassword = await bcrypt.compare(password, judge.password);
+    console.log('🔐 Password check:', { email, isValid: isValidPassword });
+    
     if (!isValidPassword) {
+      console.log('❌ Invalid password for:', email);
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },
         { status: 401 }

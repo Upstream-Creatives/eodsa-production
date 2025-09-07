@@ -10,12 +10,23 @@ class SocketClient {
       return this.socket;
     }
 
-    this.socket = io(url || process.env.NEXT_PUBLIC_SOCKET_URL || '', {
+    // Get WebSocket URL from environment or use provided URL
+    const socketUrl = url || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+    
+    console.log('🔌 Connecting to WebSocket server:', socketUrl);
+
+    this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      forceNew: false,
+      // Railway optimization
+      upgrade: true,
+      rememberUpgrade: true
     });
 
     this.socket.on('connect', () => {
@@ -55,6 +66,18 @@ class SocketClient {
 
   joinAsBackstage(eventId: string) {
     this.socket?.emit('join:backstage', eventId);
+  }
+
+  joinAsAnnouncer(eventId: string) {
+    this.socket?.emit('join:announcer', eventId);
+  }
+
+  joinAsRegistration(eventId: string) {
+    this.socket?.emit('join:registration', eventId);
+  }
+
+  joinAsMedia(eventId: string) {
+    this.socket?.emit('join:media', eventId);
   }
 
   // Emit events

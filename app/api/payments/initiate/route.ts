@@ -18,12 +18,13 @@ interface PaymentRequest {
   itemName?: string;
   itemDescription?: string;
   isBatchPayment?: boolean; // Flag for batch payments where entries don't exist yet
+  pendingEntries?: any[]; // For batch payments, store the pending entries data
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: PaymentRequest = await request.json();
-    const { entryId, eventId, userId, userFirstName, userLastName, userEmail, amount, itemName, itemDescription, isBatchPayment } = body;
+    const { entryId, eventId, userId, userFirstName, userLastName, userEmail, amount, itemName, itemDescription, isBatchPayment, pendingEntries } = body;
 
     // Validate required fields
     if (!entryId || !eventId || !userId || !userFirstName || !userLastName || !userEmail) {
@@ -94,43 +95,53 @@ export async function POST(request: NextRequest) {
     // Calculate payment amount
     const baseAmount = amount || event.entry_fee || 25.00;
     const fees = calculateEntryFees(baseAmount);
-    
-    // Generate unique payment reference
-    const paymentReference = generatePaymentReference(entryId, eventId);
-    
+
+    // Build PayFast payment payload FIRST so we use the SAME payment_id everywhere
+    const paymentData = createPaymentData({
+      entryId,
+      eventId,
+      userId,
+      amount: fees.total,
+      userFirstName,
+      userLastName,
+      userEmail,
+      itemName: itemName || `Competition Entry: ${entry.item_name}`,
+      itemDescription: itemDescription || `Competition entry for ${event.name} - ${entry.item_name}`,
+    });
+    const paymentId = paymentData.m_payment_id; // This is what PayFast will post back as m_payment_id
+
     // Create payment record - exclude entry_id for batch payments to avoid foreign key constraint
-    let payment;
     if (isBatchPayment) {
-      // For batch payments, don't include entry_id to avoid foreign key constraint
-      [payment] = await sql`
+      // For batch payments, store pending entries data in the database for webhook access
+      const pendingEntriesJson = pendingEntries ? JSON.stringify(pendingEntries) : null;
+      
+      await sql`
         INSERT INTO payments (
           payment_id, event_id, user_id, amount, currency,
-          description, status, ip_address, user_agent
+          description, status, ip_address, user_agent, pending_entries_data
         )
         VALUES (
-          ${paymentReference}, ${eventId}, ${userId || 'unknown'}, 
+          ${paymentId}, ${eventId}, ${userId || 'unknown'}, 
           ${fees.total}, 'ZAR',
-          ${`Payment for ${entry.item_name} - ${event.name}`}, 'pending',
+          ${`Payment for ${paymentData.item_name} - ${event.name}`}, 'pending',
           ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'},
-          ${request.headers.get('user-agent') || 'unknown'}
+          ${request.headers.get('user-agent') || 'unknown'}, ${pendingEntriesJson}
         )
-        RETURNING payment_id, amount
       `;
     } else {
       // For single payments, include entry_id
-      [payment] = await sql`
+      await sql`
         INSERT INTO payments (
           payment_id, entry_id, event_id, user_id, amount, currency,
           description, status, ip_address, user_agent
         )
         VALUES (
-          ${paymentReference}, ${entryId}, ${eventId}, ${userId || 'unknown'}, 
+          ${paymentId}, ${entryId}, ${eventId}, ${userId || 'unknown'}, 
           ${fees.total}, 'ZAR',
-          ${`Payment for ${entry.item_name} - ${event.name}`}, 'pending',
+          ${`Payment for ${paymentData.item_name} - ${event.name}`}, 'pending',
           ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'},
           ${request.headers.get('user-agent') || 'unknown'}
         )
-        RETURNING payment_id, amount
       `;
     }
 
@@ -138,7 +149,7 @@ export async function POST(request: NextRequest) {
     await sql`
       INSERT INTO payment_logs (payment_id, event_type, event_data, ip_address, user_agent)
       VALUES (
-        ${payment.payment_id}, 'initiated',
+        ${paymentId}, 'initiated',
         ${JSON.stringify({
           entryId,
           eventId,
@@ -155,29 +166,16 @@ export async function POST(request: NextRequest) {
     if (!isBatchPayment) {
       await sql`
         UPDATE event_entries 
-        SET payment_id = ${payment.payment_id}, payment_status = 'pending'
+        SET payment_id = ${paymentId}, payment_status = 'pending'
         WHERE id = ${entryId}
       `;
     }
-
-    // Create PayFast payment data
-    const paymentData = createPaymentData({
-      entryId,
-      eventId,
-      userId,
-      amount: fees.total,
-      userFirstName,
-      userLastName,
-      userEmail,
-      itemName: itemName || `Competition Entry: ${entry.item_name}`,
-      itemDescription: itemDescription || `Competition entry for ${event.name} - ${entry.item_name}`,
-    });
 
     // Log redirect to PayFast
     await sql`
       INSERT INTO payment_logs (payment_id, event_type, event_data, ip_address, user_agent)
       VALUES (
-        ${payment.payment_id}, 'redirect_sent',
+        ${paymentId}, 'redirect_sent',
         ${JSON.stringify(paymentData)},
         ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'},
         ${request.headers.get('user-agent') || 'unknown'}

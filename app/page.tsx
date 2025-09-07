@@ -235,15 +235,46 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* Staff Portals */}
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 border-gray-500/30 p-6 mb-8 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-4 text-center">Staff & Official Portals</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <Link href="/portal/admin" className="flex flex-col items-center p-3 bg-blue-600/20 rounded-lg hover:bg-blue-600/30 transition-colors group">
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">👑</span>
+                <span className="text-xs text-blue-400 font-medium">Admin Portal</span>
+              </Link>
+              <Link href="/portal/judge" className="flex flex-col items-center p-3 bg-green-600/20 rounded-lg hover:bg-green-600/30 transition-colors group">
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">⚖️</span>
+                <span className="text-xs text-green-400 font-medium">Judge Portal</span>
+              </Link>
+              <Link href="/portal/backstage" className="flex flex-col items-center p-3 bg-purple-600/20 rounded-lg hover:bg-purple-600/30 transition-colors group">
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">🎭</span>
+                <span className="text-xs text-purple-400 font-medium">Backstage Manager</span>
+              </Link>
+              <Link href="/portal/announcer" className="flex flex-col items-center p-3 bg-orange-600/20 rounded-lg hover:bg-orange-600/30 transition-colors group">
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">📢</span>
+                <span className="text-xs text-orange-400 font-medium">Announcer Portal</span>
+              </Link>
+              <Link href="/portal/registration" className="flex flex-col items-center p-3 bg-teal-600/20 rounded-lg hover:bg-teal-600/30 transition-colors group">
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">✅</span>
+                <span className="text-xs text-teal-400 font-medium">Registration Desk</span>
+              </Link>
+              <Link href="/portal/media" className="flex flex-col items-center p-3 bg-pink-600/20 rounded-lg hover:bg-pink-600/30 transition-colors group">
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">📸</span>
+                <span className="text-xs text-pink-400 font-medium">Media Portal</span>
+              </Link>
+            </div>
+          </div>
+
           {/* Additional Links */}
           <div className="text-center space-y-4">
             <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <Link href="/portal/admin" className="text-blue-400 hover:text-blue-300 transition-colors">
-                Admin Portal
+              <Link href="/admin/sound-tech" className="text-purple-400 hover:text-purple-300 transition-colors">
+                Sound Tech Dashboard
               </Link>
               <span className="text-gray-600">•</span>
-              <Link href="/portal/judge" className="text-green-400 hover:text-green-300 transition-colors">
-                Judge Portal
+              <Link href="/admin/scoring-approval" className="text-indigo-400 hover:text-indigo-300 transition-colors">
+                Score Approval System
               </Link>
             </div>
           </div>

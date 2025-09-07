@@ -106,6 +106,43 @@ export const initializeDatabase = async () => {
     // 🏆 NATIONALS TABLES - REMOVED
     // The nationals system has been removed. Regional competitions are now referred to as "Nationals".
 
+    // NEW: Add role column to judges table for new user types
+    await sqlClient`ALTER TABLE judges ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'judge'`;
+    
+    // NEW: Performance presence tracking table
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS performance_presence (
+        id TEXT PRIMARY KEY,
+        performance_id TEXT NOT NULL,
+        event_id TEXT NOT NULL,
+        present BOOLEAN DEFAULT FALSE,
+        checked_in_by TEXT,
+        checked_in_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    // NEW: Score approval system table
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS score_approvals (
+        id TEXT PRIMARY KEY,
+        performance_id TEXT NOT NULL,
+        judge_id TEXT NOT NULL,
+        score_id TEXT NOT NULL,
+        approved_by TEXT,
+        approved_at TEXT,
+        rejected BOOLEAN DEFAULT FALSE,
+        rejection_reason TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    // NEW: Add completed status to performances for announcer tracking
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced BOOLEAN DEFAULT FALSE`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_by TEXT`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_at TEXT`;
+
     console.log('✅ Database schema is up to date.');
     
     // Return the database object for use in API routes
@@ -1245,7 +1282,16 @@ export const db = {
       email: judge.email,
       password: judge.password,
       isAdmin: judge.is_admin,
-      specialization: judge.specialization ? JSON.parse(judge.specialization) : []
+      role: judge.role || 'judge', // Add the missing role field
+      specialization: (() => {
+        try {
+          return judge.specialization ? JSON.parse(judge.specialization) : [];
+        } catch (e) {
+          console.warn(`Invalid JSON in specialization for judge ${judge.id}:`, judge.specialization);
+          return [];
+        }
+      })(),
+      createdAt: judge.created_at
     } as Judge;
   },
 
@@ -1261,7 +1307,15 @@ export const db = {
       email: judge.email,
       password: judge.password,
       isAdmin: judge.is_admin,
-      specialization: judge.specialization ? JSON.parse(judge.specialization) : [],
+      role: judge.role || 'judge', // Add the missing role field
+      specialization: (() => {
+        try {
+          return judge.specialization ? JSON.parse(judge.specialization) : [];
+        } catch (e) {
+          console.warn(`Invalid JSON in specialization for judge ${judge.id}:`, judge.specialization);
+          return [];
+        }
+      })(),
       createdAt: judge.created_at
     } as Judge;
   },
@@ -1275,7 +1329,15 @@ export const db = {
       email: row.email,
       password: row.password,
       isAdmin: row.is_admin,
-      specialization: row.specialization ? JSON.parse(row.specialization) : [],
+      specialization: (() => {
+        try {
+          return row.specialization ? JSON.parse(row.specialization) : [];
+        } catch (e) {
+          // Handle invalid JSON in specialization field
+          console.warn(`Invalid JSON in specialization for judge ${row.id}:`, row.specialization);
+          return [];
+        }
+      })(),
       createdAt: row.created_at
     })) as Judge[];
   },
@@ -2753,6 +2815,221 @@ export const db = {
       overallImpressionScore: score.overall_impression_score,
       comments: score.comments,
       submittedAt: score.submitted_at
+    }));
+  },
+
+  // NEW: Performance presence management
+  async setPerformancePresence(performanceId: string, eventId: string, present: boolean, checkedInBy: string) {
+    const sqlClient = getSql();
+    const id = Date.now().toString();
+    const timestamp = new Date().toISOString();
+    
+    // Check if record exists
+    const existing = await sqlClient`
+      SELECT id FROM performance_presence 
+      WHERE performance_id = ${performanceId}
+    ` as any[];
+    
+    if (existing.length > 0) {
+      // Update existing record
+      await sqlClient`
+        UPDATE performance_presence 
+        SET present = ${present}, checked_in_by = ${checkedInBy}, checked_in_at = ${timestamp}
+        WHERE performance_id = ${performanceId}
+      `;
+    } else {
+      // Create new record
+      await sqlClient`
+        INSERT INTO performance_presence 
+        (id, performance_id, event_id, present, checked_in_by, checked_in_at)
+        VALUES (${id}, ${performanceId}, ${eventId}, ${present}, ${checkedInBy}, ${timestamp})
+      `;
+    }
+    
+    return { success: true };
+  },
+
+  async getPerformancePresence(performanceId: string) {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT * FROM performance_presence 
+      WHERE performance_id = ${performanceId}
+    ` as any[];
+    
+    if (result.length === 0) return null;
+    
+    const presence = result[0];
+    return {
+      id: presence.id,
+      performanceId: presence.performance_id,
+      eventId: presence.event_id,
+      present: presence.present,
+      checkedInBy: presence.checked_in_by,
+      checkedInAt: presence.checked_in_at
+    };
+  },
+
+  // NEW: Score approval system
+  async createScoreApproval(performanceId: string, judgeId: string, scoreId: string) {
+    const sqlClient = getSql();
+    const id = Date.now().toString();
+    const timestamp = new Date().toISOString();
+    
+    await sqlClient`
+      INSERT INTO score_approvals 
+      (id, performance_id, judge_id, score_id, status, created_at)
+      VALUES (${id}, ${performanceId}, ${judgeId}, ${scoreId}, 'pending', ${timestamp})
+    `;
+    
+    return { id };
+  },
+
+  async approveScore(approvalId: string, approvedBy: string) {
+    const sqlClient = getSql();
+    const timestamp = new Date().toISOString();
+    
+    await sqlClient`
+      UPDATE score_approvals 
+      SET status = 'approved', approved_by = ${approvedBy}, approved_at = ${timestamp}
+      WHERE id = ${approvalId}
+    `;
+    
+    return { success: true };
+  },
+
+  async rejectScore(approvalId: string, rejectedBy: string, reason: string) {
+    const sqlClient = getSql();
+    const timestamp = new Date().toISOString();
+    
+    await sqlClient`
+      UPDATE score_approvals 
+      SET status = 'rejected', approved_by = ${rejectedBy}, approved_at = ${timestamp}, 
+          rejected = true, rejection_reason = ${reason}
+      WHERE id = ${approvalId}
+    `;
+    
+    return { success: true };
+  },
+
+  async getScoreApprovals(performanceId?: string) {
+    const sqlClient = getSql();
+    let query;
+    
+    if (performanceId) {
+      query = sqlClient`
+        SELECT sa.*, s.technical_score, s.musical_score, s.performance_score, 
+               s.styling_score, s.overall_impression_score, s.comments,
+               j.name as judge_name, p.title as performance_title
+        FROM score_approvals sa
+        JOIN scores s ON sa.score_id = s.id
+        JOIN judges j ON sa.judge_id = j.id
+        JOIN performances p ON sa.performance_id = p.id
+        WHERE sa.performance_id = ${performanceId}
+        ORDER BY sa.created_at DESC
+      `;
+    } else {
+      query = sqlClient`
+        SELECT sa.*, s.technical_score, s.musical_score, s.performance_score, 
+               s.styling_score, s.overall_impression_score, s.comments,
+               j.name as judge_name, p.title as performance_title
+        FROM score_approvals sa
+        JOIN scores s ON sa.score_id = s.id
+        JOIN judges j ON sa.judge_id = j.id
+        JOIN performances p ON sa.performance_id = p.id
+        ORDER BY sa.created_at DESC
+      `;
+    }
+    
+    const result = await query as any[];
+    
+    return result.map((approval: any) => ({
+      id: approval.id,
+      performanceId: approval.performance_id,
+      judgeId: approval.judge_id,
+      judgeName: approval.judge_name,
+      performanceTitle: approval.performance_title,
+      scoreId: approval.score_id,
+      approvedBy: approval.approved_by,
+      approvedAt: approval.approved_at,
+      rejected: approval.rejected,
+      rejectionReason: approval.rejection_reason,
+      status: approval.status,
+      createdAt: approval.created_at,
+      score: {
+        technicalScore: approval.technical_score,
+        musicalScore: approval.musical_score,
+        performanceScore: approval.performance_score,
+        stylingScore: approval.styling_score,
+        overallImpressionScore: approval.overall_impression_score,
+        comments: approval.comments
+      }
+    }));
+  },
+
+  // NEW: Announcer functionality
+  async markPerformanceAnnounced(performanceId: string, announcedBy: string) {
+    const sqlClient = getSql();
+    const timestamp = new Date().toISOString();
+    
+    await sqlClient`
+      UPDATE performances 
+      SET announced = true, announced_by = ${announcedBy}, announced_at = ${timestamp}
+      WHERE id = ${performanceId}
+    `;
+    
+    return { success: true };
+  },
+
+  async getAnnouncedPerformances(eventId: string) {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT * FROM performances 
+      WHERE event_id = ${eventId} AND announced = true
+      ORDER BY announced_at DESC
+    ` as any[];
+    
+    return result.map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      eventId: p.event_id,
+      announced: p.announced,
+      announcedBy: p.announced_by,
+      announcedAt: p.announced_at
+    }));
+  },
+
+  // NEW: Create different role users
+  async createRoleUser(userData: {
+    name: string;
+    email: string;
+    password: string;
+    role: 'backstage_manager' | 'announcer' | 'registration' | 'media';
+  }) {
+    const sqlClient = getSql();
+    const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = new Date().toISOString();
+    
+    await sqlClient`
+      INSERT INTO judges (id, name, email, password, is_admin, role, specialization, created_at)
+      VALUES (${id}, ${userData.name}, ${userData.email}, ${userData.password}, false, ${userData.role}, '[]', ${timestamp})
+    `;
+    
+    return { id, ...userData, isAdmin: false, specialization: [], createdAt: timestamp };
+  },
+
+  async getUserByRole(role: string) {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT * FROM judges WHERE role = ${role}
+    ` as any[];
+    
+    return result.map((user: any) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isAdmin: user.is_admin,
+      createdAt: user.created_at
     }));
   },
 

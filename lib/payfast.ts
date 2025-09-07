@@ -70,14 +70,17 @@ export interface PayFastWebhookData {
 
 /**
  * Generates PayFast signature for payment data
+ * INCLUDES empty values - PayFast actual behavior (not what docs say!)
  */
 export function generatePayFastSignature(data: Record<string, string | undefined>): string {
-  // Create parameter string in the order parameters appear (DO NOT SORT)
+  // Create parameter string - INCLUDE empty values (PayFast actual behavior)
   let pfOutput = "";
   for (let key in data) {
-    if (data.hasOwnProperty(key)) {
-      if (data[key] !== undefined && data[key] !== "" && key !== 'signature') {
-        pfOutput += `${key}=${encodeURIComponent((data[key] as string).trim()).replace(/%20/g, "+")}&`;
+    if (data.hasOwnProperty(key) && key !== 'signature') {
+      const value = data[key];
+      // INCLUDE empty values - PayFast actual behavior despite docs
+      if (value !== undefined && value !== null) {
+        pfOutput += `${key}=${encodeURIComponent(value.toString().trim()).replace(/%20/g, "+")}&`;
       }
     }
   }
@@ -86,12 +89,12 @@ export function generatePayFastSignature(data: Record<string, string | undefined
   let getString = pfOutput.slice(0, -1);
   
   // Add passphrase if it exists
-  if (PAYFAST_CONFIG.passphrase) {
+  if (PAYFAST_CONFIG.passphrase !== null) {
     getString += `&passphrase=${encodeURIComponent(PAYFAST_CONFIG.passphrase.trim()).replace(/%20/g, "+")}`;
   }
 
   // Generate MD5 hash
-  return crypto.createHash('md5').update(getString).digest('hex');
+  return crypto.createHash("md5").update(getString).digest("hex");
 }
 
 /**

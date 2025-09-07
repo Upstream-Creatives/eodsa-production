@@ -31,7 +31,7 @@ interface Performance {
   participantNames: string[];
   duration: number;
   itemNumber?: number;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'ready' | 'hold' | 'in_progress' | 'completed' | 'cancelled';
   entryType?: 'live' | 'virtual';
   musicFileUrl?: string;
   videoExternalUrl?: string;
@@ -147,12 +147,62 @@ function SortablePerformanceItem({
 
           {/* Status buttons with full lifecycle control */}
           {performance.status === 'scheduled' && !isDragging && (
-            <button
-              onClick={() => updatePerformanceStatus(performance.id, 'in_progress')}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition-colors"
-            >
-              ▶️ Start
-            </button>
+            <>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'ready')}
+                className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded font-semibold transition-colors text-sm"
+              >
+                ✅ Ready
+              </button>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'hold')}
+                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded font-semibold transition-colors text-sm"
+              >
+                ⏸️ Hold
+              </button>
+            </>
+          )}
+          
+          {performance.status === 'ready' && !isDragging && (
+            <>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'in_progress')}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition-colors"
+              >
+                ▶️ Start
+              </button>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'hold')}
+                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded font-semibold transition-colors text-sm"
+              >
+                ⏸️ Hold
+              </button>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'scheduled')}
+                className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
+                title="Reset to scheduled"
+              >
+                ↩️ Reset
+              </button>
+            </>
+          )}
+          
+          {performance.status === 'hold' && !isDragging && (
+            <>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'ready')}
+                className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded font-semibold transition-colors"
+              >
+                ✅ Ready
+              </button>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'scheduled')}
+                className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
+                title="Reset to scheduled"
+              >
+                ↩️ Reset
+              </button>
+            </>
           )}
           
           {performance.status === 'in_progress' && !isDragging && (
@@ -196,6 +246,8 @@ function SortablePerformanceItem({
           <div className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${
             performance.status === 'completed' ? 'bg-green-600 border-green-400 text-white' :
             performance.status === 'in_progress' ? 'bg-blue-600 border-blue-400 text-white animate-pulse' :
+            performance.status === 'ready' ? 'bg-green-500 border-green-300 text-white' :
+            performance.status === 'hold' ? 'bg-yellow-600 border-yellow-400 text-black' :
             performance.status === 'cancelled' ? 'bg-red-600 border-red-400 text-white' :
             'bg-gray-600 border-gray-400 text-white'
           }`}>

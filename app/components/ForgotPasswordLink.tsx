@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 interface ForgotPasswordLinkProps {
-  userType: 'judge' | 'admin' | 'studio';
+  userType: 'judge' | 'admin' | 'studio' | 'announcer' | 'registration' | 'media' | 'backstage';
 }
 
 export default function ForgotPasswordLink({ userType }: ForgotPasswordLinkProps) {

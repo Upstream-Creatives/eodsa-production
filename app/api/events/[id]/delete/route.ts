@@ -20,6 +20,37 @@ export async function DELETE(
       }, { status: 400 });
     }
 
+    // Admin authentication check
+    const body = await request.json().catch(() => ({}));
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader && !body.adminSession) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authentication required'
+      }, { status: 401 });
+    }
+
+    // If adminSession is provided in body (for client-side requests)
+    if (body.adminSession) {
+      try {
+        const adminData = typeof body.adminSession === 'string' ? 
+          JSON.parse(body.adminSession) : body.adminSession;
+        
+        if (!adminData.isAdmin) {
+          return NextResponse.json({
+            success: false,
+            error: 'Admin privileges required'
+          }, { status: 403 });
+        }
+      } catch (sessionError) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid admin session'
+        }, { status: 401 });
+      }
+    }
+
     // First, check if the event exists and get its details
     const [event] = await sql`
       SELECT id, name, status, created_at 
@@ -53,7 +84,6 @@ export async function DELETE(
     const hasPayments = parseInt(paymentCount.count) > 0;
 
     // Get confirmation from request body
-    const body = await request.json().catch(() => ({}));
     const { confirmed, force } = body;
 
     // If event has entries or payments, require confirmation
