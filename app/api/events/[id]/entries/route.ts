@@ -89,16 +89,50 @@ export async function GET(
               };
             } else {
               console.error(`Could not find contestant or dancer for ID: ${entry.contestantId}`);
-              return {
-                ...entry,
-                contestantName: 'Unknown (Not Found)',
-                contestantEmail: '',
-                participantNames: ['Unknown Dancer'],
-                studioName: 'Unknown',
-                studioId: null,
-                studioEmail: null,
-                participantStudios: ['Unknown']
-              };
+              // Fallback: resolve studio from registration number and resolve participants from unified dancers table
+              try {
+                const { unifiedDb } = await import('@/lib/database');
+                const allStudios = await unifiedDb.getAllStudios?.();
+                const matchedStudio = Array.isArray(allStudios)
+                  ? allStudios.find((s: any) => s.registrationNumber === entry.eodsaId)
+                  : null;
+
+                // Resolve participant names via unified dancers table
+                const names: string[] = [];
+                if (Array.isArray(entry.participantIds)) {
+                  for (let i = 0; i < entry.participantIds.length; i++) {
+                    try {
+                      const p = await unifiedDb.getDancerById(entry.participantIds[i]);
+                      names.push(p?.name || `Participant ${i + 1}`);
+                    } catch {
+                      names.push(`Participant ${i + 1}`);
+                    }
+                  }
+                }
+
+                return {
+                  ...entry,
+                  contestantName: matchedStudio?.name || entry.eodsaId || 'Unknown',
+                  contestantEmail: '',
+                  participantNames: names.length > 0 ? names : ['Participant 1'],
+                  studioName: matchedStudio?.name || 'Unknown',
+                  studioId: matchedStudio?.id || null,
+                  studioEmail: matchedStudio?.email || null,
+                  participantStudios: names.map(() => matchedStudio?.name || 'Unknown')
+                };
+              } catch (fallbackErr) {
+                console.error('Studio fallback lookup failed:', fallbackErr);
+                return {
+                  ...entry,
+                  contestantName: entry.eodsaId || 'Unknown (Not Found)',
+                  contestantEmail: '',
+                  participantNames: (entry.participantIds || []).map((_: any, i: number) => `Participant ${i + 1}`),
+                  studioName: 'Unknown',
+                  studioId: null,
+                  studioEmail: null,
+                  participantStudios: (entry.participantIds || []).map(() => 'Unknown')
+                };
+              }
             }
           }
         } catch (error) {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/database';
+import { db, unifiedDb } from '@/lib/database';
 
 export async function POST(
   request: Request,
@@ -27,20 +27,21 @@ export async function POST(
       );
     }
 
-    // Get contestant details to get participant names
-    const contestant = await db.getContestantById(entry.contestantId);
-    if (!contestant) {
-      return NextResponse.json(
-        { success: false, error: 'Contestant not found' },
-        { status: 404 }
-      );
+    // Build participant names from unified dancers first, then legacy contestant, then fallback
+    const contestant = await db.getContestantById(entry.contestantId).catch(() => null as any);
+    const participantNames: string[] = [];
+    for (let i = 0; i < entry.participantIds.length; i++) {
+      const pid = entry.participantIds[i];
+      try {
+        const dancer = await unifiedDb.getDancerById(pid);
+        if (dancer?.name) {
+          participantNames.push(dancer.name);
+          continue;
+        }
+      } catch {}
+      const legacyName = contestant?.dancers?.find((d: any) => d.id === pid)?.name;
+      participantNames.push(legacyName || `Participant ${i + 1}`);
     }
-
-    // Create participant names array from participant IDs
-    const participantNames = entry.participantIds.map(id => {
-      const dancer = contestant.dancers.find(d => d.id === id);
-      return dancer?.name || 'Unknown Dancer';
-    });
 
     // Check if performance already exists for this entry
     const existingPerformances = await db.getAllPerformances();

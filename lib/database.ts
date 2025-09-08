@@ -1664,37 +1664,73 @@ export const db = {
         ee.music_file_url,
         ee.music_file_name,
         ee.video_external_url,
-        ee.video_external_type
+        ee.video_external_type,
+        ee.participant_ids
       FROM performances p 
       JOIN contestants c ON p.contestant_id = c.id 
       LEFT JOIN event_entries ee ON p.event_entry_id = ee.id
       WHERE p.event_id = ${eventId}
       ORDER BY p.scheduled_time ASC
     ` as any[];
-    
-    return result.map((row: any) => ({
-      id: row.id,
-      eventId: row.event_id,
-      eventEntryId: row.event_entry_id,
-      contestantId: row.contestant_id,
-      title: row.title,
-      participantNames: JSON.parse(row.participant_names),
-      duration: row.duration,
-      itemNumber: row.item_number,
-      withdrawnFromJudging: row.withdrawn_from_judging || false,
-      choreographer: row.choreographer,
-      mastery: row.mastery,
-      itemStyle: row.item_style,
-      scheduledTime: row.scheduled_time,
-      status: row.status,
-      contestantName: row.contestant_name,
-      // PHASE 2: Live vs Virtual Entry Support
-      entryType: row.entry_type || 'live',
-      musicFileUrl: row.music_file_url,
-      musicFileName: row.music_file_name,
-      videoExternalUrl: row.video_external_url,
-      videoExternalType: row.video_external_type
-    })) as (Performance & { contestantName: string })[];
+
+    // Resolve participant names if stored values are missing/unknown
+    const sqlClientInner = sqlClient; // reuse client inside map
+    const performances = await Promise.all(result.map(async (row: any) => {
+      let participantNames: string[] = [];
+      try {
+        participantNames = JSON.parse(row.participant_names || '[]');
+      } catch {
+        participantNames = [];
+      }
+
+      const needsResolve = !participantNames || participantNames.length === 0 || participantNames.some((n: string) => n === 'Unknown Dancer');
+
+      if (needsResolve) {
+        try {
+          const ids: string[] = JSON.parse(row.participant_ids || '[]');
+          if (Array.isArray(ids) && ids.length > 0) {
+            const resolved: string[] = [];
+            for (let i = 0; i < ids.length; i++) {
+              try {
+                const dancerRows = await sqlClientInner`
+                  SELECT name FROM dancers WHERE id = ${ids[i]} LIMIT 1
+                ` as any[];
+                resolved.push(dancerRows.length > 0 ? dancerRows[0].name : `Participant ${i + 1}`);
+              } catch {
+                resolved.push(`Participant ${i + 1}`);
+              }
+            }
+            participantNames = resolved;
+          }
+        } catch {}
+      }
+
+      return {
+        id: row.id,
+        eventId: row.event_id,
+        eventEntryId: row.event_entry_id,
+        contestantId: row.contestant_id,
+        title: row.title,
+        participantNames,
+        duration: row.duration,
+        itemNumber: row.item_number,
+        withdrawnFromJudging: row.withdrawn_from_judging || false,
+        choreographer: row.choreographer,
+        mastery: row.mastery,
+        itemStyle: row.item_style,
+        scheduledTime: row.scheduled_time,
+        status: row.status,
+        contestantName: row.contestant_name,
+        // PHASE 2: Live vs Virtual Entry Support
+        entryType: row.entry_type || 'live',
+        musicFileUrl: row.music_file_url,
+        musicFileName: row.music_file_name,
+        videoExternalUrl: row.video_external_url,
+        videoExternalType: row.video_external_type
+      } as Performance & { contestantName: string };
+    }));
+
+    return performances;
   },
 
   // Database cleaning - reset all data and create only main admin
@@ -3810,15 +3846,21 @@ export const unifiedDb = {
           
           // Try to get participant names from unified system first
           const participantIds = JSON.parse(row.participant_ids);
-          for (const participantId of participantIds) {
+          for (let i = 0; i < participantIds.length; i++) {
+            const participantId = participantIds[i];
             const dancer = await this.getDancerById(participantId);
             if (dancer) {
               participantNames.push(dancer.name);
+              continue;
+            }
+            // Fallback to legacy contestants
+            const contestant = await db.getContestantById(row.contestant_id);
+            const contestantDancer = contestant?.dancers.find(d => d.id === participantId);
+            if (contestantDancer?.name) {
+              participantNames.push(contestantDancer.name);
             } else {
-              // Fallback to old system
-          const contestant = await db.getContestantById(row.contestant_id);
-              const contestantDancer = contestant?.dancers.find(d => d.id === participantId);
-              participantNames.push(contestantDancer?.name || 'Unknown Dancer');
+              // Final fallback: label Participant 1/2/... instead of "Unknown Dancer"
+              participantNames.push(`Participant ${i + 1}`);
             }
           }
           
