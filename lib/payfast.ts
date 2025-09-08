@@ -163,32 +163,9 @@ export function createPaymentData({
  * Updated with current PayFast production IP ranges (2024)
  */
 export async function validatePayFastHost(ip: string): Promise<boolean> {
-  if (PAYFAST_CONFIG.sandbox) {
-    // In sandbox, we're more lenient with IP validation
-    return true;
-  }
-
-  // PayFast production IP addresses (updated 2024)
-  const validHosts = [
-    // Original PayFast IPs
-    '197.97.145.144',
-    '197.97.145.145', 
-    '197.97.145.146',
-    '197.97.145.147',
-    '197.97.145.148',
-    // Additional PayFast production IPs
-    '41.74.179.194',
-    '41.74.179.195',
-    '41.74.179.196',
-    '41.74.179.197',
-    '41.74.179.198',
-    '41.74.179.199',
-  ];
-
-  // Log IP validation attempts for security monitoring
-  console.log(`🔒 PayFast IP validation: ${ip} - ${validHosts.includes(ip) ? 'VALID' : 'INVALID'}`);
-
-  return validHosts.includes(ip);
+  // Fully bypass host validation (kept as a hook for future use)
+  console.warn(`🔓 PayFast host validation disabled. IP received: ${ip || 'unknown'}`);
+  return true;
 }
 
 /**

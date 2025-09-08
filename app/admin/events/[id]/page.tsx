@@ -1435,10 +1435,10 @@ export default function EventParticipantsPage() {
                       
                       <td className="px-6 py-4">
                         <div className="space-y-1">
-                          <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee.toFixed(2)}</div>
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entry.paymentStatus)}`}>
-                            {entry.paymentStatus.toUpperCase()}
-                          </span>
+                            <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee.toFixed(2)}</div>
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entry.paymentStatus)}`}>
+                              {entry.paymentStatus.toUpperCase()}
+                            </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 hidden md:table-cell">
@@ -1459,12 +1459,12 @@ export default function EventParticipantsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
+                            <button
                           onClick={() => { setEntryModal(entry); setEntryModalTab('overview'); setShowEntryModal(true); }}
                           className="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-indigo-600 text-white hover:bg-indigo-700"
-                        >
+                            >
                           View Details
-                        </button>
+                            </button>
                       </td>
                     </tr>
                     );
