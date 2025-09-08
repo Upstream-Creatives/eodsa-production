@@ -1,12 +1,111 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { PERFORMANCE_TYPES, MASTERY_LEVELS, ITEM_STYLES } from '@/lib/types';
 import CountdownTimer from '@/app/components/CountdownTimer';
 import { useToast } from '@/components/ui/simple-toast';
 import MusicUpload from '@/components/MusicUpload';
+import React from 'react';
+
+function TourOverlay({
+  step,
+  getTargetRect,
+  onNext,
+  onBack,
+  onClose
+}: {
+  step: 1 | 2 | 3 | 4 | 5;
+  getTargetRect: () => { top: number; left: number; width: number; height: number } | null;
+  onNext: () => void;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const [cardPos, setCardPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  useEffect(() => {
+    const update = () => {
+      const targetRect = getTargetRect();
+      setRect(targetRect);
+      if (targetRect) {
+        // Place card below the highlight, aligned left
+        const margin = 12;
+        const viewportWidth = window.innerWidth;
+        const cardWidth = 300;
+        let left = targetRect.left;
+        if (left + cardWidth + 16 > viewportWidth) {
+          left = Math.max(16, viewportWidth - cardWidth - 16);
+        }
+        let top = targetRect.top + targetRect.height + margin;
+        // If near bottom, place above
+        if (top + 160 > window.innerHeight) {
+          top = Math.max(16, targetRect.top - 160 - margin);
+        }
+        setCardPos({ top, left });
+      }
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [step, getTargetRect]);
+
+  if (!rect) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 pointer-events-none">
+      <div className="fixed inset-0 bg-black/40" />
+      <div
+        className="absolute rounded-xl ring-4 ring-blue-400/70 shadow-2xl"
+        style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }}
+      />
+      <div
+        className="absolute max-w-xs w-[300px] p-4 bg-white text-slate-900 rounded-xl shadow-xl border border-slate-200 pointer-events-auto"
+        style={{ top: cardPos.top, left: cardPos.left }}
+      >
+        <div className="text-sm font-semibold mb-2 text-slate-800">
+          {step === 1 && 'Step 1: Choose a performance type'}
+          {step === 2 && 'Step 2: Fill up the performance details'}
+          {step === 3 && 'Step 3: Choose Live or Virtual'}
+          {step === 4 && 'Step 4: Add Entry'}
+          {step === 5 && 'Step 5: Proceed to payment'}
+        </div>
+        <div className="text-sm text-slate-700 mb-3">
+          {step === 1 && 'Pick Solo, Duet, Trio or Group to start.'}
+          {step === 2 && 'Complete the fields above. Music is optional for Live; video URL is optional for Virtual.'}
+          {step === 3 && 'Pick Live (music) or Virtual (video).'}
+          {step === 4 && 'Click Add Entry. To add another, go back to Step 1 and repeat.'}
+          {step === 5 && 'If you are done with entries, continue to payment here.'}
+        </div>
+        <div className="flex justify-between items-center">
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-700 text-sm">Skip</button>
+          <div className="space-x-2">
+            {step > 1 && (
+              <button onClick={onBack} className="px-3 py-1 rounded-md text-sm border border-slate-300 text-slate-700 hover:bg-slate-50">Back</button>
+            )}
+            <button
+              onClick={() => {
+                if (step < 5) {
+                  onNext();
+                } else {
+                  onClose();
+                }
+              }}
+              className="px-3 py-1 rounded-md text-sm bg-blue-600 text-white hover:bg-blue-500"
+            >
+              {step < 5 ? 'Next' : 'Done'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Event {
   id: string;
@@ -112,6 +211,19 @@ export default function CompetitionEntryPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payfast' | 'eft' | null>(null);
   const [showEftModal, setShowEftModal] = useState(false);
   const [eftInvoiceNumber, setEftInvoiceNumber] = useState('');
+  const [showHelp, setShowHelp] = useState(true);
+  // Coachmark tour state
+  const [isTourActive, setIsTourActive] = useState(true);
+  const [tourStep, setTourStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [highlightRect, setHighlightRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const [coachmarkPos, setCoachmarkPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const typeSelectionRef = useRef<HTMLDivElement | null>(null);
+  const entryFormRef = useRef<HTMLDivElement | null>(null);
+  const addEntryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const musicSectionRef = useRef<HTMLDivElement | null>(null);
+  const participantsSectionRef = useRef<HTMLDivElement | null>(null);
+  const proceedToPaymentRef = useRef<HTMLButtonElement | null>(null);
+  const entryTypeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (region && eventId) {
@@ -490,14 +602,8 @@ export default function CompetitionEntryPage() {
       return;
     }
 
-    // PHASE 2: Validate entry type requirements
-    if (currentForm.entryType === 'live' && !currentForm.musicFileUrl) {
-      validationError('Please upload a music file for live performances.');
-      return;
-    }
-    
-    // Note: Video uploads for virtual entries are now optional during initial entry creation
-    // Users can upload videos later through their dashboard
+    // Note: Media uploads are optional during initial entry creation
+    // Users can upload music (live) or video (virtual) later through their dashboard
 
     const participants = availableDancers.filter(dancer => 
       currentForm.participantIds.includes(dancer.id)
@@ -905,13 +1011,44 @@ export default function CompetitionEntryPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Performance Type Selection and Forms */}
           <div className="lg:col-span-2">
             {/* Performance Type Selection */}
-            <div className="bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-6 mb-8">
+            <div ref={typeSelectionRef} className="bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-6 mb-8">
               <h3 className="text-xl font-bold text-white mb-4">Add Performance Types</h3>
+
+              {showHelp ? (
+                <div className="mb-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-blue-200 text-sm">
+                      <p className="font-semibold mb-2">Getting started</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Choose a performance type (Solo, Duet, Trio, Group)</li>
+                        <li>Fill in the performance details and select participants</li>
+                        <li>Click "Add Entry" to add it to your list</li>
+                      </ol>
+                      <p className="text-xs mt-2 opacity-80">Add as many entries as you want, then proceed to payment on the right.</p>
+                    </div>
+                    <button
+                      onClick={() => setShowHelp(false)}
+                      className="text-blue-300 hover:text-white px-2"
+                      aria-label="Close help"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowHelp(true)}
+                  className="mb-3 inline-flex items-center text-xs text-blue-300 hover:text-white"
+                  aria-label="Show how it works"
+                >
+                  <span className="mr-1">❓</span> How it works
+                </button>
+              )}
                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {['Solo', 'Duet', 'Trio', 'Group'].map((type) => {
                   const isActive = showAddForm === type;
@@ -991,7 +1128,7 @@ export default function CompetitionEntryPage() {
 
                          {/* Entry Form */}
              {showAddForm && (
-               <div className="bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-6 mb-8">
+               <div ref={entryFormRef} className="bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-6 mb-8">
                  <div className="flex justify-between items-center mb-4">
                    <div>
                      <h3 className="text-xl font-semibold text-white">Add {showAddForm} Entry</h3>
@@ -1000,6 +1137,7 @@ export default function CompetitionEntryPage() {
                      )}
                    </div>
                   <button
+                    ref={addEntryButtonRef}
                     onClick={() => {
                       // Save current form state before closing
                       setSavedForms(prev => ({
@@ -1142,7 +1280,7 @@ export default function CompetitionEntryPage() {
                   </div>
 
                   {/* PHASE 2: Live vs Virtual Entry Toggle */}
-                  <div>
+                  <div ref={entryTypeRef}>
                     <label className="block text-sm font-semibold text-slate-300 mb-3">🎯 Entry Type *</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <button
@@ -1185,10 +1323,10 @@ export default function CompetitionEntryPage() {
 
                   {/* Conditional Fields Based on Entry Type */}
                   {currentForm.entryType === 'live' && (
-                    <div>
+                    <div ref={musicSectionRef}>
                       <label className="block text-sm font-semibold text-slate-300 mb-3">
-                        🎵 Music File Upload *
-                        <span className="text-xs text-slate-400 block mt-1 font-normal">Upload the music file for your live performance</span>
+                        🎵 Music File Upload (Optional)
+                        <span className="text-xs text-slate-400 block mt-1 font-normal">You can upload now or later from your dashboard</span>
                       </label>
                       <MusicUpload
                         onUploadSuccess={(fileData) => {
@@ -1214,7 +1352,7 @@ export default function CompetitionEntryPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-semibold text-slate-300 mb-3">
-                          📱 Video Platform *
+                          📱 Video Platform
                         </label>
                         <select
                           value={currentForm.videoExternalType}
@@ -1271,7 +1409,7 @@ export default function CompetitionEntryPage() {
                   )}
                 </div>
                 
-                                 <div className="mt-4">
+                                 <div ref={participantsSectionRef} className="mt-4">
                    <label className="block text-sm font-medium text-slate-300 mb-2">
                      Select Participants * ({getParticipantLimits(showAddForm).min} - {getParticipantLimits(showAddForm).max} required)
                      {currentForm.participantIds.length > 0 && (
@@ -1423,20 +1561,19 @@ export default function CompetitionEntryPage() {
                      Cancel
                    </button>
                    <button
+                     ref={addEntryButtonRef}
                      onClick={handleSaveEntry}
                      disabled={
                        !currentForm.itemName || 
                        currentForm.participantIds.length === 0 ||
                        currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
-                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max ||
-                       (currentForm.entryType === 'live' && !currentForm.musicFileUrl)
+                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max
                      }
                      className={`w-full sm:w-auto px-6 py-3 text-white rounded-xl transition-all duration-300 font-semibold text-base min-h-[48px] sm:min-h-auto order-1 sm:order-2 ${
                        !currentForm.itemName || 
                        currentForm.participantIds.length === 0 ||
                        currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
-                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max ||
-                       (currentForm.entryType === 'live' && !currentForm.musicFileUrl)
+                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max
                          ? 'bg-slate-500 cursor-not-allowed'
                          : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:scale-105 shadow-lg hover:shadow-purple-500/25'
                      }`}
@@ -1447,7 +1584,6 @@ export default function CompetitionEntryPage() {
                         `➕ Need ${getParticipantLimits(showAddForm).min - currentForm.participantIds.length} More` :
                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max ? 
                         `➖ Remove ${currentForm.participantIds.length - getParticipantLimits(showAddForm).max}` :
-                      (currentForm.entryType === 'live' && !currentForm.musicFileUrl) ? '🎵 Upload Music File' :
                       `✅ Add Entry ${previewFee > 0 ? `(R${previewFee})` : ''}`}
                    </button>
                  </div>
@@ -1563,6 +1699,7 @@ export default function CompetitionEntryPage() {
                </div>
 
               <button
+                ref={proceedToPaymentRef}
                 onClick={handleProceedToPayment}
                 disabled={entries.length === 0 || isSubmitting}
                 className={`w-full py-4 sm:py-3 text-white rounded-lg font-semibold transition-all duration-300 text-lg sm:text-base min-h-[56px] sm:min-h-auto ${
@@ -1594,6 +1731,31 @@ export default function CompetitionEntryPage() {
             </div>
           </div>
         </div>
+        {/* Guided Tour Overlay */}
+        {isTourActive && (
+          <TourOverlay
+            step={tourStep}
+            getTargetRect={() => {
+              let target: HTMLElement | null = null;
+              if (tourStep === 1) target = typeSelectionRef.current; // Choose type
+              else if (tourStep === 2) target = entryFormRef.current; // Fill details
+              else if (tourStep === 3) target = entryTypeRef.current; // Live/Virtual section
+              else if (tourStep === 4) target = addEntryButtonRef.current; // Add Entry
+              else if (tourStep === 5) target = proceedToPaymentRef.current; // Payment
+              if (!target) return null;
+              const rect = target.getBoundingClientRect();
+              return {
+                top: rect.top - 8,
+                left: rect.left - 8,
+                width: rect.width + 16,
+                height: rect.height + 16,
+              };
+            }}
+            onNext={() => setTourStep((prev) => (prev === 1 ? 2 : prev === 2 ? 3 : prev === 3 ? 4 : prev === 4 ? 5 : 5))}
+            onBack={() => setTourStep((prev) => (prev === 5 ? 4 : prev === 4 ? 3 : prev === 3 ? 2 : 1))}
+            onClose={() => setIsTourActive(false)}
+          />
+        )}
       </div>
 
       {/* Success Modal */}
