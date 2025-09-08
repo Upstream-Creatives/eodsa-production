@@ -1320,8 +1320,8 @@ export default function EventParticipantsPage() {
                 <thead className="bg-gray-50/80">
                   <tr>
                     <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-24">Item #</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Performance</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Performance</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Payment</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">Submitted</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
@@ -1392,6 +1392,27 @@ export default function EventParticipantsPage() {
                           </div>
                         )}
                       </td>
+                      
+                      {/* Performance column (now 2nd) */}
+                      <td className="px-6 py-4">
+                        <div className="space-y-0.5">
+                          <div className="text-xs text-gray-500">
+                            Studio: {entry.studioName || entry.contestantName || entry.eodsaId || 'N/A'}
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">{entry.itemName}</div>
+                          {entry.participantNames && entry.participantNames.length > 0 ? (
+                            <div className="text-xs text-gray-700">
+                              {entry.participantNames.join(', ')}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-700">
+                              {entry.participantIds.map((_, i) => `Participant ${i + 1}`).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      
+                      {/* Type column (now 3rd) */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="space-y-1">
                           <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${getPerformanceTypeColor(performanceType)}`}>
@@ -1412,13 +1433,6 @@ export default function EventParticipantsPage() {
                         </div>
                       </td>
                       
-                      <td className="px-6 py-4 hidden sm:table-cell">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{entry.itemName}</div>
-                          <div className="text-sm text-gray-700">{entry.choreographer}</div>
-                          <div className="text-xs text-gray-500">{entry.mastery} • {entry.itemStyle}</div>
-                        </div>
-                      </td>
                       <td className="px-6 py-4">
                         <div className="space-y-1">
                           <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee.toFixed(2)}</div>
