@@ -800,11 +800,6 @@ export default function CompetitionEntryPage() {
   };
 
   const handleEftPayment = async () => {
-    if (!eftInvoiceNumber.trim()) {
-      validationError('Please enter a payment reference number to continue with EFT payment.');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -847,7 +842,7 @@ export default function CompetitionEntryPage() {
         userName: userName,
         eodsaId: isStudioMode ? studioInfo?.registrationNumber : contestant?.eodsaId,
         amount: totalFee,
-        invoiceNumber: eftInvoiceNumber.trim(),
+        invoiceNumber: eftInvoiceNumber.trim() || undefined,
         itemDescription: entries.map(e => `${e.performanceType}: ${e.itemName}`).join(', '),
         entries: batchEntryData,
         // NEW: Immediately submit entries as pending
@@ -1988,19 +1983,27 @@ export default function CompetitionEntryPage() {
                 </div>
 
                 {/* Payment Reference Input */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-300">
-                    📋 Payment Reference Number (Optional)
+                    📋 Payment Reference (optional)
                   </label>
-                  <input
-                    type="text"
-                    value={eftInvoiceNumber}
-                    onChange={(e) => setEftInvoiceNumber(e.target.value)}
-                    placeholder="Enter your banking reference or transaction number"
-                    className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-base"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={eftInvoiceNumber}
+                      onChange={(e) => setEftInvoiceNumber(e.target.value)}
+                      placeholder="Reference or leave blank"
+                      className="flex-1 p-3 sm:p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 text-sm sm:text-base"
+                    />
+                    <button
+                      onClick={() => setEftInvoiceNumber('')}
+                      className="px-3 sm:px-4 py-2 sm:py-3 bg-slate-700/70 hover:bg-slate-600 text-slate-200 rounded-xl text-sm"
+                    >
+                      Clear
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Optional: Add your banking reference if you've already made the payment, or leave blank to pay later
+                    This is optional and helps us match your EFT.
                   </p>
                 </div>
 
