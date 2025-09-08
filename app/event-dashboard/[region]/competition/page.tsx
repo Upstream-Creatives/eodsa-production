@@ -1519,12 +1519,21 @@ export default function CompetitionEntryPage() {
                      <div className="flex justify-between items-center">
                        <span className="text-sm text-slate-300">Entry Fee Preview:</span>
                        <span className={`text-lg font-semibold ${
-                         previewFee > 0 ? 'text-emerald-400' : 'text-red-400'
+                         (currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
+                          currentForm.participantIds.length > getParticipantLimits(showAddForm).max)
+                           ? 'text-red-400'
+                           : 'text-emerald-400'
                        }`}>
-                         {previewFee > 0 ? `R${previewFee}` : 'Invalid'}
+                         {(currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
+                           currentForm.participantIds.length > getParticipantLimits(showAddForm).max)
+                           ? 'Invalid'
+                           : (previewFee === 0 ? 'FREE' : `R${previewFee}`)}
                        </span>
                      </div>
-                     {showAddForm === 'Solo' && previewFee > 0 && (
+                     {showAddForm === 'Solo' && !(
+                       currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
+                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max
+                     ) && (
                        <div className="text-xs text-slate-400 mt-1">
                          {entries.filter(e => e.performanceType === 'Solo').length === 0 && '1st Solo: R400'}
                          {entries.filter(e => e.performanceType === 'Solo').length === 1 && '2nd Solo: R350 (Package: R750 total)'}
@@ -1533,7 +1542,10 @@ export default function CompetitionEntryPage() {
                          {entries.filter(e => e.performanceType === 'Solo').length >= 4 && '5th+ Solo: FREE!'}
                        </div>
                      )}
-                     {previewFee === 0 && currentForm.participantIds.length > 0 && (
+                     {(currentForm.participantIds.length > 0 && (
+                       currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
+                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max
+                     )) && (
                        <div className="text-xs text-red-400 mt-1">
                          Fix participant selection to see fee
                        </div>
