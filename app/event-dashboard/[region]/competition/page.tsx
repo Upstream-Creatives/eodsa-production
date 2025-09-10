@@ -473,7 +473,7 @@ export default function CompetitionEntryPage() {
 
   const getFeeExplanation = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE. Plus R300 registration.';
+      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE, additional solos R100 each. Plus R300 registration.';
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
       return 'R280 per person + R300 registration each';
     } else if (performanceType === 'Group') {
@@ -537,13 +537,14 @@ export default function CompetitionEntryPage() {
 
   const calculateEntryFee = (performanceType: string, participantCount: number) => {
     if (performanceType === 'Solo') {
-      // Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE
+      // Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE, additional solos R100 each
       const soloCount = entries.filter(entry => entry.performanceType === 'Solo').length + 1; // +1 for current entry
       if (soloCount === 1) return 400;
       if (soloCount === 2) return 750 - 400; // R350 for 2nd solo (total R750)
       if (soloCount === 3) return 1000 - 750; // R250 for 3rd solo (total R1000)
       if (soloCount === 4) return 1200 - 1000; // R200 for 4th solo (total R1200)
-      if (soloCount >= 5) return 0; // 5th solo is FREE
+      if (soloCount === 5) return 0; // 5th solo is FREE
+      if (soloCount > 5) return 100; // Additional solos R100 each
       return 400;
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
       return 280 * participantCount;
@@ -647,7 +648,8 @@ export default function CompetitionEntryPage() {
           else if (soloCount === 2) entry.fee = 750 - 400; // R350 for 2nd solo
           else if (soloCount === 3) entry.fee = 1000 - 750; // R250 for 3rd solo
           else if (soloCount === 4) entry.fee = 1200 - 1000; // R200 for 4th solo
-          else if (soloCount >= 5) entry.fee = 0; // 5th+ solo is FREE
+          else if (soloCount === 5) entry.fee = 0; // 5th solo is FREE
+          else if (soloCount > 5) entry.fee = 100; // Additional solos R100 each
         });
       }
       
@@ -1082,7 +1084,8 @@ export default function CompetitionEntryPage() {
                              {soloCount === 1 && <div className="text-xs opacity-75">2nd Solo (Package deal)</div>}
                              {soloCount === 2 && <div className="text-xs opacity-75">3rd Solo (Package deal)</div>}
                              {soloCount === 3 && <div className="text-xs opacity-75">4th Solo (Package deal)</div>}
-                             {soloCount >= 4 && <div className="text-xs opacity-75">FREE!</div>}
+                             {soloCount === 4 && <div className="text-xs opacity-75">FREE!</div>}
+                             {soloCount > 4 && <div className="text-xs opacity-75">+R100</div>}
                            </div>
                          )}
                          
@@ -1539,7 +1542,7 @@ export default function CompetitionEntryPage() {
                          {entries.filter(e => e.performanceType === 'Solo').length === 1 && '2nd Solo: R350 (Package: R750 total)'}
                          {entries.filter(e => e.performanceType === 'Solo').length === 2 && '3rd Solo: R250 (Package: R1000 total)'}
                          {entries.filter(e => e.performanceType === 'Solo').length === 3 && '4th Solo: R200 (Package: R1200 total)'}
-                         {entries.filter(e => e.performanceType === 'Solo').length >= 4 && '5th+ Solo: FREE!'}
+                         {entries.filter(e => e.performanceType === 'Solo').length >= 4 && '5th Solo: FREE! (Additional: R100 each)'}
                        </div>
                      )}
                      {(currentForm.participantIds.length > 0 && (
@@ -1667,7 +1670,7 @@ export default function CompetitionEntryPage() {
                      )}
                      {entries.filter(e => e.performanceType === 'Solo').length >= 5 && (
                        <div className="text-emerald-400">
-                         ✓ 5th+ solo entries are FREE!
+                         ✓ 5th solo entry is FREE! (Additional solos R100 each)
                        </div>
                      )}
                    </div>

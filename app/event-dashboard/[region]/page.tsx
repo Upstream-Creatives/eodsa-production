@@ -210,7 +210,7 @@ export default function NationalsEventsPage() {
 
   const getFeeExplanation = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE. Plus R300 registration.';
+      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE, additional solos R100 each. Plus R300 registration.';
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
       return 'R280 per person + R300 registration each';
     } else if (performanceType === 'Group') {
