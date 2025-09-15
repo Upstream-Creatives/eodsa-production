@@ -186,6 +186,7 @@ export default function CompetitionEntryPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [entries, setEntries] = useState<PerformanceEntry[]>([]);
+  const [existingDbEntries, setExistingDbEntries] = useState<any[]>([]);
   const [showAddForm, setShowAddForm] = useState<string | null>(null);
   const [registrationFeeCache, setRegistrationFeeCache] = useState<{[key: string]: number}>({});
   const [totalFeeCalculation, setTotalFeeCalculation] = useState<{performanceFee: number, registrationFee: number, total: number}>({performanceFee: 0, registrationFee: 0, total: 0});
@@ -233,6 +234,7 @@ export default function CompetitionEntryPage() {
       if (eodsaId) {
         setIsStudioMode(false);
         loadContestant(eodsaId);
+        loadExistingEntries(eodsaId, eventId);
       } else if (studioId) {
         setIsStudioMode(true);
         loadStudioData(studioId);
@@ -431,6 +433,30 @@ export default function CompetitionEntryPage() {
     }
   };
 
+  const loadExistingEntries = async (eodsaId: string, eventId: string) => {
+    if (!eodsaId || !eventId) return;
+    
+    try {
+      console.log(`🔍 Loading existing entries for dancer ${eodsaId} in event ${eventId}`);
+      const response = await fetch(`/api/contestants/entries?eodsaId=${eodsaId}&debug=true`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Filter entries for this specific event
+          const eventEntries = data.entries.filter((entry: any) => entry.eventId === eventId);
+          setExistingDbEntries(eventEntries);
+          console.log(`📊 Found ${eventEntries.length} existing entries for this event`);
+          if (data.debug) {
+            console.log('Debug info:', data.debug);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading existing entries:', error);
+      setExistingDbEntries([]);
+    }
+  };
+
   const loadEvent = async (id: string) => {
     setIsLoading(true);
     try {
@@ -540,14 +566,25 @@ export default function CompetitionEntryPage() {
 
   const calculateEntryFee = (performanceType: string, participantCount: number) => {
     if (performanceType === 'Solo') {
+      // Count existing solo entries from database + current session entries
+      const existingSoloCount = existingDbEntries.filter(entry => 
+        entry.participantIds && entry.participantIds.length === 1
+      ).length;
+      const sessionSoloCount = entries.filter(entry => entry.performanceType === 'Solo').length;
+      const totalSoloCount = existingSoloCount + sessionSoloCount + 1; // +1 for current entry
+      
+      console.log(`🧮 Solo pricing calculation:`);
+      console.log(`- Existing DB solos: ${existingSoloCount}`);
+      console.log(`- Session solos: ${sessionSoloCount}`);
+      console.log(`- This will be solo #${totalSoloCount}`);
+      
       // Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE, additional solos R100 each
-      const soloCount = entries.filter(entry => entry.performanceType === 'Solo').length + 1; // +1 for current entry
-      if (soloCount === 1) return 400;
-      if (soloCount === 2) return 750 - 400; // R350 for 2nd solo (total R750)
-      if (soloCount === 3) return 1000 - 750; // R250 for 3rd solo (total R1000)
-      if (soloCount === 4) return 1200 - 1000; // R200 for 4th solo (total R1200)
-      if (soloCount === 5) return 0; // 5th solo is FREE
-      if (soloCount > 5) return 100; // Additional solos R100 each
+      if (totalSoloCount === 1) return 400;
+      if (totalSoloCount === 2) return 750 - 400; // R350 for 2nd solo (total R750)
+      if (totalSoloCount === 3) return 1000 - 750; // R250 for 3rd solo (total R1000)
+      if (totalSoloCount === 4) return 1200 - 1000; // R200 for 4th solo (total R1200)
+      if (totalSoloCount === 5) return 0; // 5th solo is FREE
+      if (totalSoloCount > 5) return 100; // Additional solos R100 each
       return 400;
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
       return 280 * participantCount;
@@ -1092,7 +1129,9 @@ export default function CompetitionEntryPage() {
                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {['Solo', 'Duet', 'Trio', 'Group'].map((type) => {
                   const isActive = showAddForm === type;
-                  const soloCount = entries.filter(e => e.performanceType === 'Solo').length;
+                  const existingSolos = existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length;
+                  const sessionSolos = entries.filter(e => e.performanceType === 'Solo').length;
+                  const totalSoloCount = existingSolos + sessionSolos;
                   const nextSoloFee = type === 'Solo' ? calculateEntryFee('Solo', 1) : 0;
                   
                   // For independent dancers (non-studio mode), only allow Solo
@@ -1123,12 +1162,12 @@ export default function CompetitionEntryPage() {
                              <div className="font-semibold text-emerald-200">
                                Next: R{nextSoloFee}
                              </div>
-                             {soloCount === 0 && <div className="text-xs opacity-75">1st Solo</div>}
-                             {soloCount === 1 && <div className="text-xs opacity-75">2nd Solo (Package deal)</div>}
-                             {soloCount === 2 && <div className="text-xs opacity-75">3rd Solo (Package deal)</div>}
-                             {soloCount === 3 && <div className="text-xs opacity-75">4th Solo (Package deal)</div>}
-                             {soloCount === 4 && <div className="text-xs opacity-75">FREE!</div>}
-                             {soloCount > 4 && <div className="text-xs opacity-75">+R100</div>}
+                             {totalSoloCount === 0 && <div className="text-xs opacity-75">1st Solo</div>}
+                             {totalSoloCount === 1 && <div className="text-xs opacity-75">2nd Solo (Package deal)</div>}
+                             {totalSoloCount === 2 && <div className="text-xs opacity-75">3rd Solo (Package deal)</div>}
+                             {totalSoloCount === 3 && <div className="text-xs opacity-75">4th Solo (Package deal)</div>}
+                             {totalSoloCount === 4 && <div className="text-xs opacity-75">FREE!</div>}
+                             {totalSoloCount > 4 && <div className="text-xs opacity-75">+R100</div>}
                            </div>
                          )}
                          
@@ -1581,11 +1620,11 @@ export default function CompetitionEntryPage() {
                        currentForm.participantIds.length > getParticipantLimits(showAddForm).max
                      ) && (
                        <div className="text-xs text-slate-400 mt-1">
-                         {entries.filter(e => e.performanceType === 'Solo').length === 0 && '1st Solo: R400'}
-                         {entries.filter(e => e.performanceType === 'Solo').length === 1 && '2nd Solo: R350 (Package: R750 total)'}
-                         {entries.filter(e => e.performanceType === 'Solo').length === 2 && '3rd Solo: R250 (Package: R1000 total)'}
-                         {entries.filter(e => e.performanceType === 'Solo').length === 3 && '4th Solo: R200 (Package: R1200 total)'}
-                         {entries.filter(e => e.performanceType === 'Solo').length >= 4 && '5th Solo: FREE! (Additional: R100 each)'}
+                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 0 && '1st Solo: R400'}
+                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 1 && '2nd Solo: R350 (Package: R750 total)'}
+                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 2 && '3rd Solo: R250 (Package: R1000 total)'}
+                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 3 && '4th Solo: R200 (Package: R1200 total)'}
+                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) >= 4 && '5th Solo: FREE! (Additional: R100 each)'}
                        </div>
                      )}
                      {(currentForm.participantIds.length > 0 && (
@@ -1700,11 +1739,11 @@ export default function CompetitionEntryPage() {
                  )}
                  
                  {/* Solo package info */}
-                 {entries.filter(e => e.performanceType === 'Solo').length > 0 && (
+                 {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) > 0 && (
                    <div className="text-xs text-slate-400 bg-slate-700/30 p-2 rounded">
                      <div className="flex justify-between">
                        <span>Solo entries:</span>
-                       <span>{entries.filter(e => e.performanceType === 'Solo').length}</span>
+                       <span>{existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length}</span>
                      </div>
                      {entries.filter(e => e.performanceType === 'Solo').length >= 2 && (
                        <div className="text-emerald-400 mt-1">

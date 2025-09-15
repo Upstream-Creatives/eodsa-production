@@ -397,6 +397,255 @@ function VideoUploadSection({ dancerSession }: { dancerSession: DancerSession })
   );
 }
 
+// Competition Entries Section Component
+function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSession }) {
+  const [competitionEntries, setCompetitionEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadCompetitionEntries();
+  }, [dancerSession.eodsaId]);
+
+  const loadCompetitionEntries = async () => {
+    try {
+      // Add debug parameter if needed
+      const debugMode = process.env.NODE_ENV === 'development';
+      const response = await fetch(`/api/contestants/entries?eodsaId=${dancerSession.eodsaId}${debugMode ? '&debug=true' : ''}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setCompetitionEntries(data.entries);
+        console.log(`Loaded ${data.entries.length} competition entries for dancer ${dancerSession.eodsaId}`);
+        if (data.debug) {
+          console.log('Debug info:', data.debug);
+        }
+      } else {
+        setError(data.error || 'Failed to load entries');
+        console.error('Failed to load entries:', data.error);
+      }
+    } catch (error) {
+      console.error('Error loading competition entries:', error);
+      setError('Failed to load entries');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getEntryTypeBadge = (entryType: string) => {
+    return entryType === 'live' 
+      ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+      : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30';
+  };
+
+  const getStatusBadge = (approved: boolean, paid: boolean) => {
+    if (!paid) return 'bg-red-500/20 text-red-300 border border-red-500/30';
+    if (!approved) return 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30';
+    return 'bg-green-500/20 text-green-300 border border-green-500/30';
+  };
+
+  const getStatusText = (approved: boolean, paid: boolean) => {
+    if (!paid) return '💳 Payment Required';
+    if (!approved) return '⏳ Pending Approval';
+    return '✅ Approved';
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 p-6">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          <span className="ml-3 text-gray-300">Loading competition entries...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
+      <div className="p-6 border-b border-gray-700">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-bold text-white">
+              🏆 My Competition Entries 
+              {!loading && (
+                <span className="text-sm font-normal text-gray-400 ml-2">
+                  ({competitionEntries.length})
+                </span>
+              )}
+            </h3>
+            <p className="text-gray-400 text-sm mt-1">All your competition entries across different events</p>
+          </div>
+          <button
+            onClick={loadCompetitionEntries}
+            disabled={loading}
+            className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? '🔄' : '↻'} Refresh
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/20 border-b border-red-500/30 text-red-200">
+          {error}
+        </div>
+      )}
+
+      {competitionEntries.length === 0 ? (
+        <div className="p-8 text-center">
+          <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">🏆</span>
+          </div>
+          <p className="text-gray-400 mb-2">No competition entries found</p>
+          <p className="text-gray-500 text-sm mb-4">
+            You haven't entered any competitions yet, or entries may still be processing.
+          </p>
+          <div className="space-y-2 text-xs text-gray-600">
+            <p>📋 Entries are typically created by your studio or coach</p>
+            <p>🔍 EODSA ID being searched: <span className="font-mono text-gray-400">{dancerSession.eodsaId}</span></p>
+            <p>📞 Contact your studio if you expect to see entries here</p>
+          </div>
+          <button
+            onClick={loadCompetitionEntries}
+            className="mt-4 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            🔄 Check Again
+          </button>
+        </div>
+      ) : (
+        <div className="p-6">
+          <div className="space-y-6">
+            {competitionEntries.map((entry) => {
+              const isGroupEntry = entry.participantIds && entry.participantIds.length > 1;
+              const isOwner = entry.eodsaId === dancerSession.eodsaId;
+              const performanceType = isGroupEntry 
+                ? entry.participantIds.length === 2 ? 'Duet'
+                : entry.participantIds.length === 3 ? 'Trio' 
+                : 'Group'
+                : 'Solo';
+              
+              return (
+                <div key={entry.id} className="bg-gray-700/50 rounded-xl p-4 sm:p-6 border border-gray-600 hover:border-purple-500 transition-all duration-300">
+                  <div className="mb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
+                      <h4 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-0">{entry.itemName}</h4>
+                      
+                      {/* Badges Row */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Performance Type Badge */}
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          isGroupEntry 
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                            : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        }`}>
+                          {isGroupEntry ? `👥 ${performanceType}` : '🕺 Solo'}
+                        </span>
+                        
+                        {/* Entry Type Badge */}
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEntryTypeBadge(entry.entryType)}`}>
+                          {entry.entryType === 'live' ? '🎤 Live' : '📹 Virtual'}
+                        </span>
+                        
+                        {/* Status Badge */}
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(entry.approved, entry.paid)}`}>
+                          {getStatusText(entry.approved, entry.paid)}
+                        </span>
+                        
+                        {/* Access Type Badge for Groups */}
+                        {isGroupEntry && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            isOwner 
+                              ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                              : 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                          }`}>
+                            {isOwner ? '👑 Owner' : '🤝 Participant'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+                      <p className="text-gray-300">Event: <span className="text-white font-medium">{entry.eventName}</span></p>
+                      <p className="text-gray-300">Style: <span className="text-white font-medium">{entry.itemStyle}</span></p>
+                      <p className="text-gray-300">Mastery: <span className="text-white font-medium">{entry.mastery}</span></p>
+                      <p className="text-gray-300">Duration: <span className="text-white font-medium">{entry.estimatedDuration} min</span></p>
+                      {entry.region && (
+                        <p className="text-gray-300">Region: <span className="text-white font-medium">{entry.region}</span></p>
+                      )}
+                      {entry.venue && entry.venue !== 'TBD' && (
+                        <p className="text-gray-300">Venue: <span className="text-white font-medium">{entry.venue}</span></p>
+                      )}
+                    </div>
+
+                    {/* Event Date */}
+                    {entry.eventDate && (
+                      <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                        <p className="text-blue-300 text-sm">
+                          📅 Event Date: <span className="font-medium">{new Date(entry.eventDate).toLocaleDateString()}</span>
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Group Info */}
+                    {isGroupEntry && (
+                      <div className="mt-3 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg">
+                        <p className="text-purple-300 text-sm font-medium mb-1">
+                          🎭 Group Performance ({entry.participantIds.length} dancers)
+                        </p>
+                        <p className="text-purple-200 text-xs">
+                          {isOwner 
+                            ? 'You registered this group entry and can manage it.'
+                            : 'You\'re a participant in this group entry.'
+                          }
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Entry Fee Information */}
+                    <div className="mt-3 p-3 bg-gray-800/50 border border-gray-600 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <p className="text-gray-300 text-sm">Entry Fee:</p>
+                        <p className="text-white font-semibold">R{entry.entryFee || 0}</p>
+                      </div>
+                      {!entry.paid && (
+                        <p className="text-red-400 text-xs mt-1">⚠️ Payment required to complete registration</p>
+                      )}
+                    </div>
+
+                    {/* File Upload Status */}
+                    {entry.entryType === 'live' && (
+                      <div className="mt-3 p-2 bg-green-900/20 border border-green-500/30 rounded-lg">
+                        <p className="text-green-300 text-sm">
+                          🎵 Music File: {entry.musicFileUrl ? 
+                            <span className="text-green-400 font-medium">✅ Uploaded</span> : 
+                            <span className="text-yellow-400 font-medium">📤 Upload Required</span>
+                          }
+                        </p>
+                      </div>
+                    )}
+
+                    {entry.entryType === 'virtual' && (
+                      <div className="mt-3 p-2 bg-indigo-900/20 border border-indigo-500/30 rounded-lg">
+                        <p className="text-indigo-300 text-sm">
+                          📹 Video File: {(entry.videoFileUrl || entry.videoExternalUrl) ? 
+                            <span className="text-green-400 font-medium">✅ Uploaded</span> : 
+                            <span className="text-yellow-400 font-medium">📤 Upload Required</span>
+                          }
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DancerDashboardPage() {
   const [dancerSession, setDancerSession] = useState<DancerSession | null>(null);
   const [applications, setApplications] = useState<StudioApplication[]>([]);
@@ -521,6 +770,9 @@ export default function DancerDashboardPage() {
       </div>
 
       <div className="container mx-auto p-4 space-y-6">
+        {/* Competition Entries Section */}
+        <CompetitionEntriesSection dancerSession={dancerSession} />
+
         {/* Studio Applications Section */}
         <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
           <div className="p-6 border-b border-gray-700">
