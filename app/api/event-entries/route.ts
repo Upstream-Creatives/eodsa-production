@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, initializeDatabase, unifiedDb } from '@/lib/database';
 import { emailService } from '@/lib/email';
+import { getExistingSoloEntries, validateAndCorrectEntryFee } from '@/lib/pricing-utils';
 
 // Helper function to check if a dancer's age matches the event's age category
 function checkAgeEligibility(dancerAge: number, ageCategory: string): boolean {
@@ -263,13 +264,64 @@ export async function POST(request: NextRequest) {
       console.log(`Using unified dancer ID ${finalContestantId} as contestant ID for ${firstParticipant.name}`);
     }
 
+    // CRITICAL: Calculate correct fee based on existing entries (fix for solo pricing bug)
+    let validatedFee = body.calculatedFee;
+    
+    if (performanceType === 'Solo') {
+      // Get existing solo entries for this dancer/contestant and event
+      const allEntries = await db.getAllEventEntries();
+      const existingSoloEntries = getExistingSoloEntries(
+        allEntries,
+        body.eventId,
+        body.eodsaId,
+        finalContestantId,
+        firstParticipant?.id
+      );
+      
+      // Validate and correct the fee using the utility function
+      const feeValidation = validateAndCorrectEntryFee(
+        performanceType,
+        participantCount,
+        body.calculatedFee,
+        existingSoloEntries.length
+      );
+      
+      validatedFee = feeValidation.validatedFee;
+      
+      // Log for debugging and monitoring
+      console.log(`Solo pricing calculation for ${body.eodsaId}:`);
+      console.log(`- Event: ${body.eventId}`);
+      console.log(`- Existing solo entries: ${existingSoloEntries.length}`);
+      console.log(`- This will be solo #${existingSoloEntries.length + 1}`);
+      console.log(`- ${feeValidation.explanation}`);
+      console.log(`- Submitted fee: R${body.calculatedFee}`);
+      console.log(`- Validated fee: R${validatedFee}`);
+      
+      if (!feeValidation.wasCorrect) {
+        console.warn(`⚠️ Fee correction applied: submitted R${body.calculatedFee}, corrected to R${validatedFee}`);
+      }
+    } else {
+      // For non-solo entries, validate using the utility function
+      const feeValidation = validateAndCorrectEntryFee(
+        performanceType,
+        participantCount,
+        body.calculatedFee
+      );
+      
+      if (!feeValidation.wasCorrect) {
+        console.warn(`⚠️ ${performanceType} fee validation: submitted R${body.calculatedFee}, expected R${feeValidation.validatedFee}`);
+        console.warn(`⚠️ Using submitted fee but flagging for review`);
+        // For non-solo, we log but don't auto-correct (in case there are special pricing rules)
+      }
+    }
+
     // Create event entry
     const eventEntry = await db.createEventEntry({
       eventId: body.eventId,
       contestantId: finalContestantId,
       eodsaId: body.eodsaId,
       participantIds: body.participantIds,
-      calculatedFee: body.calculatedFee,
+      calculatedFee: validatedFee, // Use the server-validated fee
       paymentStatus: body.paymentStatus || 'pending',
       paymentMethod: body.paymentMethod,
       approved: body.approved || false,

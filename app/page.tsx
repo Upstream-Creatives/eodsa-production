@@ -106,7 +106,7 @@ export default function HomePage() {
             <p className="text-gray-400">Choose your path to get started</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 lg:gap-8 mb-16 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 mb-16 max-w-7xl mx-auto">
             {/* New User Card */}
             <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 border-indigo-500/30 p-6 text-center hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-indigo-500/20">
               <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl">
@@ -231,6 +231,28 @@ export default function HomePage() {
                 >
                   Studio Login
                 </Link>
+              </div>
+            </div>
+
+            {/* Dancer Portal Card */}
+            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 border-pink-500/30 p-6 text-center hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-pink-500/20">
+              <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl">
+                <span className="text-white text-2xl">🩰</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">Dancer Portal</h3>
+              <p className="text-gray-300 mb-4 text-sm">
+                Already registered? Access your personal dancer dashboard to view entries and uploads.
+              </p>
+              <div className="space-y-2">
+                <Link 
+                  href="/dancer-login"
+                  className="block w-full px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-lg font-semibold hover:from-pink-600 hover:to-rose-700 transition-all duration-300 shadow-lg hover:shadow-xl text-sm"
+                >
+                  Dancer Login
+                </Link>
+                <p className="text-xs text-gray-500 mt-2">
+                  Use your EODSA ID & National ID
+                </p>
               </div>
             </div>
           </div>
