@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
 import { calculateEODSAFee } from '@/lib/types';
+import { calculateSmartEODSAFee } from '@/lib/registration-fee-tracker';
 
 interface Event {
   id: string;
@@ -470,17 +471,45 @@ export default function EventParticipantsPage() {
       ];
 
       // Prepare participant data with enhanced information
-      const participantData = entries.map((entry) => {
-        // Calculate fee breakdown for each entry
-        const feeBreakdown = calculateEODSAFee(
-          entry.mastery,
-          event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
-          entry.participantIds?.length || 1,
-          {
-            soloCount: 1,
-            includeRegistration: true
+      const participantData = await Promise.all(entries.map(async (entry) => {
+        // Try to calculate fee breakdown with smart registration checking
+        let feeBreakdown;
+        try {
+          // Try smart calculation if we have participant IDs
+          if (entry.participantIds && entry.participantIds.length > 0) {
+            feeBreakdown = await calculateSmartEODSAFee(
+              entry.mastery,
+              event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
+              entry.participantIds,
+              {
+                soloCount: 1
+              }
+            );
+          } else {
+            // Fallback to basic calculation
+            feeBreakdown = calculateEODSAFee(
+              entry.mastery,
+              event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
+              entry.participantIds?.length || 1,
+              {
+                soloCount: 1,
+                includeRegistration: true
+              }
+            );
           }
-        );
+        } catch (error) {
+          console.warn('Smart fee calculation failed, using basic calculation:', error);
+          // Fallback to basic calculation
+          feeBreakdown = calculateEODSAFee(
+            entry.mastery,
+            event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
+            entry.participantIds?.length || 1,
+            {
+              soloCount: 1,
+              includeRegistration: true
+            }
+          );
+        }
 
         // Get participant names if available
         const participantNames = entry.participantNames?.join(', ') || 'Unknown';
@@ -509,7 +538,7 @@ export default function EventParticipantsPage() {
           new Date(entry.submittedAt).toLocaleDateString(),
           new Date(entry.submittedAt).toLocaleTimeString()
         ];
-      });
+      }));
 
       // Create headers for participant data
       const participantHeaders = [

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AGE_CATEGORIES, MASTERY_LEVELS, ITEM_STYLES, TIME_LIMITS, calculateEODSAFee } from '@/lib/types';
+import { calculateSmartEODSAFee } from '@/lib/registration-fee-tracker';
 import { useAlert } from '@/components/ui/custom-alert';
 import { MultiSelectDancers } from '@/components/ui/multi-select-dancers';
 
@@ -280,28 +281,26 @@ export default function PerformanceTypeEntryPage() {
             });
           }
         } else {
-          // Fallback to EODSA calculation
-          const feeBreakdownResult = calculateEODSAFee(
+          // Fallback to smart EODSA calculation
+          const feeBreakdownResult = await calculateSmartEODSAFee(
             formData.mastery,
             capitalizedPerformanceType,
-            formData.participantIds.length,
+            formData.participantIds,
             {
-              soloCount: formData.soloCount || 1,
-              includeRegistration: true
+              soloCount: formData.soloCount || 1
             }
           );
 
           setFeeBreakdown(feeBreakdownResult);
         }
       } else {
-        // Use EODSA fee calculation for non-solo or non-nationals events
-        const feeBreakdownResult = calculateEODSAFee(
+        // Use smart EODSA fee calculation for non-solo or non-nationals events
+        const feeBreakdownResult = await calculateSmartEODSAFee(
           formData.mastery,
           capitalizedPerformanceType,
-          formData.participantIds.length,
+          formData.participantIds,
           {
-            soloCount: 1,
-            includeRegistration: true
+            soloCount: 1
           }
         );
 
@@ -309,14 +308,13 @@ export default function PerformanceTypeEntryPage() {
       }
     } catch (error) {
       console.error('Error calculating fee:', error);
-      // Fallback to standard EODSA calculation
-      const feeBreakdownResult = calculateEODSAFee(
+      // Fallback to smart EODSA calculation
+      const feeBreakdownResult = await calculateSmartEODSAFee(
         formData.mastery,
         getCapitalizedPerformanceType(performanceType),
-        formData.participantIds.length,
+        formData.participantIds,
         {
-          soloCount: formData.soloCount || 1,
-          includeRegistration: true
+          soloCount: formData.soloCount || 1
         }
       );
 
@@ -1004,15 +1002,14 @@ export default function PerformanceTypeEntryPage() {
         }
       }
 
-      // Calculate fee correctly - use EODSA fee calculation for all entries
+      // Calculate fee correctly - use smart EODSA fee calculation for all entries
       let totalFee = 0;
-      const feeBreakdownResult = calculateEODSAFee(
+      const feeBreakdownResult = await calculateSmartEODSAFee(
         formData.mastery,
         getCapitalizedPerformanceType(performanceType),
-        formData.participantIds.length,
+        formData.participantIds,
         {
-          soloCount: performanceType?.toLowerCase() === 'solo' ? formData.soloCount : 1,
-          includeRegistration: true
+          soloCount: performanceType?.toLowerCase() === 'solo' ? formData.soloCount : 1
         }
       );
       totalFee = feeBreakdownResult.totalFee;

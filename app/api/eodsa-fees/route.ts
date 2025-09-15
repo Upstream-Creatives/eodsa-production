@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateEODSAFee } from '@/lib/types';
+import { calculateSmartEODSAFee } from '@/lib/registration-fee-tracker';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest) {
     const numberOfParticipants = parseInt(searchParams.get('numberOfParticipants') || '1');
     const soloCount = parseInt(searchParams.get('soloCount') || '1');
     const includeRegistration = searchParams.get('includeRegistration') !== 'false';
+    const participantIds = searchParams.get('participantIds')?.split(',').filter(Boolean) || [];
     
     if (!masteryLevel || !performanceType) {
       return NextResponse.json(
@@ -17,15 +19,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const feeBreakdown = calculateEODSAFee(
-      masteryLevel,
-      performanceType,
-      numberOfParticipants,
-      {
-        soloCount,
-        includeRegistration
-      }
-    );
+    let feeBreakdown;
+    
+    // Use smart calculation if participant IDs are provided
+    if (participantIds.length > 0) {
+      feeBreakdown = await calculateSmartEODSAFee(
+        masteryLevel,
+        performanceType,
+        participantIds,
+        {
+          soloCount
+        }
+      );
+    } else {
+      // Fallback to basic calculation
+      feeBreakdown = calculateEODSAFee(
+        masteryLevel,
+        performanceType,
+        numberOfParticipants,
+        {
+          soloCount,
+          includeRegistration
+        }
+      );
+    }
     
     return NextResponse.json({
       success: true,
@@ -55,7 +72,8 @@ export async function POST(request: NextRequest) {
       performanceType, 
       numberOfParticipants = 1, 
       soloCount = 1, 
-      includeRegistration = true 
+      includeRegistration = true,
+      participantIds = []
     } = body;
     
     if (!masteryLevel || !performanceType) {
@@ -65,15 +83,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const feeBreakdown = calculateEODSAFee(
-      masteryLevel,
-      performanceType,
-      numberOfParticipants,
-      {
-        soloCount,
-        includeRegistration
-      }
-    );
+    let feeBreakdown;
+    
+    // Use smart calculation if participant IDs are provided
+    if (participantIds && participantIds.length > 0) {
+      feeBreakdown = await calculateSmartEODSAFee(
+        masteryLevel,
+        performanceType,
+        participantIds,
+        {
+          soloCount
+        }
+      );
+    } else {
+      // Fallback to basic calculation
+      feeBreakdown = calculateEODSAFee(
+        masteryLevel,
+        performanceType,
+        numberOfParticipants,
+        {
+          soloCount,
+          includeRegistration
+        }
+      );
+    }
     
     return NextResponse.json({
       success: true,

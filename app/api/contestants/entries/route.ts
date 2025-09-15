@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
             venue: event?.venue || 'TBD',
             region: event?.region || null,
             entryFee: entry.calculatedFee || 0,
-            paid: entry.paymentStatus === 'paid' || entry.paymentStatus === 'completed'
+            paid: entry.paymentStatus === 'paid'
           };
         } catch (error) {
           console.error('Error getting event details for entry:', entry.id, error);
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
             venue: 'TBD',
             region: null,
             entryFee: entry.calculatedFee || 0,
-            paid: entry.paymentStatus === 'paid' || entry.paymentStatus === 'completed'
+            paid: entry.paymentStatus === 'paid'
           };
         }
       })
