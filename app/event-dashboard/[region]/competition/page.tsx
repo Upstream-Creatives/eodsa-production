@@ -502,13 +502,13 @@ export default function CompetitionEntryPage() {
 
   const getFeeExplanation = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE, additional solos R100 each. Plus R300 registration.';
+      return 'Solo packages: 1st solo R400, 2nd R350, 3rd R300, 4th R250, 5th FREE, additional solos R100 each. Plus R250 registration.';
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return 'R280 per person + R300 registration each';
+      return 'R280 per person + R250 registration each';
     } else if (performanceType === 'Group') {
-      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R300 registration each.';
+      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R250 registration each.';
     }
-    return 'Per person + R300 registration each';
+    return 'Per person + R250 registration each';
   };
 
   // NEW: Helper function to get maximum duration display for performance type
@@ -568,7 +568,7 @@ export default function CompetitionEntryPage() {
     try {
       if (!currentForm.mastery) {
         console.warn('No mastery level selected, using default performance fee calculation');
-        return calculateFallbackEntryFee(performanceType, participantIds.length);
+        return calculateFallbackEntryFee(performanceType, participantIds.length, participantIds);
       }
 
       // Use smart fee calculation that accounts for registration fees
@@ -644,7 +644,12 @@ export default function CompetitionEntryPage() {
           ).length;
         }
         
-        const sessionSoloCount = entries.filter(entry => entry.performanceType === 'Solo').length;
+        // Count session solos for THIS SPECIFIC DANCER ONLY, not all dancers
+        const sessionSoloCount = entries.filter(entry => 
+          entry.performanceType === 'Solo' && 
+          entry.participantIds.length === 1 && 
+          entry.participantIds[0] === participantIds[0]
+        ).length;
         soloCount = existingSoloCount + sessionSoloCount + 1; // +1 for current entry
         
         console.log(`🧮 Solo pricing calculation:`);
@@ -664,25 +669,59 @@ export default function CompetitionEntryPage() {
       );
 
       console.log('🧮 Smart fee calculation result:', feeBreakdown);
-      return feeBreakdown.totalFee;
+      // Performance-only; registration is handled in the summary
+      return feeBreakdown.performanceFee;
     } catch (error) {
       console.error('Error in smart fee calculation, falling back to basic calculation:', error);
-      return calculateFallbackEntryFee(performanceType, participantIds.length);
+      return calculateFallbackEntryFee(performanceType, participantIds.length, participantIds);
     }
   };
 
   // Fallback fee calculation for when smart calculation fails
-  const calculateFallbackEntryFee = (performanceType: string, participantCount: number) => {
+  const calculateFallbackEntryFee = (performanceType: string, participantCount: number, specificParticipantIds?: string[]) => {
     if (performanceType === 'Solo') {
-      // Count existing solo entries from database + current session entries
-      const existingSoloCount = existingDbEntries.filter(entry => 
-        entry.participantIds && entry.participantIds.length === 1
-      ).length;
-      const sessionSoloCount = entries.filter(entry => entry.performanceType === 'Solo').length;
+      let existingSoloCount = 0;
+      let sessionSoloCount = 0;
+      
+      // If we have specific participant info, count per dancer
+      if (specificParticipantIds && specificParticipantIds.length === 1) {
+        const dancerEodsaId = specificParticipantIds[0];
+        
+        // Count existing solos for this specific dancer
+        existingSoloCount = existingDbEntries.filter(entry => {
+          if (!entry.participantIds || entry.participantIds.length !== 1) return false;
+          
+          let entryParticipants = [];
+          if (Array.isArray(entry.participantIds)) {
+            entryParticipants = entry.participantIds;
+          } else if (typeof entry.participantIds === 'string') {
+            try {
+              entryParticipants = JSON.parse(entry.participantIds);
+            } catch (e) {
+              entryParticipants = [entry.participantIds];
+            }
+          }
+          
+          return entryParticipants.includes(dancerEodsaId);
+        }).length;
+        
+        // Count session solos for this specific dancer
+        sessionSoloCount = entries.filter(entry => 
+          entry.performanceType === 'Solo' && 
+          entry.participantIds.length === 1 && 
+          entry.participantIds[0] === dancerEodsaId
+        ).length;
+      } else {
+        // Fallback to old logic if no specific participant info
+        existingSoloCount = existingDbEntries.filter(entry => 
+          entry.participantIds && entry.participantIds.length === 1
+        ).length;
+        sessionSoloCount = entries.filter(entry => entry.performanceType === 'Solo').length;
+      }
+      
       const totalSoloCount = existingSoloCount + sessionSoloCount + 1; // +1 for current entry
       
       // Use nationals solo pricing: 1st R400, 2nd R350, 3rd R300, 4th R250, 5th FREE, additional R100
-      const registrationFee = 250; // R250 registration per dancer
       let performanceFee = 0;
       
       if (totalSoloCount === 1) {
@@ -698,14 +737,15 @@ export default function CompetitionEntryPage() {
       } else if (totalSoloCount > 5) {
         performanceFee = 100; // Additional solos R100 each
       }
-      
-      return registrationFee + performanceFee;
+      // Performance-only
+      return performanceFee;
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return (280 * participantCount) + (250 * participantCount); // R280 performance + R250 registration per dancer
+      // Performance-only per person
+      return (280 * participantCount);
     } else if (performanceType === 'Group') {
+      // Performance-only per person
       const performanceFee = participantCount <= 9 ? 220 * participantCount : 190 * participantCount; // R220 (4-9 people), R190 (10+ people)
-      const registrationFee = 250 * participantCount; // R250 registration per dancer
-      return performanceFee + registrationFee;
+      return performanceFee;
     }
     return 0;
   };
