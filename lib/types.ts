@@ -358,28 +358,33 @@ export const calculateEODSAFee = (
   let registrationFee = 0;
   let registrationBreakdown = '';
   
-  if (includeRegistration && participantDancers.length > 0) {
+  if (includeRegistration && performanceType === 'Solo' && participantDancers.length > 0) {
+    // REGISTRATION FEE CHECKING ONLY FOR SOLO PERFORMANCES
     // Check each dancer's registration status
     const unpaidDancers = participantDancers.filter(dancer => {
       if (!dancer.registrationFeePaid) {
         return true; // Not paid at all
       }
-      return false; // Already paid
+      // Check if registration was paid for a different mastery level
+      if (dancer.registrationFeeMasteryLevel && dancer.registrationFeeMasteryLevel !== masteryLevel) {
+        return true; // Paid for different mastery level, need to pay again
+      }
+      return false; // Already paid for this mastery level
     });
     
     if (unpaidDancers.length > 0) {
       registrationFee = EODSA_FEES.REGISTRATION[masteryLevel as keyof typeof EODSA_FEES.REGISTRATION] * unpaidDancers.length;
       
       if (unpaidDancers.length === participantDancers.length) {
-        registrationBreakdown = `Registration fee for ${unpaidDancers.length} dancer${unpaidDancers.length > 1 ? 's' : ''}`;
+        registrationBreakdown = `Registration fee for ${unpaidDancers.length} dancer${unpaidDancers.length > 1 ? 's' : ''} (${masteryLevel})`;
       } else {
         const paidCount = participantDancers.length - unpaidDancers.length;
-        registrationBreakdown = `Registration fee for ${unpaidDancers.length} dancer${unpaidDancers.length > 1 ? 's' : ''} (${paidCount} already paid)`;
+        registrationBreakdown = `Registration fee for ${unpaidDancers.length} dancer${unpaidDancers.length > 1 ? 's' : ''} (${paidCount} already paid for ${masteryLevel})`;
       }
     } else {
-      registrationBreakdown = 'All dancers have already paid registration fee';
+      registrationBreakdown = `All dancers have already paid registration fee for ${masteryLevel}`;
     }
-  } else if (includeRegistration) {
+  } else if (includeRegistration && performanceType === 'Solo') {
     // Fallback calculation if no dancer data provided
     registrationFee = EODSA_FEES.REGISTRATION[masteryLevel as keyof typeof EODSA_FEES.REGISTRATION] * numberOfParticipants;
     registrationBreakdown = `Registration fee for ${numberOfParticipants} dancer${numberOfParticipants > 1 ? 's' : ''}`;

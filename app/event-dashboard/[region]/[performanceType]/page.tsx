@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AGE_CATEGORIES, MASTERY_LEVELS, ITEM_STYLES, TIME_LIMITS, calculateEODSAFee } from '@/lib/types';
-import { calculateSmartEODSAFee } from '@/lib/registration-fee-tracker';
+// Registration fee checking moved to API calls
 import { useAlert } from '@/components/ui/custom-alert';
 import { MultiSelectDancers } from '@/components/ui/multi-select-dancers';
 
@@ -123,6 +123,7 @@ export default function PerformanceTypeEntryPage() {
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [step, setStep] = useState(1); // 1: Event Selection, 2: Details, 3: Payment, 4: Review
   const [isDancersLoading, setIsDancersLoading] = useState(false);
@@ -251,6 +252,7 @@ export default function PerformanceTypeEntryPage() {
       return;
     }
 
+    setIsCalculatingFee(true);
     try {
       const capitalizedPerformanceType = getCapitalizedPerformanceType(performanceType);
       
@@ -281,44 +283,102 @@ export default function PerformanceTypeEntryPage() {
             });
           }
         } else {
-          // Fallback to smart EODSA calculation
-          const feeBreakdownResult = await calculateSmartEODSAFee(
-            formData.mastery,
-            capitalizedPerformanceType,
-            formData.participantIds,
-            {
-              soloCount: formData.soloCount || 1
+          // Fallback to API call for EODSA calculation
+          try {
+            const fallbackResponse = await fetch('/api/eodsa-fees', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                masteryLevel: formData.mastery,
+                performanceType: capitalizedPerformanceType,
+                participantIds: formData.participantIds,
+                soloCount: formData.soloCount || 1,
+                includeRegistration: true
+              })
+            });
+            
+            if (fallbackResponse.ok) {
+              const fallbackData = await fallbackResponse.json();
+              setFeeBreakdown(fallbackData.fees);
+            } else {
+              throw new Error('Fallback API call failed');
             }
-          );
-
-          setFeeBreakdown(feeBreakdownResult);
+          } catch (fallbackError) {
+            console.error('Both API calls failed, using basic calculation:', fallbackError);
+            // Final fallback to basic calculation
+            const basicFee = calculateEODSAFee(
+              formData.mastery,
+              capitalizedPerformanceType,
+              formData.participantIds.length,
+              {
+                soloCount: formData.soloCount || 1,
+                includeRegistration: true
+              }
+            );
+            setFeeBreakdown(basicFee);
+          }
         }
       } else {
-        // Use smart EODSA fee calculation for non-solo or non-nationals events
-        const feeBreakdownResult = await calculateSmartEODSAFee(
-          formData.mastery,
-          capitalizedPerformanceType,
-          formData.participantIds,
-          {
-            soloCount: 1
-          }
-        );
+        // Use smart EODSA fee calculation for non-nationals events
+        let soloCountForPreview = 1;
+        if (capitalizedPerformanceType === 'Solo' && formData.participantIds.length === 1) {
+          // In this page, participantIds are already internal dancer IDs
+          const internalId = formData.participantIds[0];
+          // Count current session solos for this dancer
+          const sessionSoloCount = 0; // This page tracks a single entry, so session count is 0 here
+          // For preview, assume next solo number is previous solos + 1
+          soloCountForPreview = 1 + sessionSoloCount;
+        }
 
-        setFeeBreakdown(feeBreakdownResult);
+        try {
+          const response = await fetch('/api/eodsa-fees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              masteryLevel: formData.mastery,
+              performanceType: capitalizedPerformanceType,
+              participantIds: formData.participantIds,
+              soloCount: soloCountForPreview,
+              includeRegistration: true
+            })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setFeeBreakdown(data.fees);
+          } else {
+            throw new Error('API call failed');
+          }
+        } catch (apiError) {
+          console.error('API call failed, using basic calculation:', apiError);
+          // Fallback to basic calculation
+          const basicFee = calculateEODSAFee(
+            formData.mastery,
+            capitalizedPerformanceType,
+            formData.participantIds.length,
+            {
+              soloCount: soloCountForPreview,
+              includeRegistration: true
+            }
+          );
+          setFeeBreakdown(basicFee);
+        }
       }
     } catch (error) {
       console.error('Error calculating fee:', error);
-      // Fallback to smart EODSA calculation
-      const feeBreakdownResult = await calculateSmartEODSAFee(
+      // Final fallback to basic calculation
+      const basicFee = calculateEODSAFee(
         formData.mastery,
         getCapitalizedPerformanceType(performanceType),
-        formData.participantIds,
+        formData.participantIds.length,
         {
-          soloCount: formData.soloCount || 1
+          soloCount: formData.soloCount || 1,
+          includeRegistration: true
         }
       );
-
-      setFeeBreakdown(feeBreakdownResult);
+      setFeeBreakdown(basicFee);
+    } finally {
+      setIsCalculatingFee(false);
     }
   };
 
@@ -1002,17 +1062,41 @@ export default function PerformanceTypeEntryPage() {
         }
       }
 
-      // Calculate fee correctly - use smart EODSA fee calculation for all entries
+      // Calculate fee correctly - use API for smart EODSA fee calculation
       let totalFee = 0;
-      const feeBreakdownResult = await calculateSmartEODSAFee(
-        formData.mastery,
-        getCapitalizedPerformanceType(performanceType),
-        formData.participantIds,
-        {
-          soloCount: performanceType?.toLowerCase() === 'solo' ? formData.soloCount : 1
+      try {
+        const response = await fetch('/api/eodsa-fees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            masteryLevel: formData.mastery,
+            performanceType: getCapitalizedPerformanceType(performanceType),
+            participantIds: formData.participantIds,
+            soloCount: performanceType?.toLowerCase() === 'solo' ? formData.soloCount : 1,
+            includeRegistration: true
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          totalFee = data.fees.totalFee;
+        } else {
+          throw new Error('API call failed');
         }
-      );
-      totalFee = feeBreakdownResult.totalFee;
+      } catch (apiError) {
+        console.error('API call failed, using basic calculation:', apiError);
+        // Fallback to basic calculation
+        const basicFee = calculateEODSAFee(
+          formData.mastery,
+          getCapitalizedPerformanceType(performanceType),
+          formData.participantIds.length,
+          {
+            soloCount: performanceType?.toLowerCase() === 'solo' ? formData.soloCount : 1,
+            includeRegistration: true
+          }
+        );
+        totalFee = basicFee.totalFee;
+      }
 
       // For group entries without initial EODSA ID, use the first participant's EODSA ID
       let finalEodsaId = eodsaId;
@@ -1868,7 +1952,12 @@ export default function PerformanceTypeEntryPage() {
                   {/* Fee Summary */}
                   <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-2 border-purple-500/30 rounded-xl p-6">
                     <h3 className="text-xl font-bold text-purple-300 mb-4">💰 Fee Summary</h3>
-                    {feeBreakdown ? (
+                    {isCalculatingFee ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="w-6 h-6 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin mr-3"></div>
+                        <span className="text-purple-200">Calculating fees...</span>
+                      </div>
+                    ) : feeBreakdown ? (
                         <div className="space-y-3">
                           <div className="flex justify-between text-purple-200 text-lg">
                             <span>{feeBreakdown.registrationBreakdown || `Registration Fee (${formData.participantIds.length} dancers)`}</span>
@@ -1946,13 +2035,18 @@ export default function PerformanceTypeEntryPage() {
               ) : (
                 <button
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isCalculatingFee || !feeBreakdown}
                   className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <div className="flex items-center justify-center">
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div>
                       Submitting Entries...
+                    </div>
+                  ) : isCalculatingFee ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div>
+                      Calculating Fee...
                     </div>
                   ) : (
                     <span className="flex items-center justify-center">

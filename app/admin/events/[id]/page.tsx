@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
 import { calculateEODSAFee } from '@/lib/types';
-import { calculateSmartEODSAFee } from '@/lib/registration-fee-tracker';
+// Registration fee checking moved to API calls
 
 interface Event {
   id: string;
@@ -475,16 +475,40 @@ export default function EventParticipantsPage() {
         // Try to calculate fee breakdown with smart registration checking
         let feeBreakdown;
         try {
-          // Try smart calculation if we have participant IDs
+          // Try smart calculation via API if we have participant IDs
           if (entry.participantIds && entry.participantIds.length > 0) {
-            feeBreakdown = await calculateSmartEODSAFee(
-              entry.mastery,
-              event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
-              entry.participantIds,
-              {
-                soloCount: 1
+            try {
+              const response = await fetch('/api/eodsa-fees', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  masteryLevel: entry.mastery,
+                  performanceType: event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
+                  participantIds: entry.participantIds,
+                  soloCount: 1,
+                  includeRegistration: true
+                })
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                feeBreakdown = data.fees;
+              } else {
+                throw new Error('API call failed');
               }
-            );
+            } catch (apiError) {
+              console.error('API call failed, using basic calculation:', apiError);
+              // Fallback to basic calculation
+              feeBreakdown = calculateEODSAFee(
+                entry.mastery,
+                event?.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group' || 'Solo',
+                entry.participantIds.length,
+                {
+                  soloCount: 1,
+                  includeRegistration: true
+                }
+              );
+            }
           } else {
             // Fallback to basic calculation
             feeBreakdown = calculateEODSAFee(

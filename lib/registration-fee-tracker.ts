@@ -25,8 +25,13 @@ export const calculateSmartEODSAFee = async (
     soloCount?: number;
   }
 ) => {
-  // Get dancer registration status for all participants
-  const dancers = await unifiedDb.getDancersWithRegistrationStatus(participantIds);
+  // REGISTRATION FEE CHECKING ONLY FOR SOLO PERFORMANCES
+  let dancers: any[] = [];
+  
+  if (performanceType === 'Solo') {
+    // Get dancer registration status only for solo performances
+    dancers = await unifiedDb.getDancersWithRegistrationStatus(participantIds);
+  }
   
   // Calculate fees with intelligent registration fee handling
   const feeBreakdown = calculateEODSAFee(
@@ -36,19 +41,19 @@ export const calculateSmartEODSAFee = async (
     {
       soloCount: options?.soloCount || 1,
       includeRegistration: true,
-      participantDancers: dancers
+      participantDancers: dancers // Empty array for non-solo, will trigger fallback calculation
     }
   );
 
   return {
     ...feeBreakdown,
-    unpaidRegistrationDancers: dancers.filter(d => 
+    unpaidRegistrationDancers: performanceType === 'Solo' ? dancers.filter(d => 
       !d.registrationFeePaid || 
       (d.registrationFeeMasteryLevel && d.registrationFeeMasteryLevel !== masteryLevel)
-    ),
-    paidRegistrationDancers: dancers.filter(d => 
+    ) : [],
+    paidRegistrationDancers: performanceType === 'Solo' ? dancers.filter(d => 
       d.registrationFeePaid && d.registrationFeeMasteryLevel === masteryLevel
-    )
+    ) : []
   };
 };
 
@@ -70,11 +75,22 @@ export const markGroupRegistrationFeePaid = async (
   return results;
 };
 
-// Check if a group of dancers need to pay registration fees
+// Check if a group of dancers need to pay registration fees (SOLO ONLY)
 export const checkGroupRegistrationStatus = async (
   dancerIds: string[],
-  masteryLevel: string
+  masteryLevel: string,
+  performanceType?: 'Solo' | 'Duet' | 'Trio' | 'Group'
 ) => {
+  // REGISTRATION FEE CHECKING ONLY FOR SOLO PERFORMANCES
+  if (performanceType && performanceType !== 'Solo') {
+    return {
+      totalDancers: dancerIds.length,
+      needRegistration: [],
+      alreadyPaid: [],
+      registrationFeeRequired: 0
+    };
+  }
+  
   const dancers = await unifiedDb.getDancersWithRegistrationStatus(dancerIds);
   
   const analysis = {

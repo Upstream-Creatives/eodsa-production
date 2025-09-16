@@ -7,7 +7,7 @@ import { PERFORMANCE_TYPES, MASTERY_LEVELS, ITEM_STYLES } from '@/lib/types';
 import CountdownTimer from '@/app/components/CountdownTimer';
 import { useToast } from '@/components/ui/simple-toast';
 import MusicUpload from '@/components/MusicUpload';
-import { checkGroupRegistrationStatus, calculateSmartEODSAFee } from '@/lib/registration-fee-tracker';
+// Registration fee checking moved to API calls
 import React from 'react';
 
 function TourOverlay({
@@ -190,6 +190,8 @@ export default function CompetitionEntryPage() {
   const [showAddForm, setShowAddForm] = useState<string | null>(null);
   const [registrationFeeCache, setRegistrationFeeCache] = useState<{[key: string]: number}>({});
   const [totalFeeCalculation, setTotalFeeCalculation] = useState<{performanceFee: number, registrationFee: number, total: number}>({performanceFee: 0, registrationFee: 0, total: 0});
+  const [previewFee, setPreviewFee] = useState<number>(0);
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
   const [currentForm, setCurrentForm] = useState({
     itemName: '',
     choreographer: '',
@@ -500,15 +502,89 @@ export default function CompetitionEntryPage() {
     return 0;
   };
 
+  // Resolve a dancer's EODSA ID from an internal participant ID (studio mode)
+  const resolveEodsaIdFromParticipantId = async (participantId: string): Promise<string | null> => {
+    try {
+      // First try from already-loaded studio dancers to avoid API calls
+      const local = availableDancers.find((d: any) => d.id === participantId);
+      if (local?.eodsaId) {
+        console.log('SOLO_DEBUG: resolveEodsaIdFromParticipantId:local', { participantId, eodsaId: local.eodsaId });
+        return local.eodsaId as string;
+      }
+      console.log('SOLO_DEBUG: resolveEodsaIdFromParticipantId:start', { participantId });
+      const resp = await fetch(`/api/dancers/${participantId}`);
+      console.log('SOLO_DEBUG: resolveEodsaIdFromParticipantId:resp', { status: resp.status });
+      if (resp.ok) {
+        const data = await resp.json();
+        const eodsaId = data?.dancer?.eodsaId;
+        console.log('SOLO_DEBUG: resolveEodsaIdFromParticipantId:data', { hasSuccess: data?.success, eodsaId });
+        if (data.success && eodsaId) {
+          return eodsaId as string;
+        }
+      }
+    } catch (error) {
+      console.warn('SOLO_DEBUG: resolveEodsaIdFromParticipantId:error', error);
+    }
+    return null;
+  };
+
+  // Get existing solo count for a specific dancer (by participant/internal ID) in the current event
+  const getExistingSoloCountForDancer = async (participantId: string): Promise<number> => {
+    try {
+      const dancerEodsaId = await resolveEodsaIdFromParticipantId(participantId);
+      console.log('SOLO_DEBUG: existingSoloCount:resolved', { participantId, dancerEodsaId, eventId });
+      if (!dancerEodsaId || !eventId) return 0;
+
+      const url = `/api/contestants/entries?eodsaId=${encodeURIComponent(dancerEodsaId)}&debug=false`;
+      console.log('SOLO_DEBUG: existingSoloCount:fetch', { url });
+      const response = await fetch(url);
+      console.log('SOLO_DEBUG: existingSoloCount:resp', { status: response.status });
+      if (!response.ok) return 0;
+      const data = await response.json();
+      console.log('SOLO_DEBUG: existingSoloCount:data', { success: data?.success, total: data?.entries?.length });
+      if (!data.success || !Array.isArray(data.entries)) return 0;
+
+      const dancerEventEntries = data.entries.filter((entry: any) => entry.eventId === eventId || entry.event_id === eventId);
+      console.log('SOLO_DEBUG: existingSoloCount:eventEntries', { count: dancerEventEntries.length });
+
+      let count = 0;
+      for (const entry of dancerEventEntries) {
+        if (!entry.participantIds) continue;
+        let entryParticipants: string[] = [];
+        if (Array.isArray(entry.participantIds)) {
+          entryParticipants = entry.participantIds;
+        } else if (typeof entry.participantIds === 'string') {
+          try {
+            entryParticipants = JSON.parse(entry.participantIds);
+          } catch {
+            entryParticipants = [entry.participantIds];
+          }
+        }
+        const isSoloForDancer = (
+          entryParticipants.length === 1 &&
+          (entryParticipants.includes(dancerEodsaId) || entryParticipants.includes(participantId))
+        );
+        console.log('SOLO_DEBUG: existingSoloCount:entryCheck', { entryId: entry.id, entryParticipants, isSoloForDancer });
+        if (isSoloForDancer) count++;
+      }
+
+      console.log('SOLO_DEBUG: existingSoloCount:final', { count });
+      return count;
+    } catch (error) {
+      console.warn('SOLO_DEBUG: existingSoloCount:error', error);
+      return 0;
+    }
+  };
+
   const getFeeExplanation = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 'Solo packages: 1 solo R400, 2 solos R750, 3 solos R1000, 4 solos R1200, 5th FREE, additional solos R100 each. Plus R300 registration.';
+      return 'Solo packages: 1st solo R400, 2nd R350, 3rd R300, 4th R250, 5th FREE, additional solos R100 each. Plus R250 registration.';
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return 'R280 per person + R300 registration each';
+      return 'R280 per person + R250 registration each';
     } else if (performanceType === 'Group') {
-      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R300 registration each.';
+      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R250 registration each.';
     }
-    return 'Per person + R300 registration each';
+    return 'Per person + R250 registration each';
   };
 
   // NEW: Helper function to get maximum duration display for performance type
@@ -568,7 +644,7 @@ export default function CompetitionEntryPage() {
     try {
       if (!currentForm.mastery) {
         console.warn('No mastery level selected, using default performance fee calculation');
-        return calculateFallbackEntryFee(performanceType, participantIds.length);
+        return calculateFallbackEntryFee(performanceType, participantIds.length, participantIds);
       }
 
       // Use smart fee calculation that accounts for registration fees
@@ -576,113 +652,118 @@ export default function CompetitionEntryPage() {
       
       let soloCount = 1;
       if (performanceType === 'Solo') {
-        // Count existing solo entries from database + current session entries
-        // For studios, we need to count solos for the specific dancer, not all studio solos
+        // Count existing solo entries from database + current session entries for the selected dancer
         let existingSoloCount = 0;
-        
         if (participantIds.length === 1) {
-          const dancerEodsaId = participantIds[0];
-          
-          // If we don't have existing entries loaded for this dancer, load them now
-          if (existingDbEntries.length === 0 && studioInfo) {
-            try {
-              console.log(`🔍 Loading existing entries for studio dancer ${dancerEodsaId}`);
-              const response = await fetch(`/api/contestants/entries?eodsaId=${dancerEodsaId}&debug=true`);
-              if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                  const dancerEventEntries = data.entries.filter((entry: any) => entry.eventId === eventId || entry.event_id === eventId);
-                  console.log(`📊 Found ${dancerEventEntries.length} existing entries for studio dancer`);
-                  
-                  // Count solos from the loaded entries
-                  existingSoloCount = dancerEventEntries.filter((entry: any) => {
-                    if (!entry.participantIds) return false;
-                    
-                    let entryParticipants = [];
-                    if (Array.isArray(entry.participantIds)) {
-                      entryParticipants = entry.participantIds;
-                    } else if (typeof entry.participantIds === 'string') {
-                      try {
-                        entryParticipants = JSON.parse(entry.participantIds);
-                      } catch (e) {
-                        entryParticipants = [entry.participantIds];
-                      }
-                    }
-                    
-                    return entryParticipants.length === 1 && entryParticipants.includes(dancerEodsaId);
-                  }).length;
-                }
-              }
-            } catch (error) {
-              console.error('Error loading dancer entries:', error);
-              existingSoloCount = 0;
-            }
+          const internalId = participantIds[0];
+          // Prefer direct lookup for studio dancers
+          if (studioInfo) {
+            console.log('SOLO_DEBUG: calculateEntryFee:studioSolo:start', { internalId, eventId });
+            existingSoloCount = await getExistingSoloCountForDancer(internalId);
+            console.log('SOLO_DEBUG: calculateEntryFee:studioSolo:existing', { existingSoloCount });
           } else {
-            // Count solos where this specific dancer is the participant
+            // Fallback to previously loaded entries (independent/private flow)
             existingSoloCount = existingDbEntries.filter(entry => {
               if (!entry.participantIds || entry.participantIds.length !== 1) return false;
-              
-              // Check if this dancer is the participant in the solo
-              let entryParticipants = [];
+              let entryParticipants: string[] = [];
               if (Array.isArray(entry.participantIds)) {
                 entryParticipants = entry.participantIds;
               } else if (typeof entry.participantIds === 'string') {
                 try {
                   entryParticipants = JSON.parse(entry.participantIds);
-                } catch (e) {
+                } catch {
                   entryParticipants = [entry.participantIds];
                 }
               }
-              
-              return entryParticipants.includes(dancerEodsaId);
+              return entryParticipants.includes(internalId);
             }).length;
           }
         } else {
-          // Fallback for non-solo or invalid participant setup
-          existingSoloCount = existingDbEntries.filter(entry => 
-            entry.participantIds && entry.participantIds.length === 1
-          ).length;
+          existingSoloCount = existingDbEntries.filter(entry => entry.participantIds && entry.participantIds.length === 1).length;
         }
-        
-        const sessionSoloCount = entries.filter(entry => entry.performanceType === 'Solo').length;
-        soloCount = existingSoloCount + sessionSoloCount + 1; // +1 for current entry
-        
-        console.log(`🧮 Solo pricing calculation:`);
-        console.log(`- Target dancer: ${participantIds[0] || 'unknown'}`);
-        console.log(`- Existing DB solos for this dancer: ${existingSoloCount}`);
-        console.log(`- Session solos: ${sessionSoloCount}`);
-        console.log(`- This will be solo #${soloCount}`);
+
+        const sessionSoloCount = entries.filter(entry => 
+          entry.performanceType === 'Solo' && 
+          entry.participantIds.length === 1 && 
+          entry.participantIds[0] === participantIds[0]
+        ).length;
+        soloCount = existingSoloCount + sessionSoloCount + 1;
+
+        console.log('SOLO_DEBUG: calculateEntryFee:counts', {
+          internalId: participantIds[0] || 'unknown',
+          existingSoloCount,
+          sessionSoloCount,
+          soloCount,
+        });
       }
 
-      const feeBreakdown = await calculateSmartEODSAFee(
-        currentForm.mastery,
-        capitalizedPerformanceType,
-        participantIds,
-        {
-          soloCount: soloCount
-        }
-      );
-
-      console.log('🧮 Smart fee calculation result:', feeBreakdown);
-      return feeBreakdown.totalFee;
+      // Compute performance-only fee locally to avoid DB dependency
+      let fee = 0;
+      if (capitalizedPerformanceType === 'Solo') {
+        if (soloCount === 1) fee = 400;
+        else if (soloCount === 2) fee = 350;
+        else if (soloCount === 3) fee = 300;
+        else if (soloCount === 4) fee = 250;
+        else if (soloCount === 5) fee = 0;
+        else fee = 100;
+      } else if (capitalizedPerformanceType === 'Duet' || capitalizedPerformanceType === 'Trio') {
+        fee = 280 * participantIds.length;
+      } else if (capitalizedPerformanceType === 'Group') {
+        fee = participantIds.length <= 9 ? 220 * participantIds.length : 190 * participantIds.length;
+      }
+      console.log('SOLO_DEBUG: calculateEntryFee:feeResult', { fee, soloCount, type: capitalizedPerformanceType });
+      return fee;
     } catch (error) {
       console.error('Error in smart fee calculation, falling back to basic calculation:', error);
-      return calculateFallbackEntryFee(performanceType, participantIds.length);
+      return calculateFallbackEntryFee(performanceType, participantIds.length, participantIds);
     }
   };
 
   // Fallback fee calculation for when smart calculation fails
-  const calculateFallbackEntryFee = (performanceType: string, participantCount: number) => {
+  const calculateFallbackEntryFee = (performanceType: string, participantCount: number, specificParticipantIds?: string[]) => {
     if (performanceType === 'Solo') {
-      // Count existing solo entries from database + current session entries
-      const existingSoloCount = existingDbEntries.filter(entry => 
-        entry.participantIds && entry.participantIds.length === 1
-      ).length;
-      const sessionSoloCount = entries.filter(entry => entry.performanceType === 'Solo').length;
+      let existingSoloCount = 0;
+      let sessionSoloCount = 0;
+      
+      // If we have specific participant info, count per dancer
+      if (specificParticipantIds && specificParticipantIds.length === 1) {
+        const dancerEodsaId = specificParticipantIds[0];
+        
+        // Count existing solos for this specific dancer
+        existingSoloCount = existingDbEntries.filter(entry => {
+          if (!entry.participantIds || entry.participantIds.length !== 1) return false;
+          
+          let entryParticipants = [];
+          if (Array.isArray(entry.participantIds)) {
+            entryParticipants = entry.participantIds;
+          } else if (typeof entry.participantIds === 'string') {
+            try {
+              entryParticipants = JSON.parse(entry.participantIds);
+            } catch (e) {
+              entryParticipants = [entry.participantIds];
+            }
+          }
+          
+          return entryParticipants.includes(dancerEodsaId);
+        }).length;
+        
+        // Count session solos for this specific dancer
+        sessionSoloCount = entries.filter(entry => 
+          entry.performanceType === 'Solo' && 
+          entry.participantIds.length === 1 && 
+          entry.participantIds[0] === dancerEodsaId
+        ).length;
+      } else {
+        // Fallback to old logic if no specific participant info
+        existingSoloCount = existingDbEntries.filter(entry => 
+          entry.participantIds && entry.participantIds.length === 1
+        ).length;
+        sessionSoloCount = entries.filter(entry => entry.performanceType === 'Solo').length;
+      }
+      
       const totalSoloCount = existingSoloCount + sessionSoloCount + 1; // +1 for current entry
       
       // Use nationals solo pricing: 1st R400, 2nd R350, 3rd R300, 4th R250, 5th FREE, additional R100
-      const registrationFee = 250; // R250 registration per dancer
       let performanceFee = 0;
       
       if (totalSoloCount === 1) {
@@ -698,14 +779,15 @@ export default function CompetitionEntryPage() {
       } else if (totalSoloCount > 5) {
         performanceFee = 100; // Additional solos R100 each
       }
-      
-      return registrationFee + performanceFee;
+      // Performance-only
+      return performanceFee;
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return (280 * participantCount) + (250 * participantCount); // R280 performance + R250 registration per dancer
+      // Performance-only per person
+      return (280 * participantCount);
     } else if (performanceType === 'Group') {
+      // Performance-only per person
       const performanceFee = participantCount <= 9 ? 220 * participantCount : 190 * participantCount; // R220 (4-9 people), R190 (10+ people)
-      const registrationFee = 250 * participantCount; // R250 registration per dancer
-      return performanceFee + registrationFee;
+      return performanceFee;
     }
     return 0;
   };
@@ -814,6 +896,7 @@ export default function CompetitionEntryPage() {
   };
 
   const calculateTotalFee = async () => {
+    setIsCalculatingFee(true);
     const performanceFee = entries.reduce((total, entry) => total + entry.fee, 0);
     const uniqueParticipants = new Set<string>();
     entries.forEach(entry => {
@@ -833,8 +916,25 @@ export default function CompetitionEntryPage() {
         try {
           // Use the first entry's mastery level (they should all be the same for Nationals)
           const masteryLevel = entries.length > 0 ? entries[0].mastery : 'Fire (Advanced)';
-          const registrationStatus = await checkGroupRegistrationStatus(participantIds, masteryLevel);
-          registrationFee = registrationStatus.registrationFeeRequired;
+          
+          // Call API to get smart fee calculation with registration checking
+          const response = await fetch('/api/eodsa-fees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              masteryLevel,
+              performanceType: 'Solo', // Just for registration calculation
+              participantIds: Array.from(participantIds),
+              includeRegistration: true
+            })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            registrationFee = data.fees.registrationFee;
+          } else {
+            throw new Error('API call failed');
+          }
           
           // Cache the result
           setRegistrationFeeCache(prev => ({
@@ -851,6 +951,7 @@ export default function CompetitionEntryPage() {
     
     const result = { performanceFee, registrationFee, total: performanceFee + registrationFee };
     setTotalFeeCalculation(result);
+    setIsCalculatingFee(false);
     return result;
   };
 
@@ -860,21 +961,43 @@ export default function CompetitionEntryPage() {
       calculateTotalFee();
     } else {
       setTotalFeeCalculation({performanceFee: 0, registrationFee: 0, total: 0});
+      setIsCalculatingFee(false);
     }
   }, [entries, registrationFeeCache]);
 
-  const getPreviewFee = () => {
-    if (!showAddForm || currentForm.participantIds.length === 0) return 0;
-    
-    // Only show fee if validation passes
-    const limits = getParticipantLimits(showAddForm);
-    if (currentForm.participantIds.length < limits.min || currentForm.participantIds.length > limits.max) {
-      return 0;
-    }
-    
-    // This needs to be handled async, return estimated fee for now
-    return calculateFallbackEntryFee(showAddForm, currentForm.participantIds.length);
-  };
+  // Compute async preview fee whenever selection changes
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!showAddForm || currentForm.participantIds.length === 0) {
+          setPreviewFee(0);
+          return;
+        }
+        const limits = getParticipantLimits(showAddForm);
+        if (currentForm.participantIds.length < limits.min || currentForm.participantIds.length > limits.max) {
+          setPreviewFee(0);
+          return;
+        }
+        console.log('SOLO_DEBUG: preview:start', {
+          showAddForm,
+          participantIds: currentForm.participantIds,
+          mastery: currentForm.mastery,
+          studioMode: !!studioInfo,
+          eventId
+        });
+        const fee = await calculateEntryFee(showAddForm, currentForm.participantIds);
+        console.log('SOLO_DEBUG: preview:fee', { fee });
+        setPreviewFee(fee || 0);
+      } catch (err) {
+        console.warn('SOLO_DEBUG: preview:error, using fallback', err);
+        setPreviewFee(
+          calculateFallbackEntryFee(showAddForm || 'Solo', currentForm.participantIds.length, currentForm.participantIds)
+        );
+      }
+    };
+    run();
+    // Include entries to account for session solo count
+  }, [showAddForm, currentForm.participantIds, currentForm.mastery, studioInfo, eventId, entries]);
 
   const handleProceedToPayment = async () => {
     if (entries.length === 0 || isSubmitting) return;
@@ -1127,7 +1250,6 @@ export default function CompetitionEntryPage() {
 
   // Calculate fees in real-time
   const feeCalculation = totalFeeCalculation;
-  const previewFee = getPreviewFee();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 pb-safe-bottom">
@@ -1875,14 +1997,23 @@ export default function CompetitionEntryPage() {
                    </div>
                  )}
                  
-                 <div className="flex justify-between">
-                   <span>Performance Fees:</span>
-                   <span>R{feeCalculation.performanceFee}</span>
-                 </div>
-                 <div className="flex justify-between">
-                   <span>Registration Fees:</span>
-                   <span>R{feeCalculation.registrationFee}</span>
-                 </div>
+                 {isCalculatingFee ? (
+                   <div className="flex items-center justify-center py-4">
+                     <div className="w-5 h-5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin mr-3"></div>
+                     <span className="text-emerald-300">Calculating fees...</span>
+                   </div>
+                 ) : (
+                   <>
+                     <div className="flex justify-between">
+                       <span>Performance Fees:</span>
+                       <span>R{feeCalculation.performanceFee}</span>
+                     </div>
+                     <div className="flex justify-between">
+                       <span>Registration Fees:</span>
+                       <span>R{feeCalculation.registrationFee}</span>
+                     </div>
+                   </>
+                 )}
                  <div className="text-xs text-slate-400">
                    ({new Set(entries.flatMap(e => e.participantIds)).size} unique participants × R300)
                  </div>
@@ -1910,7 +2041,7 @@ export default function CompetitionEntryPage() {
               <button
                 ref={proceedToPaymentRef}
                 onClick={handleProceedToPayment}
-                disabled={entries.length === 0 || isSubmitting}
+                disabled={entries.length === 0 || isSubmitting || isCalculatingFee}
                 className={`w-full py-4 sm:py-3 text-white rounded-lg font-semibold transition-all duration-300 text-lg sm:text-base min-h-[56px] sm:min-h-auto ${
                   isSubmitting 
                     ? 'bg-slate-500 cursor-not-allowed' 
@@ -1921,6 +2052,11 @@ export default function CompetitionEntryPage() {
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Submitting Entries...</span>
+                  </div>
+                ) : isCalculatingFee ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Calculating Fee...</span>
                   </div>
                 ) : (
                   'Proceed to Payment'
