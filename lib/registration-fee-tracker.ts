@@ -25,13 +25,9 @@ export const calculateSmartEODSAFee = async (
     soloCount?: number;
   }
 ) => {
-  // REGISTRATION FEE CHECKING ONLY FOR SOLO PERFORMANCES
-  let dancers: any[] = [];
-  
-  if (performanceType === 'Solo') {
-    // Get dancer registration status only for solo performances
-    dancers = await unifiedDb.getDancersWithRegistrationStatus(participantIds);
-  }
+  // REGISTRATION FEE CHECKING FOR ALL PERFORMANCE TYPES
+  // Get dancer registration status for all participants regardless of performance type
+  const dancers = await unifiedDb.getDancersWithRegistrationStatus(participantIds);
   
   // Calculate fees with intelligent registration fee handling
   const feeBreakdown = calculateEODSAFee(
@@ -41,19 +37,19 @@ export const calculateSmartEODSAFee = async (
     {
       soloCount: options?.soloCount || 1,
       includeRegistration: true,
-      participantDancers: dancers // Empty array for non-solo, will trigger fallback calculation
+      participantDancers: dancers // Will check registration status for all performance types
     }
   );
 
   return {
     ...feeBreakdown,
-    unpaidRegistrationDancers: performanceType === 'Solo' ? dancers.filter(d => 
+    unpaidRegistrationDancers: dancers.filter(d => 
       !d.registrationFeePaid || 
       (d.registrationFeeMasteryLevel && d.registrationFeeMasteryLevel !== masteryLevel)
-    ) : [],
-    paidRegistrationDancers: performanceType === 'Solo' ? dancers.filter(d => 
+    ),
+    paidRegistrationDancers: dancers.filter(d => 
       d.registrationFeePaid && d.registrationFeeMasteryLevel === masteryLevel
-    ) : []
+    )
   };
 };
 
@@ -75,21 +71,13 @@ export const markGroupRegistrationFeePaid = async (
   return results;
 };
 
-// Check if a group of dancers need to pay registration fees (SOLO ONLY)
+// Check if a group of dancers need to pay registration fees (ALL PERFORMANCE TYPES)
 export const checkGroupRegistrationStatus = async (
   dancerIds: string[],
   masteryLevel: string,
   performanceType?: 'Solo' | 'Duet' | 'Trio' | 'Group'
 ) => {
-  // REGISTRATION FEE CHECKING ONLY FOR SOLO PERFORMANCES
-  if (performanceType && performanceType !== 'Solo') {
-    return {
-      totalDancers: dancerIds.length,
-      needRegistration: [],
-      alreadyPaid: [],
-      registrationFeeRequired: 0
-    };
-  }
+  // REGISTRATION FEE CHECKING FOR ALL PERFORMANCE TYPES
   
   const dancers = await unifiedDb.getDancersWithRegistrationStatus(dancerIds);
   
@@ -107,10 +95,10 @@ export const checkGroupRegistrationStatus = async (
 
   if (analysis.needRegistration.length > 0) {
     const registrationFeePerPerson = {
-      'Water (Competitive)': 250,
-      'Fire (Advanced)': 250,
+      'Water (Competitive)': 300,
+      'Fire (Advanced)': 300,
       'Nationals': 300
-    }[masteryLevel] || 250; // Default to R250 if unknown mastery level
+    }[masteryLevel] || 300; // Default to R300 if unknown mastery level
 
     analysis.registrationFeeRequired = registrationFeePerPerson * analysis.needRegistration.length;
   }

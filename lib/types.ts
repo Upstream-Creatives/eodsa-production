@@ -314,8 +314,8 @@ export const TIME_LIMITS = {
 export const EODSA_FEES = {
   // Registration fees per person
   REGISTRATION: {
-    'Water (Competitive)': 250,    // R250 PP for Water (Competition)
-    'Fire (Advanced)': 250,        // R250 PP for Fire (Advanced)
+    'Water (Competitive)': 300,    // R300 PP for Water (Competition)
+    'Fire (Advanced)': 300,        // R300 PP for Fire (Advanced)
     'Nationals': 300               // R300 PP for Nationals entry
   },
   
@@ -358,8 +358,8 @@ export const calculateEODSAFee = (
   let registrationFee = 0;
   let registrationBreakdown = '';
   
-  if (includeRegistration && performanceType === 'Solo' && participantDancers.length > 0) {
-    // REGISTRATION FEE CHECKING ONLY FOR SOLO PERFORMANCES
+  if (includeRegistration && participantDancers.length > 0) {
+    // REGISTRATION FEE CHECKING FOR ALL PERFORMANCE TYPES
     // Check each dancer's registration status
     const unpaidDancers = participantDancers.filter(dancer => {
       if (!dancer.registrationFeePaid) {
@@ -384,7 +384,7 @@ export const calculateEODSAFee = (
     } else {
       registrationBreakdown = `All dancers have already paid registration fee for ${masteryLevel}`;
     }
-  } else if (includeRegistration && performanceType === 'Solo') {
+  } else if (includeRegistration) {
     // Fallback calculation if no dancer data provided
     registrationFee = EODSA_FEES.REGISTRATION[masteryLevel as keyof typeof EODSA_FEES.REGISTRATION] * numberOfParticipants;
     registrationBreakdown = `Registration fee for ${numberOfParticipants} dancer${numberOfParticipants > 1 ? 's' : ''}`;

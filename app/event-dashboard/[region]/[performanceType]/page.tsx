@@ -307,14 +307,14 @@ export default function PerformanceTypeEntryPage() {
             console.error('Both API calls failed, using basic calculation:', fallbackError);
             // Final fallback to basic calculation
             const basicFee = calculateEODSAFee(
-              formData.mastery,
-              capitalizedPerformanceType,
+            formData.mastery,
+            capitalizedPerformanceType,
               formData.participantIds.length,
-              {
+            {
                 soloCount: formData.soloCount || 1,
                 includeRegistration: true
-              }
-            );
+            }
+          );
             setFeeBreakdown(basicFee);
           }
         }
@@ -353,14 +353,14 @@ export default function PerformanceTypeEntryPage() {
           console.error('API call failed, using basic calculation:', apiError);
           // Fallback to basic calculation
           const basicFee = calculateEODSAFee(
-            formData.mastery,
-            capitalizedPerformanceType,
+          formData.mastery,
+          capitalizedPerformanceType,
             formData.participantIds.length,
-            {
+          {
               soloCount: soloCountForPreview,
               includeRegistration: true
-            }
-          );
+          }
+        );
           setFeeBreakdown(basicFee);
         }
       }
@@ -1087,14 +1087,14 @@ export default function PerformanceTypeEntryPage() {
         console.error('API call failed, using basic calculation:', apiError);
         // Fallback to basic calculation
         const basicFee = calculateEODSAFee(
-          formData.mastery,
-          getCapitalizedPerformanceType(performanceType),
+        formData.mastery,
+        getCapitalizedPerformanceType(performanceType),
           formData.participantIds.length,
-          {
+        {
             soloCount: performanceType?.toLowerCase() === 'solo' ? formData.soloCount : 1,
             includeRegistration: true
-          }
-        );
+        }
+      );
         totalFee = basicFee.totalFee;
       }
 

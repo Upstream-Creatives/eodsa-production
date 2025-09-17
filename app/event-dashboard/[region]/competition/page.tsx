@@ -578,13 +578,13 @@ export default function CompetitionEntryPage() {
 
   const getFeeExplanation = (performanceType: string) => {
     if (performanceType === 'Solo') {
-      return 'Solo packages: 1st solo R400, 2nd R350, 3rd R300, 4th R250, 5th FREE, additional solos R100 each. Plus R250 registration.';
+      return 'Solo packages: 1st solo R400, 2nd R350, 3rd R300, 4th R250, 5th FREE, additional solos R100 each. Plus R300 registration.';
     } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-      return 'R280 per person + R250 registration each';
+      return 'R280 per person + R300 registration each';
     } else if (performanceType === 'Group') {
-      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R250 registration each.';
+      return 'Small groups (4-9): R220pp, Large groups (10+): R190pp. Plus R300 registration each.';
     }
-    return 'Per person + R250 registration each';
+    return 'Per person + R300 registration each';
   };
 
   // NEW: Helper function to get maximum duration display for performance type
@@ -918,12 +918,13 @@ export default function CompetitionEntryPage() {
           const masteryLevel = entries.length > 0 ? entries[0].mastery : 'Fire (Advanced)';
           
           // Call API to get smart fee calculation with registration checking
+          // Use 'Solo' as performance type since we're only calculating registration fees
           const response = await fetch('/api/eodsa-fees', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               masteryLevel,
-              performanceType: 'Solo', // Just for registration calculation
+              performanceType: 'Solo', // Use Solo to trigger registration fee logic
               participantIds: Array.from(participantIds),
               includeRegistration: true
             })
