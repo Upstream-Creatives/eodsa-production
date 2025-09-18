@@ -29,6 +29,26 @@ export const calculateSmartEODSAFee = async (
   // Get dancer registration status for all participants regardless of performance type
   const dancers = await unifiedDb.getDancersWithRegistrationStatus(participantIds);
   
+  // SIMPLE FIX: Check for any pending entries that include registration fees for these dancers
+  const dancersWithPendingCheck = await Promise.all(
+    dancers.map(async (dancer) => {
+      // Check if this dancer has any pending entries that include registration fees
+      const hasPendingRegistrationEntry = await unifiedDb.hasPendingRegistrationEntry(dancer.id, masteryLevel);
+      
+      console.log(`🔍 Dancer ${dancer.name} (${dancer.id}):`);
+      console.log(`   - Registration fee paid: ${dancer.registrationFeePaid}`);
+      console.log(`   - Registration fee mastery level: ${dancer.registrationFeeMasteryLevel}`);
+      console.log(`   - Has pending registration entry: ${hasPendingRegistrationEntry}`);
+      
+      return {
+        ...dancer,
+        // If they have a pending entry with registration fee, consider it as "paid" for calculation purposes
+        registrationFeePaid: dancer.registrationFeePaid || hasPendingRegistrationEntry,
+        registrationFeeMasteryLevel: dancer.registrationFeeMasteryLevel || (hasPendingRegistrationEntry ? masteryLevel : undefined)
+      };
+    })
+  );
+  
   // Calculate fees with intelligent registration fee handling
   const feeBreakdown = calculateEODSAFee(
     masteryLevel,
@@ -37,17 +57,17 @@ export const calculateSmartEODSAFee = async (
     {
       soloCount: options?.soloCount || 1,
       includeRegistration: true,
-      participantDancers: dancers // Will check registration status for all performance types
+      participantDancers: dancersWithPendingCheck // Use the enhanced dancer data
     }
   );
 
   return {
     ...feeBreakdown,
-    unpaidRegistrationDancers: dancers.filter(d => 
+    unpaidRegistrationDancers: dancersWithPendingCheck.filter(d => 
       !d.registrationFeePaid || 
       (d.registrationFeeMasteryLevel && d.registrationFeeMasteryLevel !== masteryLevel)
     ),
-    paidRegistrationDancers: dancers.filter(d => 
+    paidRegistrationDancers: dancersWithPendingCheck.filter(d => 
       d.registrationFeePaid && d.registrationFeeMasteryLevel === masteryLevel
     )
   };

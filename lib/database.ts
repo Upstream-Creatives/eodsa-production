@@ -4778,6 +4778,69 @@ export const unifiedDb = {
     `;
     
     return { success: true };
+  },
+
+  // Check if a dancer has any pending entries that include registration fees
+  async hasPendingRegistrationEntry(dancerId: string, masteryLevel: string) {
+    const sqlClient = getSql();
+    
+    try {
+      // Get the dancer's EODSA ID
+      const dancer = await sqlClient`
+        SELECT eodsa_id FROM dancers WHERE id = ${dancerId}
+      ` as any[];
+      
+      if (dancer.length === 0) {
+        console.log(`❌ No dancer found with ID: ${dancerId}`);
+        return false;
+      }
+      
+      const eodsaId = dancer[0].eodsa_id;
+      console.log(`🔍 Checking pending entries for dancer ${eodsaId} (internal ID: ${dancerId}) with mastery ${masteryLevel}`);
+      
+      // Check for pending entries that include this dancer and have registration fees
+      // Use the internal dancer ID for participant_ids search since that's what's stored there
+      const pendingEntries = await sqlClient`
+        SELECT ee.*
+        FROM event_entries ee
+        WHERE ee.approved = FALSE 
+          AND ee.payment_status = 'pending'
+          AND (
+            ee.eodsa_id = ${eodsaId}
+            OR ee.participant_ids::text LIKE ${'%' + dancerId + '%'}
+          )
+      ` as any[];
+      
+      console.log(`📋 Found ${pendingEntries.length} pending entries for dancer ${eodsaId}`);
+      for (const entry of pendingEntries) {
+        console.log(`   - Entry: ${entry.item_name} - Fee: R${entry.calculated_fee} - Approved: ${entry.approved} - Mastery: ${entry.mastery}`);
+      }
+      
+      // Also check all pending entries for this dancer regardless of mastery level
+      const allPendingEntries = await sqlClient`
+        SELECT ee.*
+        FROM event_entries ee
+        WHERE ee.approved = FALSE 
+          AND ee.payment_status = 'pending'
+          AND (
+            ee.eodsa_id = ${eodsaId}
+            OR ee.participant_ids::text LIKE ${'%' + dancerId + '%'}
+          )
+      ` as any[];
+      
+      console.log(`📋 Total pending entries for dancer ${eodsaId}: ${allPendingEntries.length}`);
+      for (const entry of allPendingEntries) {
+        console.log(`   - Entry: ${entry.item_name} - Fee: R${entry.calculated_fee} - Approved: ${entry.approved} - Mastery: ${entry.mastery}`);
+      }
+      
+      // If there are any pending entries, assume they include registration fees
+      // This is a conservative approach to prevent double-charging
+      return pendingEntries.length > 0;
+      
+    } catch (error) {
+      console.error('Error checking pending registration entries:', error);
+      return false;
+    }
   }
 };
 

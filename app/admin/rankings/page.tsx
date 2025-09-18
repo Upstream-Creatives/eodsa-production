@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getMedalFromPercentage } from '@/lib/types';
+import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface RankingData {
   performanceId: string;
@@ -38,7 +40,9 @@ interface EventWithScores {
   scoreCount: number;
 }
 
-export default function AdminRankingsPage() {
+function AdminRankingsPage() {
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
   const [rankings, setRankings] = useState<RankingData[]>([]);
   const [filteredRankings, setFilteredRankings] = useState<RankingData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -270,10 +274,10 @@ export default function AdminRankingsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading rankings...</p>
+          <p className="text-gray-400">Loading rankings...</p>
         </div>
       </div>
     );
@@ -281,10 +285,10 @@ export default function AdminRankingsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">⚠️</div>
-          <p className="text-red-600 text-lg mb-4">{error}</p>
+          <p className="text-red-400 text-lg mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
@@ -297,9 +301,9 @@ export default function AdminRankingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-gray-800 shadow-sm border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
@@ -307,14 +311,14 @@ export default function AdminRankingsPage() {
                 <span className="text-white text-xl">🏆</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Nationals Rankings</h1>
-                <p className="text-sm text-gray-600">View and analyze nationals performance rankings</p>
+                <h1 className="text-2xl font-bold text-white">Nationals Rankings</h1>
+                <p className="text-sm text-gray-400">View and analyze nationals performance rankings</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => window.location.href = '/admin'}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 font-medium"
+                className="px-4 py-2 text-gray-400 hover:text-white font-medium"
               >
                 Back to Admin
               </button>
@@ -326,47 +330,47 @@ export default function AdminRankingsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-blue-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-blue-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
                 {filteredRankings.length}
               </div>
-              <div className="text-sm text-gray-700 font-medium">Total Performances</div>
+              <div className="text-sm text-gray-300 font-medium">Total Performances</div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-green-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-green-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
                 {new Set(filteredRankings.map(r => r.studioName)).size}
               </div>
-              <div className="text-sm text-gray-700 font-medium">Studios</div>
+              <div className="text-sm text-gray-300 font-medium">Studios</div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-purple-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-purple-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
                 {new Set(filteredRankings.map(r => r.ageCategory)).size}
               </div>
-              <div className="text-sm text-gray-700 font-medium">Age Categories</div>
+              <div className="text-sm text-gray-300 font-medium">Age Categories</div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-teal-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-teal-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
             <div className="text-center">
               <div className="text-2xl font-bold text-teal-600">
                 {new Set(filteredRankings.map(r => r.itemStyle)).size}
               </div>
-              <div className="text-sm text-gray-700 font-medium">Dance Styles</div>
+              <div className="text-sm text-gray-300 font-medium">Dance Styles</div>
             </div>
           </div>
         </div>
 
         {/* Nationals Breakdown */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-indigo-100 mb-8">
+        <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-indigo-100 mb-8">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
               <span className="text-white text-sm">🏫</span>
             </div>
-            <h3 className="text-xl font-bold text-gray-900">Performances per Studio</h3>
+            <h3 className="text-xl font-bold text-white">Performances per Studio</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -389,7 +393,7 @@ export default function AdminRankingsPage() {
                 return (
                   <div className="col-span-full text-center py-8">
                     <div className="text-gray-400 text-4xl mb-2">🏫</div>
-                    <p className="text-gray-500">No nationals data available</p>
+                    <p className="text-gray-400">No nationals data available</p>
                     <p className="text-gray-400 text-sm">Nationals breakdown will appear when rankings are loaded</p>
                   </div>
                 );
@@ -410,8 +414,8 @@ export default function AdminRankingsPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-gray-900 text-sm">{studio}</div>
-                      <div className="text-xs text-gray-600">
+                      <div className="font-bold text-white text-sm">{studio}</div>
+                      <div className="text-xs text-gray-400">
                         {((count / filteredRankings.length) * 100).toFixed(1)}% of total
                       </div>
                     </div>
@@ -422,7 +426,7 @@ export default function AdminRankingsPage() {
                         ? 'text-blue-600'
                         : index === 2
                         ? 'text-amber-600'
-                        : 'text-gray-600'
+                        : 'text-gray-400'
                     }`}>
                       {count}
                     </div>
@@ -433,7 +437,7 @@ export default function AdminRankingsPage() {
                       <span className="text-xs">
                         {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
                       </span>
-                      <span className="text-xs text-gray-600 font-medium">
+                      <span className="text-xs text-gray-400 font-medium">
                         {index === 0 ? 'Most items' : index === 1 ? '2nd most' : '3rd most'}
                       </span>
                     </div>
@@ -446,7 +450,7 @@ export default function AdminRankingsPage() {
         </div>
 
         {/* Enhanced Filters with View Mode Tabs */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-8 border border-indigo-100">
+        <div className="bg-gray-800/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-8 border border-indigo-100">
           {/* View Mode Tabs */}
           <div className="flex flex-wrap gap-2 mb-6">
             <button
@@ -454,7 +458,7 @@ export default function AdminRankingsPage() {
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'all'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
               }`}
             >
               All Rankings
@@ -464,7 +468,7 @@ export default function AdminRankingsPage() {
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top3_age'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
               }`}
             >
               Top 3 by Age
@@ -474,7 +478,7 @@ export default function AdminRankingsPage() {
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top3_style'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
               }`}
             >
               Top 3 by Style
@@ -484,7 +488,7 @@ export default function AdminRankingsPage() {
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top3_duets'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
               }`}
             >
               Top 3 Duets
@@ -494,7 +498,7 @@ export default function AdminRankingsPage() {
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top3_groups'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
               }`}
             >
               Top 3 Groups
@@ -504,7 +508,7 @@ export default function AdminRankingsPage() {
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top3_trios'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
               }`}
             >
               Top 3 Trios
@@ -514,7 +518,7 @@ export default function AdminRankingsPage() {
               className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
                 viewMode === 'top10_soloists'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
               }`}
             >
               Top 10 Soloists
@@ -526,23 +530,23 @@ export default function AdminRankingsPage() {
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white text-sm">🔍</span>
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Filter Avalon Rankings</h2>
+            <h2 className="text-xl font-bold text-white">Filter Avalon Rankings</h2>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
-              <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium">
+              <label className="block text-sm font-semibold text-gray-300 mb-3">Competition</label>
+              <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-white font-medium">
                 Avalon
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Age Category</label>
+              <label className="block text-sm font-semibold text-gray-300 mb-3">Age Category</label>
               <select
                 value={selectedAgeCategory}
                 onChange={(e) => setSelectedAgeCategory(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-white"
               >
                 <option value="">All Ages</option>
                 {['Primary', 'Junior', 'Senior', 'Youth', 'Adult', 'Elite'].map(age => (
@@ -552,11 +556,11 @@ export default function AdminRankingsPage() {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Type</label>
+              <label className="block text-sm font-semibold text-gray-300 mb-3">Performance Type</label>
               <select
                 value={selectedPerformanceType}
                 onChange={(e) => setSelectedPerformanceType(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-white"
               >
                 <option value="">All Types</option>
                 {['Solo', 'Duet', 'Trio', 'Group'].map(type => (
@@ -566,11 +570,11 @@ export default function AdminRankingsPage() {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Mastery Level</label>
+              <label className="block text-sm font-semibold text-gray-300 mb-3">Mastery Level</label>
               <select
                 value={masteryFilter}
                 onChange={(e) => setMasteryFilter(e.target.value as 'all' | 'competitive' | 'advanced')}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-gray-900"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium text-white"
               >
                 <option value="all">All Levels</option>
                 <option value="competitive">Competitive (Water)</option>
@@ -579,7 +583,7 @@ export default function AdminRankingsPage() {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Actions</label>
+              <label className="block text-sm font-semibold text-gray-300 mb-3">Actions</label>
               <div className="flex flex-col space-y-2">
                 <button
                   onClick={clearFilters}
@@ -600,7 +604,7 @@ export default function AdminRankingsPage() {
         </div>
 
         {/* Rankings Table */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden border border-indigo-100">
+        <div className="bg-gray-800/90 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden border border-indigo-100">
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
@@ -616,9 +620,9 @@ export default function AdminRankingsPage() {
           
           <div className="p-8">
             {filteredRankings.length === 0 ? (
-              <div className="text-center py-12 bg-white/80 rounded-2xl shadow-lg">
+              <div className="text-center py-12 bg-gray-800/80 rounded-2xl shadow-lg">
                 <div className="text-6xl mb-4">📊</div>
-                <p className="text-gray-500 text-lg">No rankings available</p>
+                <p className="text-gray-400 text-lg">No rankings available</p>
                 <p className="text-gray-400 text-sm mt-2">Rankings will appear here once competitions are completed and scored</p>
               </div>
             ) : (
@@ -626,13 +630,13 @@ export default function AdminRankingsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-4 px-6 font-bold text-gray-900">Rank</th>
-                      <th className="text-left py-4 px-6 font-bold text-gray-900">Item #</th>
-                      <th className="text-left py-4 px-6 font-bold text-gray-900">Performance</th>
-                      <th className="text-left py-4 px-6 font-bold text-gray-900">Contestant</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Rank</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Item #</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Performance</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Contestant</th>
                       
-                      <th className="text-left py-4 px-6 font-bold text-gray-900">Score</th>
-                      <th className="text-left py-4 px-6 font-bold text-gray-900">Level</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Score</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Level</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -651,9 +655,9 @@ export default function AdminRankingsPage() {
                             </div>
                           </td>
                           <td className="py-4 px-6">
-                            <div className="font-semibold text-gray-900">{ranking.title}</div>
+                            <div className="font-semibold text-white">{ranking.title}</div>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-sm text-gray-600">{ranking.itemStyle}</span>
+                              <span className="text-sm text-gray-400">{ranking.itemStyle}</span>
                               {ranking.mastery && (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                                   {ranking.mastery}
@@ -662,15 +666,15 @@ export default function AdminRankingsPage() {
                             </div>
                           </td>
                           <td className="py-4 px-6">
-                            <div className="font-medium text-gray-900">{ranking.contestantName}</div>
+                            <div className="font-medium text-white">{ranking.contestantName}</div>
                             {ranking.studioName && (
-                              <div className="text-xs text-gray-500 mt-1">{ranking.studioName}</div>
+                              <div className="text-xs text-gray-400 mt-1">{ranking.studioName}</div>
                             )}
                           </td>
 
                           <td className="py-4 px-6">
-                            <div className="font-bold text-gray-900">{ranking.totalScore.toFixed(1)}</div>
-                            <div className="text-sm text-gray-600">{percentage}% • {ranking.judgeCount} judges</div>
+                            <div className="font-bold text-white">{ranking.totalScore.toFixed(1)}</div>
+                            <div className="text-sm text-gray-400">{percentage}% • {ranking.judgeCount} judges</div>
                           </td>
                           <td className="py-4 px-6">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${rankingColor}`}>
@@ -689,5 +693,14 @@ export default function AdminRankingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrap with ThemeProvider
+export default function AdminRankingsPageWrapper() {
+  return (
+    <ThemeProvider>
+      <AdminRankingsPage />
+    </ThemeProvider>
   );
 } 
