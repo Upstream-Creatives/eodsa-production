@@ -6,6 +6,8 @@ import { REGIONS, PERFORMANCE_TYPES, AGE_CATEGORIES, EODSA_FEES } from '@/lib/ty
 import Link from 'next/link';
 import { useToast } from '@/components/ui/simple-toast';
 import { useAlert } from '@/components/ui/custom-alert';
+import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface Event {
   id: string;
@@ -105,7 +107,9 @@ interface StudioApplication {
   };
 }
 
-export default function AdminDashboard() {
+function AdminDashboard() {
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
   const [events, setEvents] = useState<Event[]>([]);
   const [judges, setJudges] = useState<Judge[]>([]);
   const [assignments, setAssignments] = useState<JudgeAssignment[]>([]);
@@ -1178,7 +1182,7 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
         <div className="text-center">
           <div className="relative mb-8">
             {/* Modern Spinner */}
@@ -1197,7 +1201,7 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Loading Avalon Admin Dashboard
             </h2>
-            <p className="text-gray-700 font-medium animate-pulse">Preparing your dashboard...</p>
+            <p className={`${themeClasses.loadingText} font-medium animate-pulse`}>Preparing your dashboard...</p>
             
             {/* Progress Dots */}
             <div className="flex justify-center space-x-2 mt-6">
@@ -1212,9 +1216,9 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Enhanced Header - Mobile Optimized */}
-      <header className="bg-white/90 backdrop-blur-lg shadow-xl border-b border-indigo-100">
+      <header className={`${themeClasses.headerBg} backdrop-blur-lg shadow-xl border-b ${themeClasses.headerBorder}`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:py-8 gap-4">
             <div className="flex items-center space-x-3 sm:space-x-4">
@@ -1225,13 +1229,13 @@ export default function AdminDashboard() {
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent leading-tight">
                   Avalon Admin Dashboard
                 </h1>
-                <p className="text-gray-700 text-xs sm:text-sm lg:text-base font-medium">Competition Management System</p>
+                <p className={`${themeClasses.textSecondary} text-xs sm:text-sm lg:text-base font-medium`}>Competition Management System</p>
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="hidden md:flex items-center space-x-3 px-3 sm:px-4 py-2 bg-indigo-50 rounded-xl">
+              <div className={`hidden md:flex items-center space-x-3 px-3 sm:px-4 py-2 ${themeClasses.systemOnlineBg} rounded-xl`}>
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs sm:text-sm font-medium text-gray-700">System Online</span>
+                <span className={`text-xs sm:text-sm font-medium ${themeClasses.textSecondary}`}>System Online</span>
               </div>
               {/* Email testing disabled for Phase 1 */}
               {/* <button
@@ -1262,6 +1266,8 @@ export default function AdminDashboard() {
                   </>
                 )}
               </button>
+              <ThemeToggle />
+              
               <Link 
                 href="/admin/rankings"
                 className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg sm:rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
@@ -1300,7 +1306,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Enhanced Tab Navigation - Mobile Optimized */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 mb-6 sm:mb-8 shadow-xl border border-white/50">
+        <div className={`${themeClasses.navBg} backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 mb-6 sm:mb-8 shadow-xl border ${themeClasses.navBorder}`}>
           <nav className="flex flex-col sm:flex-row gap-2">
             {[
               { id: 'events', label: 'Events', icon: '🏆', color: 'indigo' },
@@ -1317,7 +1323,7 @@ export default function AdminDashboard() {
                 className={`flex items-center justify-center space-x-2 sm:space-x-3 px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base transform ${
                     activeTab === tab.id
                     ? `bg-gradient-to-r from-${tab.color}-500 to-${tab.color === 'indigo' ? 'blue' : tab.color === 'purple' ? 'pink' : 'rose'}-600 text-white shadow-lg scale-105`
-                    : 'text-gray-600 hover:bg-white/80 hover:shadow-md hover:scale-102'
+                    : `${themeClasses.textSecondary} hover:bg-white/80 hover:shadow-md hover:scale-102`
                 }`}
               >
                 <span className="text-lg sm:text-xl">{tab.icon}</span>
@@ -1334,15 +1340,15 @@ export default function AdminDashboard() {
         {activeTab === 'events' && (
           <div className="space-y-6 sm:space-y-8 animate-fadeIn">
             {/* Enhanced Events List - Mobile Optimized */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-indigo-100">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b border-indigo-100">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                       <span className="text-white text-xs sm:text-sm">🏆</span>
                   </div>
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">Events</h2>
-                    <div className="px-2 sm:px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs sm:text-sm font-medium">
+                    <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Events</h2>
+                    <div className={`px-2 sm:px-3 py-1 ${theme === 'dark' ? 'bg-indigo-900/80 text-indigo-200' : 'bg-indigo-100 text-indigo-800'} rounded-full text-xs sm:text-sm font-medium`}>
                       {events.length} events
                   </div>
                   </div>
@@ -1360,7 +1366,7 @@ export default function AdminDashboard() {
               </div>
 
               {events.length === 0 ? (
-                <div className="text-center py-8 sm:py-12 text-gray-500">
+                <div className={`text-center py-8 sm:py-12 ${themeClasses.textMuted}`}>
                   <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                     <span className="text-lg sm:text-2xl">🏆</span>
                   </div>
@@ -1377,29 +1383,29 @@ export default function AdminDashboard() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50/80">
+                    <thead className={themeClasses.tableHeader}>
                       <tr>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Event</th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Region</th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">Type</th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date</th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                        <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Event</th>
+                        <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden sm:table-cell`}>Region</th>
+                        <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden md:table-cell`}>Type</th>
+                        <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Date</th>
+                        <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Status</th>
+                        <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white/50 divide-y divide-gray-200">
+                    <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
                       {events.map((event) => (
-                        <tr key={event.id} className="hover:bg-indigo-50/50 transition-colors duration-200">
+                        <tr key={event.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                           <td className="px-3 sm:px-6 py-3 sm:py-4">
                             <div>
-                              <div className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">{event.name}</div>
-                              <div className="text-xs sm:text-sm text-gray-700 font-medium mt-1">{event.venue}</div>
-                                                            <div className="text-xs text-gray-500 sm:hidden mt-1">
+                              <div className={`text-xs sm:text-sm font-bold ${themeClasses.textPrimary} leading-tight`}>{event.name}</div>
+                              <div className={`text-xs sm:text-sm ${themeClasses.textSecondary} font-medium mt-1`}>{event.venue}</div>
+                                                            <div className={`text-xs ${themeClasses.textMuted} sm:hidden mt-1`}>
                                 {event.region} • {event.performanceType === 'All' ? 'All Performance Types' : event.performanceType} • {event.ageCategory}
                               </div>
               </div>
                           </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900 hidden sm:table-cell">{event.region}</td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium hidden sm:table-cell">{event.region}</td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                             <div className="space-y-1">
                               {event.performanceType === 'All' ? (
@@ -1417,7 +1423,7 @@ export default function AdminDashboard() {
                             <div className="text-xs sm:text-sm text-gray-700">{event.ageCategory}</div>
                             </div>
                           </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900">
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium">
                             <div className="hidden sm:block">
                               {new Date(event.eventDate).toLocaleDateString()}
                             </div>
@@ -1481,15 +1487,15 @@ export default function AdminDashboard() {
         {activeTab === 'judges' && (
           <div className="space-y-8 animate-fadeIn">
             {/* Enhanced Judges List */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-100">
-              <div className="px-6 py-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-b border-purple-100">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">👨‍⚖️</span>
                   </div>
-                    <h2 className="text-xl font-bold text-gray-900">Judges</h2>
-                    <div className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Judges</h2>
+                    <div className={`px-3 py-1 ${theme === 'dark' ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-100 text-purple-800'} rounded-full text-sm font-medium`}>
                       {judges.filter(j => !j.isAdmin).length} judges
                   </div>
                 </div>
@@ -1505,7 +1511,7 @@ export default function AdminDashboard() {
             </div>
               
               {judges.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 ${themeClasses.textMuted}">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                     <span className="text-2xl">👨‍⚖️</span>
                   </div>
@@ -1522,25 +1528,25 @@ export default function AdminDashboard() {
               ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50/80">
+                    <thead className={themeClasses.tableHeader}>
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Email</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Role</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">Created</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Name</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden sm:table-cell`}>Email</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Role</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden md:table-cell`}>Created</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
                     </tr>
                   </thead>
-                    <tbody className="bg-white/50 divide-y divide-gray-200">
+                    <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
                       {judges.map((judge) => (
-                        <tr key={judge.id} className="hover:bg-purple-50/50 transition-colors duration-200">
+                        <tr key={judge.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                           <td className="px-6 py-4">
                             <div>
-                              <div className="text-sm font-bold text-gray-900">{judge.name}</div>
-                              <div className="text-sm text-gray-700 font-medium sm:hidden">{judge.email}</div>
+                              <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{judge.name}</div>
+                              <div className={`text-sm ${themeClasses.textSecondary} font-medium sm:hidden`}>{judge.email}</div>
                           </div>
                         </td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900 hidden sm:table-cell">{judge.email}</td>
+                          <td className={`px-6 py-4 text-sm font-medium ${themeClasses.textPrimary} hidden sm:table-cell`}>{judge.email}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${
                               judge.isAdmin ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-300' : 'bg-gray-50 text-gray-700 border-gray-200'
@@ -1548,7 +1554,7 @@ export default function AdminDashboard() {
                               {judge.isAdmin ? '👑 Admin' : '👨‍⚖️ Judge'}
                           </span>
                         </td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-600 hidden md:table-cell">
+                          <td className={`px-6 py-4 text-sm font-medium ${themeClasses.textSecondary} hidden md:table-cell`}>
                             {new Date(judge.createdAt).toLocaleDateString()}
                         </td>
                           <td className="px-6 py-4">
@@ -1575,15 +1581,15 @@ export default function AdminDashboard() {
         {activeTab === 'assignments' && (
           <div className="space-y-8 animate-fadeIn">
             {/* Enhanced Assignments List */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-pink-100">
-              <div className="px-6 py-4 bg-gradient-to-r from-pink-500/10 to-rose-500/10 border-b border-pink-100">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-pink-500/20 to-rose-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🔗</span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Judge Assignments</h2>
-                    <div className="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm font-medium">
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Judge Assignments</h2>
+                    <div className={`px-3 py-1 ${theme === 'dark' ? 'bg-pink-900/80 text-pink-200' : 'bg-pink-100 text-pink-800'} rounded-full text-sm font-medium`}>
                       {assignments.length} assignments
                     </div>
                   </div>
@@ -1599,7 +1605,7 @@ export default function AdminDashboard() {
               </div>
 
               {assignments.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 ${themeClasses.textMuted}">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                     <span className="text-2xl">🔗</span>
                   </div>
@@ -1616,28 +1622,28 @@ export default function AdminDashboard() {
               ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50/80">
+                    <thead className={themeClasses.tableHeader}>
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Judge</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Event</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Email</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Judge</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Event</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden sm:table-cell`}>Email</th>
+                        <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
                     </tr>
                   </thead>
-                    <tbody className="bg-white/50 divide-y divide-gray-200">
+                    <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
                       {assignments.map((assignment) => (
-                        <tr key={assignment.id} className="hover:bg-pink-50/50 transition-colors duration-200">
+                        <tr key={assignment.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                           <td className="px-6 py-4">
                             <div>
-                              <div className="text-sm font-bold text-gray-900">{assignment.judgeName}</div>
-                              <div className="text-sm text-gray-700 font-medium sm:hidden">{assignment.judgeEmail}</div>
+                              <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{assignment.judgeName}</div>
+                              <div className={`text-sm ${themeClasses.textSecondary} font-medium sm:hidden`}>{assignment.judgeEmail}</div>
                             </div>
                         </td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <td className="px-6 py-4 text-sm font-medium">
                             {assignment.eventName}
-                            <div className="text-xs text-gray-500 mt-1">{assignment.eventDate ? new Date(assignment.eventDate).toLocaleDateString() : 'No date'}</div>
+                            <div className={`text-xs ${themeClasses.textMuted} mt-1`}>{assignment.eventDate ? new Date(assignment.eventDate).toLocaleDateString() : 'No date'}</div>
                           </td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-600 hidden sm:table-cell">{assignment.judgeEmail}</td>
+                          <td className="px-6 py-4 text-sm font-medium ${themeClasses.textSecondary} hidden sm:table-cell">{assignment.judgeEmail}</td>
                           <td className="px-6 py-4">
                             <button
                               onClick={() => handleUnassignJudge(assignment)}
@@ -1663,14 +1669,14 @@ export default function AdminDashboard() {
         {activeTab === 'dancers' && (
           <div className="space-y-8 animate-fadeIn">
             {/* Enhanced Dancers List */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-rose-100">
-              <div className="px-6 py-4 bg-gradient-to-r from-rose-500/10 to-pink-500/10 border-b border-rose-100">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-rose-500/20 to-pink-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-rose-500 to-pink-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">💃</span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Individual Dancer Registrations</h2>
+                    <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Individual Dancer Registrations</h2>
                     <div className="px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-sm font-medium">
                       {dancers.filter(d => {
                         const matchesSearch = !dancerSearchTerm || 
@@ -1695,7 +1701,7 @@ export default function AdminDashboard() {
                         placeholder="Search dancers..."
                         value={dancerSearchTerm}
                         onChange={(e) => setDancerSearchTerm(e.target.value)}
-                        className="w-full sm:w-64 px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm text-gray-900 placeholder-gray-500"
+                        className="w-full sm:w-64 px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm ${themeClasses.textPrimary} placeholder-gray-500"
                       />
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <span className="text-gray-400">🔍</span>
@@ -1705,7 +1711,7 @@ export default function AdminDashboard() {
                     <select
                       value={dancerStatusFilter}
                       onChange={(e) => setDancerStatusFilter(e.target.value as any)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm ${themeClasses.textPrimary}"
                     >
                       <option value="all">All Status</option>
                       <option value="pending">⏳ Pending</option>
@@ -1734,7 +1740,7 @@ export default function AdminDashboard() {
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Sort by newest first
 
                 return filteredDancers.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 ${themeClasses.textMuted}">
                     <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                       <span className="text-2xl">💃</span>
                     </div>
@@ -1763,41 +1769,41 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50/80">
+                      <thead className={themeClasses.tableHeader}>
                         <tr>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Age</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Studio</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Guardian</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Name</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Age</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Contact</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Studio</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Guardian</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Status</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white/50 divide-y divide-gray-200">
+                      <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
                         {filteredDancers.map((dancer) => (
-                          <tr key={dancer.id} className="hover:bg-rose-50/50 transition-colors duration-200">
+                          <tr key={dancer.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                             <td className="px-6 py-4">
                               <div>
-                                <div className="text-sm font-bold text-gray-900">{dancer.name}</div>
-                                <div className="text-xs text-gray-500">ID: {dancer.nationalId}</div>
-                                <div className="text-xs text-gray-500">EODSA: {dancer.eodsaId}</div>
-                                <div className="text-xs text-gray-500">Registered: {new Date(dancer.createdAt).toLocaleDateString()}</div>
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{dancer.name}</div>
+                                <div className={`text-xs ${themeClasses.textMuted}`}>ID: {dancer.nationalId}</div>
+                                <div className={`text-xs ${themeClasses.textMuted}`}>EODSA: {dancer.eodsaId}</div>
+                                <div className={`text-xs ${themeClasses.textMuted}`}>Registered: {new Date(dancer.createdAt).toLocaleDateString()}</div>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{dancer.age}</div>
-                              <div className="text-xs text-gray-500">{dancer.dateOfBirth}</div>
+                              <div className="text-sm font-medium">{dancer.age}</div>
+                              <div className={`text-xs ${themeClasses.textMuted}`}>{dancer.dateOfBirth}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{dancer.email || 'N/A'}</div>
-                              <div className="text-xs text-gray-500">{dancer.phone || 'N/A'}</div>
+                              <div className="text-sm font-medium">{dancer.email || 'N/A'}</div>
+                              <div className={`text-xs ${themeClasses.textMuted}`}>{dancer.phone || 'N/A'}</div>
                             </td>
                             <td className="px-6 py-4">
                               {dancer.studioName ? (
                                 <div>
                                   <div className="text-sm font-medium text-blue-600">🏢 {dancer.studioName}</div>
-                                  <div className="text-xs text-gray-500">{dancer.studioEmail}</div>
+                                  <div className={`text-xs ${themeClasses.textMuted}`}>{dancer.studioEmail}</div>
                                   <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-1">
                                     Studio Dancer
                                   </div>
@@ -1814,9 +1820,9 @@ export default function AdminDashboard() {
                             <td className="px-6 py-4">
                               {dancer.guardianName ? (
                                 <div>
-                                  <div className="text-sm font-medium text-gray-900">{dancer.guardianName}</div>
-                                  <div className="text-xs text-gray-500">{dancer.guardianEmail}</div>
-                                  <div className="text-xs text-gray-500">{dancer.guardianPhone}</div>
+                                  <div className="text-sm font-medium">{dancer.guardianName}</div>
+                                  <div className={`text-xs ${themeClasses.textMuted}`}>{dancer.guardianEmail}</div>
+                                  <div className={`text-xs ${themeClasses.textMuted}`}>{dancer.guardianPhone}</div>
                                 </div>
                               ) : (
                                 <span className="text-sm text-gray-400">Adult</span>
@@ -1829,7 +1835,7 @@ export default function AdminDashboard() {
                                     ✅ Approved
                                   </span>
                                   {dancer.approvedAt && (
-                                    <div className="text-xs text-gray-500 mt-1">
+                                    <div className={`text-xs ${themeClasses.textMuted} mt-1`}>
                                       {new Date(dancer.approvedAt).toLocaleDateString()}
                                     </div>
                                   )}
@@ -1839,7 +1845,7 @@ export default function AdminDashboard() {
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                     ❌ Rejected
                                   </span>
-                                  <div className="text-xs text-gray-500 mt-1" title={dancer.rejectionReason}>
+                                  <div className={`text-xs ${themeClasses.textMuted} mt-1`} title={dancer.rejectionReason}>
                                     {dancer.rejectionReason.length > 30 
                                       ? dancer.rejectionReason.substring(0, 30) + '...' 
                                       : dancer.rejectionReason}
@@ -1923,14 +1929,14 @@ export default function AdminDashboard() {
         {activeTab === 'studios' && (
           <div className="space-y-8 animate-fadeIn">
             {/* Enhanced Studios List */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-orange-100">
-              <div className="px-6 py-4 bg-gradient-to-r from-orange-500/10 to-red-500/10 border-b border-orange-100">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-orange-500/20 to-red-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🏢</span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Studio Registrations</h2>
+                    <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Studio Registrations</h2>
                     <div className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
                       {studios.filter(s => {
                         const matchesSearch = !studioSearchTerm || 
@@ -1954,7 +1960,7 @@ export default function AdminDashboard() {
                         placeholder="Search studios..."
                         value={studioSearchTerm}
                         onChange={(e) => setStudioSearchTerm(e.target.value)}
-                        className="w-full sm:w-64 px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm text-gray-900 placeholder-gray-500"
+                        className="w-full sm:w-64 px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm ${themeClasses.textPrimary} placeholder-gray-500"
                       />
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <span className="text-gray-400">🔍</span>
@@ -1964,7 +1970,7 @@ export default function AdminDashboard() {
                     <select
                       value={studioStatusFilter}
                       onChange={(e) => setStudioStatusFilter(e.target.value as any)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm ${themeClasses.textPrimary}"
                     >
                       <option value="all">All Status</option>
                       <option value="pending">⏳ Pending</option>
@@ -1992,7 +1998,7 @@ export default function AdminDashboard() {
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Sort by newest first
 
                 return filteredStudios.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 ${themeClasses.textMuted}">
                     <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                       <span className="text-2xl">🏢</span>
                     </div>
@@ -2021,31 +2027,31 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50/80">
+                      <thead className={themeClasses.tableHeader}>
                         <tr>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Studio</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Registration</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Studio</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Contact</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Registration</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Status</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white/50 divide-y divide-gray-200">
+                      <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
                         {filteredStudios.map((studio) => (
-                          <tr key={studio.id} className="hover:bg-orange-50/50 transition-colors duration-200">
+                          <tr key={studio.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                             <td className="px-6 py-4">
                               <div>
-                                <div className="text-sm font-bold text-gray-900">{studio.name}</div>
-                                <div className="text-xs text-gray-500">Reg: {studio.registrationNumber}</div>
-                                <div className="text-xs text-gray-500">Registered: {new Date(studio.createdAt).toLocaleDateString()}</div>
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{studio.name}</div>
+                                <div className={`text-xs ${themeClasses.textMuted}`}>Reg: {studio.registrationNumber}</div>
+                                <div className={`text-xs ${themeClasses.textMuted}`}>Registered: {new Date(studio.createdAt).toLocaleDateString()}</div>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{studio.email}</div>
+                              <div className="text-sm font-medium">{studio.email}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{studio.registrationNumber}</div>
-                              <div className="text-xs text-gray-500">{new Date(studio.createdAt).toLocaleDateString()}</div>
+                              <div className="text-sm font-medium">{studio.registrationNumber}</div>
+                              <div className={`text-xs ${themeClasses.textMuted}`}>{new Date(studio.createdAt).toLocaleDateString()}</div>
                             </td>
                             <td className="px-6 py-4">
                               {studio.approved ? (
@@ -2054,7 +2060,7 @@ export default function AdminDashboard() {
                                     ✅ Approved
                                   </span>
                                   {studio.approvedAt && (
-                                    <div className="text-xs text-gray-500 mt-1">
+                                    <div className={`text-xs ${themeClasses.textMuted} mt-1`}>
                                       {new Date(studio.approvedAt).toLocaleDateString()}
                                     </div>
                                   )}
@@ -2064,7 +2070,7 @@ export default function AdminDashboard() {
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                     ❌ Rejected
                                   </span>
-                                  <div className="text-xs text-gray-500 mt-1" title={studio.rejectionReason}>
+                                  <div className={`text-xs ${themeClasses.textMuted} mt-1`} title={studio.rejectionReason}>
                                     {studio.rejectionReason.length > 30 
                                       ? studio.rejectionReason.substring(0, 30) + '...' 
                                       : studio.rejectionReason}
@@ -2111,14 +2117,14 @@ export default function AdminDashboard() {
         {/* Sound Tech Tab */}
         {activeTab === 'sound-tech' && (
           <div className="space-y-8 animate-fadeIn">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-blue-100">
-              <div className="px-6 py-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-b border-blue-100">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🎵</span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Sound Tech Dashboard</h2>
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Sound Tech Dashboard</h2>
                   </div>
                   <button
                     onClick={() => window.open('/admin/sound-tech', '_blank')}
@@ -2131,45 +2137,45 @@ export default function AdminDashboard() {
               
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-green-900/40 to-emerald-900/40 border-green-700' : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'} rounded-xl p-6 border`}>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-green-800' : 'bg-green-100'} rounded-lg flex items-center justify-center`}>
                         <span className="text-green-600 text-lg">🎵</span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Live Performances</p>
-                        <p className="text-2xl font-bold text-gray-900">Coming Soon</p>
+                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Live Performances</p>
+                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Coming Soon</p>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6">
+                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-blue-900/40 to-cyan-900/40 border-blue-700' : 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200'} rounded-xl p-6 border`}>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-blue-800' : 'bg-blue-100'} rounded-lg flex items-center justify-center`}>
                         <span className="text-blue-600 text-lg">📹</span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Virtual Performances</p>
-                        <p className="text-2xl font-bold text-gray-900">Coming Soon</p>
+                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Virtual Performances</p>
+                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Coming Soon</p>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-purple-700' : 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200'} rounded-xl p-6 border`}>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-purple-800' : 'bg-purple-100'} rounded-lg flex items-center justify-center`}>
                         <span className="text-purple-600 text-lg">⬇️</span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Music Downloads</p>
-                        <p className="text-2xl font-bold text-gray-900">Available</p>
+                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Music Downloads</p>
+                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Available</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+                <div className={`${theme === 'dark' ? 'bg-blue-900/40 border-blue-700' : 'bg-blue-50 border-blue-200'} rounded-xl p-6 border`}>
+                  <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-blue-200' : 'text-blue-900'} mb-3 flex items-center`}>
                     <span className="mr-2">🎵</span>
                     Sound Tech Features
                   </h3>
@@ -2177,35 +2183,35 @@ export default function AdminDashboard() {
                     <div className="space-y-3">
                       <div className="flex items-center space-x-2">
                         <span className="text-green-500">✅</span>
-                        <span className="text-sm text-blue-800">Access all uploaded music files</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Access all uploaded music files</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-green-500">✅</span>
-                        <span className="text-sm text-blue-800">Play music with full controls</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Play music with full controls</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-green-500">✅</span>
-                        <span className="text-sm text-blue-800">Download individual or all music files</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Download individual or all music files</span>
                       </div>
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center space-x-2">
                         <span className="text-green-500">✅</span>
-                        <span className="text-sm text-blue-800">Filter by event and performance type</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Filter by event and performance type</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-green-500">✅</span>
-                        <span className="text-sm text-blue-800">View performance details and item numbers</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>View performance details and item numbers</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-green-500">✅</span>
-                        <span className="text-sm text-blue-800">Access virtual performance video links</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Access virtual performance video links</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="mt-6 p-4 bg-white border border-blue-300 rounded-lg">
-                    <p className="text-sm text-blue-700">
+                  <div className={`mt-6 p-4 ${theme === 'dark' ? 'bg-blue-800/20 border-blue-600' : 'bg-white border-blue-300'} rounded-lg border`}>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
                       <strong>For Sound Techs:</strong> Use the full dashboard to access all music files, organize by performance order, 
                       and prepare audio for live events. Download all music files at once for offline preparation.
                     </p>
@@ -2219,14 +2225,14 @@ export default function AdminDashboard() {
         {/* Music Upload Tracking Tab */}
         {activeTab === 'music-tracking' && (
           <div className="space-y-8 animate-fadeIn">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-cyan-100">
-              <div className="px-6 py-4 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-b border-cyan-100">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🎼</span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Music Upload Tracking</h2>
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Music Upload Tracking</h2>
                   </div>
                   <button
                     onClick={fetchMusicTrackingData}
@@ -2241,10 +2247,10 @@ export default function AdminDashboard() {
                 {loadingMusicTracking ? (
                   <div className="text-center py-8">
                     <div className="animate-spin w-8 h-8 border-2 border-cyan-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p className="text-gray-500">Loading music tracking data...</p>
+                    <p className={`${themeClasses.textMuted}`}>Loading music tracking data...</p>
                   </div>
                 ) : musicTrackingData.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className={`text-center py-8 ${themeClasses.textMuted}`}>
                     <span className="text-4xl mb-4 block">📭</span>
                     <p className="text-lg">No entries found</p>
                     <p className="text-sm text-gray-400 mt-2">Click "Refresh Data" to load music upload tracking information</p>
@@ -2253,34 +2259,34 @@ export default function AdminDashboard() {
                   <div className="space-y-6">
                     {/* Summary Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className={`${theme === 'dark' ? 'bg-green-900/40 border-green-700' : 'bg-green-50 border-green-200'} rounded-lg p-4 border`}>
                         <div className="flex items-center space-x-2">
                           <span className="text-2xl">✅</span>
                           <div>
-                            <p className="text-sm text-green-600 font-medium">Music Uploaded</p>
-                            <p className="text-2xl font-bold text-green-700">
+                            <p className={`text-sm ${theme === 'dark' ? 'text-green-300' : 'text-green-600'} font-medium`}>Music Uploaded</p>
+                            <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-green-200' : 'text-green-700'}`}>
                               {musicTrackingData.filter(entry => entry.musicFileUrl).length}
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className={`${theme === 'dark' ? 'bg-red-900/40 border-red-700' : 'bg-red-50 border-red-200'} rounded-lg p-4 border`}>
                         <div className="flex items-center space-x-2">
                           <span className="text-2xl">❌</span>
                           <div>
-                            <p className="text-sm text-red-600 font-medium">Missing Music</p>
-                            <p className="text-2xl font-bold text-red-700">
+                            <p className={`text-sm ${theme === 'dark' ? 'text-red-300' : 'text-red-600'} font-medium`}>Missing Music</p>
+                            <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-red-200' : 'text-red-700'}`}>
                               {musicTrackingData.filter(entry => !entry.musicFileUrl && entry.entryType === 'live').length}
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className={`${theme === 'dark' ? 'bg-blue-900/40 border-blue-700' : 'bg-blue-50 border-blue-200'} rounded-lg p-4 border`}>
                         <div className="flex items-center space-x-2">
                           <span className="text-2xl">🎥</span>
                           <div>
-                            <p className="text-sm text-blue-600 font-medium">Virtual Entries</p>
-                            <p className="text-2xl font-bold text-blue-700">
+                            <p className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Virtual Entries</p>
+                            <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
                               {musicTrackingData.filter(entry => entry.entryType === 'virtual').length}
                             </p>
                           </div>
@@ -2290,57 +2296,57 @@ export default function AdminDashboard() {
 
                     {/* Entries Table */}
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className={`min-w-full divide-y ${themeClasses.tableBorder}`}>
+                        <thead className={`${themeClasses.tableHeader}`}>
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Entry Details
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Contestant
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Event
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Type
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Music Status
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Actions
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
                           {musicTrackingData.map((entry) => (
-                            <tr key={entry.id} className="hover:bg-gray-50">
+                            <tr key={entry.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
-                                  <div className="text-sm font-medium text-gray-900">{entry.itemName}</div>
-                                  <div className="text-sm text-gray-500">Item #{entry.itemNumber || 'Not assigned'}</div>
-                                  <div className="text-sm text-gray-500">{entry.mastery} • {entry.itemStyle}</div>
+                                  <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{entry.itemName}</div>
+                                  <div className={`text-sm ${themeClasses.textMuted}`}>Item #{entry.itemNumber || 'Not assigned'}</div>
+                                  <div className={`text-sm ${themeClasses.textMuted}`}>{entry.mastery} • {entry.itemStyle}</div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
-                                  <div className="text-sm font-medium text-gray-900">{entry.contestantName || 'Unknown'}</div>
-                                  <div className="text-sm text-gray-500">{entry.eodsaId}</div>
-                                  <div className="text-sm text-gray-500">{entry.studioName || 'Independent'}</div>
+                                  <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{entry.contestantName || 'Unknown'}</div>
+                                  <div className={`text-sm ${themeClasses.textMuted}`}>{entry.eodsaId}</div>
+                                  <div className={`text-sm ${themeClasses.textMuted}`}>{entry.studioName || 'Independent'}</div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
-                                  <div className="text-sm font-medium text-gray-900">{entry.eventName}</div>
-                                  <div className="text-sm text-gray-500">{entry.eventDate ? new Date(entry.eventDate).toLocaleDateString() : 'TBD'}</div>
+                                  <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{entry.eventName}</div>
+                                  <div className={`text-sm ${themeClasses.textMuted}`}>{entry.eventDate ? new Date(entry.eventDate).toLocaleDateString() : 'TBD'}</div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                   entry.entryType === 'live' 
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-purple-100 text-purple-800'
+                                    ? theme === 'dark' ? 'bg-blue-900/80 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                    : theme === 'dark' ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-100 text-purple-800'
                                 }`}>
                                   {entry.entryType === 'live' ? '🎵 Live' : '🎥 Virtual'}
                                 </span>
@@ -2349,18 +2355,18 @@ export default function AdminDashboard() {
                                 {entry.entryType === 'live' ? (
                                   entry.musicFileUrl ? (
                                     <div className="flex items-center space-x-2">
-                                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
                                         ✅ Uploaded
                                       </span>
-                                      <span className="text-xs text-gray-500 truncate max-w-[100px]">{entry.musicFileName}</span>
+                                      <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[100px]`}>{entry.musicFileName}</span>
                                     </div>
                                   ) : (
-                                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
                                       ❌ Missing
                                     </span>
                                   )
                                 ) : (
-                                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
                                     N/A
                                   </span>
                                 )}
@@ -2408,11 +2414,11 @@ export default function AdminDashboard() {
                   <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">🎭</span>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Create New Event</h2>
+                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Create New Event</h2>
                 </div>
                 <button
                   onClick={() => setShowCreateEventModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2427,7 +2433,7 @@ export default function AdminDashboard() {
                       type="text"
                     value={newEvent.name}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
                     required
                     placeholder="e.g., EODSA Nationals Championships 2024"
                   />
@@ -2439,7 +2445,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={newEvent.venue}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, venue: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
                     required
                     placeholder="e.g., Johannesburg Civic Theatre"
                   />
@@ -2450,7 +2456,7 @@ export default function AdminDashboard() {
                   <textarea
                     value={newEvent.description}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
                     rows={3}
                     required
                     placeholder="Describe the event..."
@@ -2459,7 +2465,7 @@ export default function AdminDashboard() {
 
                 <div className="lg:col-span-1">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
-                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium text-base">
+                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 ${themeClasses.textPrimary} font-medium text-base">
                     EODSA Nationals
                   </div>
                 </div>
@@ -2472,7 +2478,7 @@ export default function AdminDashboard() {
                     type="datetime-local"
                     value={newEvent.eventDate}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, eventDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
                     required
                   />
                 </div>
@@ -2483,7 +2489,7 @@ export default function AdminDashboard() {
                     type="datetime-local"
                     value={newEvent.eventEndDate}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, eventEndDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
                     required
                   />
                 </div>
@@ -2494,7 +2500,7 @@ export default function AdminDashboard() {
                     type="datetime-local"
                     value={newEvent.registrationDeadline}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, registrationDeadline: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
                     required
                   />
                 </div>
@@ -2503,10 +2509,10 @@ export default function AdminDashboard() {
 
                 <div className="lg:col-span-1">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Types</label>
-                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 font-medium text-base">
+                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 ${themeClasses.textPrimary} font-medium text-base">
                     🎭 Creates All Performance Types (Solo, Duet, Trio, Group)
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className={`text-xs ${themeClasses.textMuted} mt-1`}>
                     💡 This will automatically create separate events for Solo, Duet, Trio, and Group performances.
                   </p>
                 </div>
@@ -2568,7 +2574,7 @@ export default function AdminDashboard() {
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">✏️</span>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Edit Event</h2>
+                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Edit Event</h2>
                 </div>
                 <button
                   onClick={() => {
@@ -2576,7 +2582,7 @@ export default function AdminDashboard() {
                     setEditingEvent(null);
                     setUpdateEventMessage('');
                   }}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2596,7 +2602,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={editEventData.name}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                     required
                   />
                 </div>
@@ -2606,7 +2612,7 @@ export default function AdminDashboard() {
                   <select
                     value={editEventData.region}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, region: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                     required
                   >
                     <option value="Nationals">Nationals</option>
@@ -2622,7 +2628,7 @@ export default function AdminDashboard() {
                     type="date"
                     value={editEventData.eventDate}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, eventDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                     required
                   />
                 </div>
@@ -2633,7 +2639,7 @@ export default function AdminDashboard() {
                     type="date"
                     value={editEventData.eventEndDate}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, eventEndDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                   />
                 </div>
 
@@ -2643,7 +2649,7 @@ export default function AdminDashboard() {
                     type="date"
                     value={editEventData.registrationDeadline}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, registrationDeadline: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                     required
                   />
                 </div>
@@ -2653,7 +2659,7 @@ export default function AdminDashboard() {
                   <select
                     value={editEventData.status}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                   >
                     <option value="upcoming">Upcoming</option>
                     <option value="registration_open">Registration Open</option>
@@ -2669,7 +2675,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={editEventData.venue}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, venue: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                     required
                   />
                 </div>
@@ -2680,7 +2686,7 @@ export default function AdminDashboard() {
                     value={editEventData.description}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, description: e.target.value }))}
                     rows={3}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                     placeholder="Event description (optional)"
                   />
                 </div>
@@ -2747,11 +2753,11 @@ export default function AdminDashboard() {
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">👨‍⚖️</span>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Create New Judge</h2>
+                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Create New Judge</h2>
                 </div>
                 <button
                   onClick={() => setShowCreateJudgeModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2769,7 +2775,7 @@ export default function AdminDashboard() {
                         const cleanValue = e.target.value.replace(/[^a-zA-Z\s\-\']/g, '');
                         setNewJudge(prev => ({ ...prev, name: cleanValue }));
                       }}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
                       required
                     placeholder="Full Name"
                     />
@@ -2781,7 +2787,7 @@ export default function AdminDashboard() {
                       type="email"
                       value={newJudge.email}
                       onChange={(e) => setNewJudge(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
                       required
                     placeholder="judge@email.com"
                     />
@@ -2793,7 +2799,7 @@ export default function AdminDashboard() {
                       type="password"
                       value={newJudge.password}
                       onChange={(e) => setNewJudge(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
                       required
                       minLength={6}
                       placeholder="Minimum 6 characters"
@@ -2809,7 +2815,7 @@ export default function AdminDashboard() {
                         onChange={(e) => setNewJudge(prev => ({ ...prev, isAdmin: e.target.checked }))}
                       className="h-5 w-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                       />
-                    <label htmlFor="isAdmin" className="ml-3 block text-sm font-medium text-gray-900">
+                    <label htmlFor="isAdmin" className="ml-3 block text-sm font-medium">
                           Admin privileges
                         </label>
                       </div>
@@ -2872,11 +2878,11 @@ export default function AdminDashboard() {
                   <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">🔗</span>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Assign Judge to Event</h2>
+                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Assign Judge to Event</h2>
                 </div>
                 <button
                   onClick={() => setShowAssignJudgeModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2890,7 +2896,7 @@ export default function AdminDashboard() {
                   <select
                     value={assignment.judgeId}
                     onChange={(e) => setAssignment(prev => ({ ...prev, judgeId: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium"
                     required
                   >
                     <option value="">Choose a judge</option>
@@ -2905,7 +2911,7 @@ export default function AdminDashboard() {
                   <select
                     value={assignment.eventId}
                     onChange={(e) => setAssignment(prev => ({ ...prev, eventId: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium"
                     required
                   >
                     <option value="">Choose an event</option>
@@ -2915,7 +2921,7 @@ export default function AdminDashboard() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className={`text-xs ${themeClasses.textMuted} mt-1`}>
                     💡 Unified events support all performance types (Solo, Duet, Trio, Group) within the same event.
                   </p>
                 </div>
@@ -2978,11 +2984,11 @@ export default function AdminDashboard() {
                   <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">📧</span>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Email Test</h2>
+                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Email Test</h2>
                   </div>
                 <button
                   onClick={() => setShowEmailTestModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -3073,13 +3079,13 @@ export default function AdminDashboard() {
                     <span className="text-white text-lg">💰</span>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Financial Overview</h2>
-                    <p className="text-gray-600">{selectedDancerFinances.name} - {selectedDancerFinances.eodsaId}</p>
+                    <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Financial Overview</h2>
+                    <p className="${themeClasses.textSecondary}">{selectedDancerFinances.name} - {selectedDancerFinances.eodsaId}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowFinancialModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -3090,19 +3096,19 @@ export default function AdminDashboard() {
               {loadingFinances ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading financial information...</p>
+                  <p className="${themeClasses.textSecondary}">Loading financial information...</p>
                 </div>
               ) : (
                 <>
                   {/* Registration Fee Section */}
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
                       <span className="mr-2">📝</span>
                       Registration Fee
                     </h3>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Status:</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Status:</span>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           selectedDancerFinances.registrationFeePaid
                             ? 'bg-green-100 text-green-800 border border-green-200'
@@ -3114,8 +3120,8 @@ export default function AdminDashboard() {
                       
                       {selectedDancerFinances.registrationFeePaid && selectedDancerFinances.registrationFeePaidAt && (
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Paid Date:</span>
-                          <span className="text-sm text-gray-900">
+                          <span className={`text-sm ${themeClasses.textSecondary}`}>Paid Date:</span>
+                          <span className="text-sm ${themeClasses.textPrimary}">
                             {new Date(selectedDancerFinances.registrationFeePaidAt).toLocaleDateString()}
                           </span>
                         </div>
@@ -3123,8 +3129,8 @@ export default function AdminDashboard() {
                       
                       {selectedDancerFinances.registrationFeeMasteryLevel && (
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Mastery Level:</span>
-                          <span className="text-sm text-gray-900">
+                          <span className={`text-sm ${themeClasses.textSecondary}`}>Mastery Level:</span>
+                          <span className="text-sm ${themeClasses.textPrimary}">
                             {selectedDancerFinances.registrationFeeMasteryLevel}
                           </span>
                         </div>
@@ -3143,19 +3149,19 @@ export default function AdminDashboard() {
 
                   {/* Enhanced Balance Overview */}
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
                       <span className="mr-2">💰</span>
                       Financial Summary
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white rounded-lg p-3">
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Paid</div>
+                        <div className="text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider">Total Paid</div>
                         <div className="text-lg font-bold text-green-600">
                           R{selectedDancerFinances.financial?.totalPaid?.toFixed(2) || '0.00'}
                         </div>
                       </div>
                       <div className="bg-white rounded-lg p-3">
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</div>
+                        <div className="text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider">Outstanding</div>
                         <div className="text-lg font-bold text-red-600">
                           R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
                         </div>
@@ -3166,7 +3172,7 @@ export default function AdminDashboard() {
                   {/* Solo Entries Section */}
                   {selectedDancerFinances.entries?.soloCount > 0 && (
                     <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                      <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
                         <span className="mr-2">🕺</span>
                         Solo Entries ({selectedDancerFinances.entries.soloCount})
                       </h3>
@@ -3175,12 +3181,12 @@ export default function AdminDashboard() {
                           <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <div className="text-sm font-bold text-gray-900">{entry.itemName}</div>
-                                <div className="text-xs text-gray-500">{entry.eventName}</div>
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{entry.itemName}</div>
+                                <div className={`text-xs ${themeClasses.textMuted}`}>{entry.eventName}</div>
                                 <div className="text-xs text-purple-600 font-medium mt-1">Solo Performance</div>
                               </div>
                               <div className="text-right ml-4">
-                                <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee?.toFixed(2) || '0.00'}</div>
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>R{entry.calculatedFee?.toFixed(2) || '0.00'}</div>
                                 <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
                                   entry.paymentStatus === 'paid' 
                                     ? 'bg-green-100 text-green-800 border border-green-200'
@@ -3199,7 +3205,7 @@ export default function AdminDashboard() {
                   {/* Group Entries Section */}
                   {selectedDancerFinances.entries?.groupCount > 0 && (
                     <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                      <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
                         <span className="mr-2">👥</span>
                         Group Entries ({selectedDancerFinances.entries.groupCount})
                       </h3>
@@ -3208,8 +3214,8 @@ export default function AdminDashboard() {
                           <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
-                                <div className="text-sm font-bold text-gray-900">{entry.itemName}</div>
-                                <div className="text-xs text-gray-500">{entry.eventName}</div>
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{entry.itemName}</div>
+                                <div className={`text-xs ${themeClasses.textMuted}`}>{entry.eventName}</div>
                                 <div className="flex items-center space-x-2 mt-1">
                                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
                                     entry.participationRole === 'duet' ? 'bg-blue-100 text-blue-800' :
@@ -3226,10 +3232,10 @@ export default function AdminDashboard() {
                                 </div>
                               </div>
                               <div className="text-right ml-4">
-                                <div className="text-xs text-gray-500 mb-1">
+                                <div className="text-xs ${themeClasses.textMuted} mb-1">
                                   {entry.isMainContestant ? 'Full Fee' : 'Your Share'}
                                 </div>
-                                <div className="text-sm font-bold text-gray-900">
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>
                                   R{entry.dancerShare?.toFixed(2) || '0.00'}
                                 </div>
                                 {!entry.isMainContestant && (
@@ -3249,7 +3255,7 @@ export default function AdminDashboard() {
                             
                             {/* Group Members List */}
                             <div className="border-t border-gray-100 pt-3">
-                              <div className="text-xs font-medium text-gray-600 mb-2">Group Members:</div>
+                              <div className="text-xs font-medium ${themeClasses.textSecondary} mb-2">Group Members:</div>
                               <div className="flex flex-wrap gap-1">
                                 {entry.participantNames?.map((name: string, nameIndex: number) => (
                                   <span key={nameIndex} className={`inline-flex px-2 py-1 text-xs rounded-full ${
@@ -3273,22 +3279,22 @@ export default function AdminDashboard() {
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="text-center py-6">
                         <div className="text-gray-400 text-4xl mb-3">🎭</div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Event Entries</h3>
-                        <p className="text-gray-600 text-sm">This dancer hasn't registered for any competitions yet.</p>
+                        <h3 className="text-lg font-medium mb-2">No Event Entries</h3>
+                        <p className="${themeClasses.textSecondary} text-sm">This dancer hasn't registered for any competitions yet.</p>
                       </div>
                     </div>
                   )}
 
                   {/* Detailed Outstanding Breakdown */}
                   <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
                       <span className="mr-2">⚠️</span>
                       Outstanding Balance Breakdown
                     </h3>
                     <div className="space-y-3">
                       {/* Registration Fee */}
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Registration Fee:</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Registration Fee:</span>
                         <span className="text-sm font-medium text-red-600">
                           R{selectedDancerFinances.financial?.registrationFeeOutstanding?.toFixed(2) || '0.00'}
                         </span>
@@ -3297,14 +3303,14 @@ export default function AdminDashboard() {
                       {/* Entry Fees Breakdown */}
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Solo Entries Outstanding:</span>
+                          <span className={`text-sm ${themeClasses.textSecondary}`}>Solo Entries Outstanding:</span>
                           <span className="text-sm font-medium text-red-600">
                             R{(selectedDancerFinances.entries?.solo?.filter((e: any) => e.paymentStatus !== 'paid')
                               .reduce((sum: number, entry: any) => sum + (entry.calculatedFee || 0), 0) || 0).toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Group Entries Outstanding:</span>
+                          <span className={`text-sm ${themeClasses.textSecondary}`}>Group Entries Outstanding:</span>
                           <span className="text-sm font-medium text-red-600">
                             R{(selectedDancerFinances.entries?.group?.filter((e: any) => e.paymentStatus !== 'paid')
                               .reduce((sum: number, entry: any) => sum + (entry.dancerShare || 0), 0) || 0).toFixed(2)}
@@ -3314,7 +3320,7 @@ export default function AdminDashboard() {
                       
                       {/* Total */}
                       <div className="flex justify-between items-center pt-3 border-t border-red-200">
-                        <span className="text-base font-bold text-gray-900">TOTAL OUTSTANDING:</span>
+                        <span className="text-base font-bold ${themeClasses.textPrimary}">TOTAL OUTSTANDING:</span>
                         <span className="text-xl font-bold text-red-600">
                           R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
                         </span>
@@ -3324,8 +3330,8 @@ export default function AdminDashboard() {
                       {selectedDancerFinances.entries?.totalEntries > 0 && (
                         <div className="pt-3 border-t border-red-200">
                           <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-medium text-gray-600">Payment Progress:</span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs font-medium ${themeClasses.textSecondary}">Payment Progress:</span>
+                            <span className={`text-xs ${themeClasses.textMuted}`}>
                               {selectedDancerFinances.entries.all?.filter((e: any) => e.paymentStatus === 'paid').length || 0} of {selectedDancerFinances.entries.totalEntries} entries paid
                             </span>
                           </div>
@@ -3346,7 +3352,7 @@ export default function AdminDashboard() {
 
                   {/* Quick Actions */}
                   <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
                       <span className="mr-2">⚡</span>
                       Quick Actions
                     </h3>
@@ -3373,5 +3379,14 @@ export default function AdminDashboard() {
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap with ThemeProvider
+export default function AdminDashboardPage() {
+  return (
+    <ThemeProvider>
+      <AdminDashboard />
+    </ThemeProvider>
   );
 } 

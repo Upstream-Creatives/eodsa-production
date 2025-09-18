@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
 import { calculateEODSAFee } from '@/lib/types';
+import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 // Registration fee checking moved to API calls
 
 interface Event {
@@ -77,7 +79,10 @@ interface Performance {
   withdrawnFromJudging?: boolean;
 }
 
-export default function EventParticipantsPage() {
+function EventParticipantsPage() {
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
+  
   const params = useParams();
   const router = useRouter();
   const eventId = params?.id as string;
@@ -935,7 +940,7 @@ export default function EventParticipantsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="relative mb-8">
             {/* Modern Spinner */}
@@ -954,7 +959,7 @@ export default function EventParticipantsPage() {
             <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Loading Event Details
             </h2>
-            <p className="text-gray-600 font-medium animate-pulse">Preparing participant data...</p>
+            <p className="text-gray-400 font-medium animate-pulse">Preparing participant data...</p>
             
             {/* Progress Dots */}
             <div className="flex justify-center space-x-2 mt-6">
@@ -975,21 +980,21 @@ export default function EventParticipantsPage() {
       {/* Scores Management Modal */}
       {showScoresModal && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                   <span className="text-white text-lg">🎯</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Performance Scores</h2>
-                  <p className="text-gray-600">{selectedPerformanceScores?.performanceTitle}</p>
+                  <h2 className="text-xl font-bold text-white">Performance Scores</h2>
+                  <p className="text-gray-400">{selectedPerformanceScores?.performanceTitle}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowScoresModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="text-gray-400 hover:text-gray-400 p-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <span className="text-2xl">×</span>
               </button>
@@ -1000,30 +1005,30 @@ export default function EventParticipantsPage() {
             {loadingScores ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading scores...</p>
+                <p className="text-gray-400">Loading scores...</p>
               </div>
             ) : selectedPerformanceScores ? (
               <div className="space-y-6">
                 {/* Scoring Overview */}
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-700 rounded-lg p-4">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                     <div>
                       <div className="text-2xl font-bold text-blue-600">{selectedPerformanceScores.totalJudges}</div>
-                      <div className="text-sm text-gray-600">Total Judges</div>
+                      <div className="text-sm text-gray-400">Total Judges</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-green-600">{selectedPerformanceScores.scoredJudges}</div>
-                      <div className="text-sm text-gray-600">Scored</div>
+                      <div className="text-sm text-gray-400">Scored</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-orange-600">{selectedPerformanceScores.pendingJudgeIds?.length || 0}</div>
-                      <div className="text-sm text-gray-600">Pending</div>
+                      <div className="text-sm text-gray-400">Pending</div>
                     </div>
                     <div>
                       <div className={`text-2xl font-bold ${selectedPerformanceScores.isFullyScored ? 'text-green-600' : 'text-red-600'}`}>
                         {selectedPerformanceScores.isFullyScored ? '✓' : '✗'}
                       </div>
-                      <div className="text-sm text-gray-600">Complete</div>
+                      <div className="text-sm text-gray-400">Complete</div>
                     </div>
                   </div>
                 </div>
@@ -1031,33 +1036,33 @@ export default function EventParticipantsPage() {
                 {/* Individual Scores */}
                 {selectedPerformanceScores.scores && selectedPerformanceScores.scores.length > 0 ? (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Individual Judge Scores</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">Individual Judge Scores</h3>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y divide-gray-600">
+                        <thead className="bg-gray-700">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Judge</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Score</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Judge</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Score</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Percentage</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Submitted</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white divide-y divide-gray-600">
                           {selectedPerformanceScores.scores.map((score: any) => (
-                            <tr key={score.judgeId} className="hover:bg-gray-50">
+                            <tr key={score.judgeId} className="hover:bg-gray-700">
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{score.judgeName}</div>
-                                <div className="text-sm text-gray-500">ID: {score.judgeId}</div>
+                                <div className="text-sm font-medium text-white">{score.judgeName}</div>
+                                <div className="text-sm text-gray-400">ID: {score.judgeId}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-lg font-bold text-gray-900">{score.totalScore.toFixed(1)}/100</div>
+                                <div className="text-lg font-bold text-white">{score.totalScore.toFixed(1)}/100</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{((score.totalScore / 100) * 100).toFixed(1)}%</div>
+                                <div className="text-sm text-white">{((score.totalScore / 100) * 100).toFixed(1)}%</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-400">
                                   {new Date(score.submittedAt).toLocaleDateString()} {new Date(score.submittedAt).toLocaleTimeString()}
                                 </div>
                               </td>
@@ -1086,14 +1091,14 @@ export default function EventParticipantsPage() {
                 ) : (
                   <div className="text-center py-8">
                     <div className="text-gray-400 text-4xl mb-4">📝</div>
-                    <p className="text-gray-600">No scores submitted yet</p>
+                    <p className="text-gray-400">No scores submitted yet</p>
                   </div>
                 )}
 
                 {/* Pending Judges */}
                 {selectedPerformanceScores.pendingJudgeIds && selectedPerformanceScores.pendingJudgeIds.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Judges</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">Pending Judges</h3>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       <p className="text-yellow-800 text-sm mb-2">The following judges have not submitted scores yet:</p>
                       <div className="flex flex-wrap gap-2">
@@ -1110,7 +1115,7 @@ export default function EventParticipantsPage() {
             ) : (
               <div className="text-center py-8">
                 <div className="text-red-400 text-4xl mb-4">⚠️</div>
-                <p className="text-gray-600">Failed to load scores</p>
+                <p className="text-gray-400">Failed to load scores</p>
               </div>
             )}
           </div>
@@ -1119,9 +1124,9 @@ export default function EventParticipantsPage() {
     )}
 
 
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Enhanced Header */}
-      <header className="bg-white/90 backdrop-blur-lg shadow-xl border-b border-indigo-100">
+      <header className="bg-gray-800/90 backdrop-blur-lg shadow-xl border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-8">
             <div className="flex items-center space-x-4">
@@ -1129,19 +1134,23 @@ export default function EventParticipantsPage() {
                 <span className="text-white text-xl">👥</span>
               </div>
               <div>
-                <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                   Event Participants
                 </h1>
-                <p className="text-gray-600 font-medium">{event?.name || 'Loading...'}</p>
+                <p className="text-gray-400 font-medium">{event?.name || 'Loading...'}</p>
               </div>
             </div>
-            <Link
-              href="/admin"
-              className="inline-flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-gray-500 to-gray-700 text-white rounded-xl hover:from-gray-600 hover:to-gray-800 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
-            >
-              <span>←</span>
-              <span>Back to Admin</span>
-            </Link>
+            <div className="flex items-center space-x-4">
+              <ThemeToggle />
+              
+              <Link
+                href="/admin"
+                className="inline-flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-gray-500 to-gray-700 text-white rounded-xl hover:from-gray-600 hover:to-gray-800 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
+              >
+                <span>←</span>
+                <span>Back to Admin</span>
+              </Link>
+            </div>
           </div>
         </div>
       </header>
@@ -1149,13 +1158,13 @@ export default function EventParticipantsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Event Details Card */}
         {event && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-indigo-100">
+          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white text-sm">🏆</span>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Event Details</h2>
+                <h2 className="text-xl font-bold text-white">Event Details</h2>
               </div>
               
               {/* Excel Export Button */}
@@ -1170,19 +1179,19 @@ export default function EventParticipantsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="font-semibold text-gray-700">Date</p>
-                <p className="text-gray-700">{new Date(event.eventDate).toLocaleDateString()}</p>
+                <p className="font-semibold text-gray-300">Date</p>
+                <p className="text-gray-300">{new Date(event.eventDate).toLocaleDateString()}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">Venue</p>
-                <p className="text-gray-700">{event.venue}</p>
+                <p className="font-semibold text-gray-300">Venue</p>
+                <p className="text-gray-300">{event.venue}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">Entries</p>
-                <p className="text-gray-700">{entries.length} total</p>
+                <p className="font-semibold text-gray-300">Entries</p>
+                <p className="text-gray-300">{entries.length} total</p>
                 {entries.length > 0 && (
                   <div className="space-y-1">
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-400">
                       {getPerformanceStats().solo > 0 && `${getPerformanceStats().solo} Solo`}
                       {getPerformanceStats().duet > 0 && (getPerformanceStats().solo > 0 ? `, ${getPerformanceStats().duet} Duet` : `${getPerformanceStats().duet} Duet`)}
                       {getPerformanceStats().trio > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 ? `, ${getPerformanceStats().trio} Trio` : `${getPerformanceStats().trio} Trio`)}
@@ -1200,20 +1209,20 @@ export default function EventParticipantsPage() {
 
         {/* Performance Type Filter Tabs */}
         {entries.length > 0 && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-indigo-100 mb-6">
+          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-700 mb-6">
             <div className="px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Entries</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Filter Entries</h3>
               
               {/* Performance Type Filters */}
               <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Performance Type:</h4>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Performance Type:</h4>
                 <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setPerformanceTypeFilter('all')}
                   className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                     performanceTypeFilter === 'all'
                       ? 'bg-indigo-600 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
                   }`}
                 >
                   All Entries ({entries.length})
@@ -1271,14 +1280,14 @@ export default function EventParticipantsPage() {
               
               {/* Entry Type Filters */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Entry Type:</h4>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Entry Type:</h4>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setEntryTypeFilter('all')}
                     className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                       entryTypeFilter === 'all'
                         ? 'bg-indigo-600 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
                     }`}
                   >
                     All Types ({entries.length})
@@ -1314,10 +1323,10 @@ export default function EventParticipantsPage() {
         )}
 
         {/* Participants List */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-indigo-100 mb-8">
-          <div className="px-6 py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b border-indigo-100">
+        <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-gray-700 mb-8">
+          <div className="px-6 py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b border-gray-700">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-white">
                 {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
                   ? 'All Participants & Entries'
                   : `${performanceTypeFilter === 'all' ? 'All' : performanceTypeFilter.charAt(0).toUpperCase() + performanceTypeFilter.slice(1)} ${entryTypeFilter === 'all' ? '' : entryTypeFilter.charAt(0).toUpperCase() + entryTypeFilter.slice(1)} Entries`
@@ -1336,7 +1345,7 @@ export default function EventParticipantsPage() {
                 <div className="hidden md:flex items-center space-x-1">
                   <button
                     onClick={() => setPaymentFilter('all')}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='all'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='all'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-300 hover:bg-gray-700'}`}
                   >All</button>
                   <button
                     onClick={() => setPaymentFilter('paid')}
@@ -1357,7 +1366,7 @@ export default function EventParticipantsPage() {
 
           {/* Table with Item Number column */}
           {filteredEntries.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-gray-400">
               <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                 <span className="text-2xl">📝</span>
               </div>
@@ -1376,19 +1385,19 @@ export default function EventParticipantsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50/80">
+              <table className="min-w-full divide-y divide-gray-600">
+                <thead className="bg-gray-700/80">
                   <tr>
-                    <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-24">Item #</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Performance</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Payment</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">Submitted</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                    <th className="px-3 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider w-24">Item #</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Performance</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Payment</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider hidden md:table-cell">Submitted</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white/50 divide-y divide-gray-200">
+                <tbody className="bg-white/50 divide-y divide-gray-600">
                   {filteredEntries.map((entry) => {
                     const performanceType = getPerformanceType(entry.participantIds);
                     return (
@@ -1404,7 +1413,7 @@ export default function EventParticipantsPage() {
                                 if (e.key === 'Enter') handleItemNumberSave(entry.id);
                                 if (e.key === 'Escape') handleItemNumberCancel();
                               }}
-                              className="w-16 px-2 py-1 text-xs text-gray-900 bg-white border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className="w-16 px-2 py-1 text-xs text-white bg-white border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                               placeholder="Item #"
                               min="1"
                               autoFocus
@@ -1419,7 +1428,7 @@ export default function EventParticipantsPage() {
                               </button>
                               <button
                                 onClick={handleItemNumberCancel}
-                                className="px-2 py-1 text-[10px] bg-gray-500 text-white rounded hover:bg-gray-600"
+                                className="px-2 py-1 text-[10px] bg-gray-7000 text-white rounded hover:bg-gray-600"
                               >
                                 ✕
                               </button>
@@ -1435,7 +1444,7 @@ export default function EventParticipantsPage() {
                                 <div className="text-base font-bold text-indigo-600">
                                   #{entry.itemNumber}
                                 </div>
-                                <div className="text-[10px] text-gray-500">
+                                <div className="text-[10px] text-gray-400">
                                   Click to reassign
                                 </div>
                               </div>
@@ -1444,7 +1453,7 @@ export default function EventParticipantsPage() {
                                 <div className="text-xs font-medium text-orange-600">
                                   Click to assign
                             </div>
-                                <div className="text-[10px] text-gray-500">
+                                <div className="text-[10px] text-gray-400">
                               Program Order
                             </div>
                               </div>
@@ -1456,16 +1465,16 @@ export default function EventParticipantsPage() {
                       {/* Performance column (now 2nd) */}
                       <td className="px-6 py-4">
                         <div className="space-y-0.5">
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-400">
                             Studio: {entry.studioName || entry.contestantName || entry.eodsaId || 'N/A'}
                           </div>
-                          <div className="text-sm font-semibold text-gray-900">{entry.itemName}</div>
+                          <div className="text-sm font-semibold text-white">{entry.itemName}</div>
                           {entry.participantNames && entry.participantNames.length > 0 ? (
-                            <div className="text-xs text-gray-700">
+                            <div className="text-xs text-gray-300">
                               {entry.participantNames.join(', ')}
                             </div>
                           ) : (
-                            <div className="text-xs text-gray-700">
+                            <div className="text-xs text-gray-300">
                               {entry.participantIds.map((_, i) => `Participant ${i + 1}`).join(', ')}
                             </div>
                           )}
@@ -1486,7 +1495,7 @@ export default function EventParticipantsPage() {
                             }`}>
                               {entry.entryType === 'live' ? '🎵 LIVE' : '📹 VIRTUAL'}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-400">
                               {entry.participantIds.length} participant{entry.participantIds.length !== 1 ? 's' : ''}
                             </span>
                           </div>
@@ -1495,13 +1504,13 @@ export default function EventParticipantsPage() {
                       
                       <td className="px-6 py-4">
                         <div className="space-y-1">
-                            <div className="text-sm font-bold text-gray-900">R{entry.calculatedFee.toFixed(2)}</div>
+                            <div className="text-sm font-bold text-white">R{entry.calculatedFee.toFixed(2)}</div>
                             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entry.paymentStatus)}`}>
                               {entry.paymentStatus.toUpperCase()}
                             </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700 hidden md:table-cell">
+                      <td className="px-6 py-4 text-sm text-gray-300 hidden md:table-cell">
                         {new Date(entry.submittedAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1536,14 +1545,14 @@ export default function EventParticipantsPage() {
         </div>
 
         {/* Performances Section */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-indigo-100 mt-8">
+        <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-gray-700 mt-8">
           <div className="px-6 py-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-b border-green-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
                   <span className="text-white text-sm">🎭</span>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Performances</h2>
+                <h2 className="text-xl font-bold text-white">Performances</h2>
               </div>
               <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
                 {performances.length} performances
@@ -1552,7 +1561,7 @@ export default function EventParticipantsPage() {
           </div>
 
           {performances.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-gray-400">
               <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                 <span className="text-2xl">🎭</span>
               </div>
@@ -1561,37 +1570,37 @@ export default function EventParticipantsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50/80">
+              <table className="min-w-full divide-y divide-gray-600">
+                <thead className="bg-gray-700/80">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Performance</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Participants</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Duration</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">Choreographer</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Scores</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Performance</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider hidden sm:table-cell">Participants</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Duration</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider hidden md:table-cell">Choreographer</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Scores</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white/50 divide-y divide-gray-200">
+                <tbody className="bg-white/50 divide-y divide-gray-600">
                   {performances.map((performance) => (
                     <tr key={performance.id} className="hover:bg-green-50/50 transition-colors duration-200">
                       <td className="px-6 py-4">
                         <div>
-                          <div className="text-sm font-bold text-gray-900">{performance.title}</div>
-                          <div className="text-sm text-gray-700">{performance.contestantName}</div>
-                          <div className="text-xs text-gray-500">{performance.mastery} • {performance.itemStyle}</div>
+                          <div className="text-sm font-bold text-white">{performance.title}</div>
+                          <div className="text-sm text-gray-300">{performance.contestantName}</div>
+                          <div className="text-xs text-gray-400">{performance.mastery} • {performance.itemStyle}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 hidden sm:table-cell">
-                        <div className="text-sm text-gray-700">
+                        <div className="text-sm text-gray-300">
                           {performance.participantNames.join(', ')}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{performance.duration} min</div>
+                        <div className="text-sm font-medium text-white">{performance.duration} min</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700 hidden md:table-cell">
+                      <td className="px-6 py-4 text-sm text-gray-300 hidden md:table-cell">
                         {performance.choreographer}
                       </td>
                       <td className="px-6 py-4">
@@ -1610,7 +1619,7 @@ export default function EventParticipantsPage() {
                             }
                           </span>
                           {performance.withdrawnFromJudging && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-400">
                               (Shows as unscored)
                             </span>
                           )}
@@ -1659,13 +1668,13 @@ export default function EventParticipantsPage() {
     {/* Dancers Modal */}
     {showDancersModal && dancerModalEntry && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-          <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+        <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg">
+          <div className="p-5 border-b border-gray-700 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Dancers for {dancerModalEntry.itemName}</h3>
-              <p className="text-sm text-gray-600">Studio/Contestant: {dancerModalEntry.contestantName || dancerModalEntry.studioName || dancerModalEntry.eodsaId}</p>
+              <h3 className="text-lg font-bold text-white">Dancers for {dancerModalEntry.itemName}</h3>
+              <p className="text-sm text-gray-400">Studio/Contestant: {dancerModalEntry.contestantName || dancerModalEntry.studioName || dancerModalEntry.eodsaId}</p>
             </div>
-            <button onClick={() => setShowDancersModal(false)} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors">×</button>
+            <button onClick={() => setShowDancersModal(false)} className="text-gray-400 hover:text-gray-400 p-2 rounded-lg hover:bg-gray-100 transition-colors">×</button>
           </div>
           <div className="p-5 space-y-3">
             {(dancerModalEntry.participantNames && dancerModalEntry.participantNames.length > 0
@@ -1673,7 +1682,7 @@ export default function EventParticipantsPage() {
               : (dancerModalEntry.participantIds || []).map((_, i) => `Participant ${i + 1}`)
             ).map((name, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm">
-                <div className="font-medium text-gray-900">{name}</div>
+                <div className="font-medium text-white">{name}</div>
                 <div className="text-blue-700 text-xs bg-blue-50 px-2 py-1 rounded">
                   {dancerModalEntry.participantStudios?.[idx] || dancerModalEntry.studioName || 'Independent'}
                 </div>
@@ -1689,21 +1698,21 @@ export default function EventParticipantsPage() {
     {/* Scores Management Modal */}
     {showScoresModal && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                   <span className="text-white text-lg">🎯</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Performance Scores</h2>
-                  <p className="text-gray-600">{selectedPerformanceScores?.performanceTitle}</p>
+                  <h2 className="text-xl font-bold text-white">Performance Scores</h2>
+                  <p className="text-gray-400">{selectedPerformanceScores?.performanceTitle}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowScoresModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="text-gray-400 hover:text-gray-400 p-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <span className="text-2xl">×</span>
               </button>
@@ -1714,30 +1723,30 @@ export default function EventParticipantsPage() {
             {loadingScores ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading scores...</p>
+                <p className="text-gray-400">Loading scores...</p>
               </div>
             ) : selectedPerformanceScores ? (
               <div className="space-y-6">
                 {/* Scoring Overview */}
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-700 rounded-lg p-4">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                     <div>
                       <div className="text-2xl font-bold text-blue-600">{selectedPerformanceScores.totalJudges}</div>
-                      <div className="text-sm text-gray-600">Total Judges</div>
+                      <div className="text-sm text-gray-400">Total Judges</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-green-600">{selectedPerformanceScores.scoredJudges}</div>
-                      <div className="text-sm text-gray-600">Scored</div>
+                      <div className="text-sm text-gray-400">Scored</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-orange-600">{selectedPerformanceScores.pendingJudgeIds?.length || 0}</div>
-                      <div className="text-sm text-gray-600">Pending</div>
+                      <div className="text-sm text-gray-400">Pending</div>
                     </div>
                     <div>
                       <div className={`text-2xl font-bold ${selectedPerformanceScores.isFullyScored ? 'text-green-600' : 'text-red-600'}`}>
                         {selectedPerformanceScores.isFullyScored ? '✓' : '✗'}
                       </div>
-                      <div className="text-sm text-gray-600">Complete</div>
+                      <div className="text-sm text-gray-400">Complete</div>
                     </div>
                   </div>
                 </div>
@@ -1745,33 +1754,33 @@ export default function EventParticipantsPage() {
                 {/* Individual Scores */}
                 {selectedPerformanceScores.scores && selectedPerformanceScores.scores.length > 0 ? (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Individual Judge Scores</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">Individual Judge Scores</h3>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y divide-gray-600">
+                        <thead className="bg-gray-700">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Judge</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Score</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Judge</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Score</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Percentage</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Submitted</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white divide-y divide-gray-600">
                           {selectedPerformanceScores.scores.map((score: any) => (
-                            <tr key={score.judgeId} className="hover:bg-gray-50">
+                            <tr key={score.judgeId} className="hover:bg-gray-700">
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{score.judgeName}</div>
-                                <div className="text-sm text-gray-500">ID: {score.judgeId}</div>
+                                <div className="text-sm font-medium text-white">{score.judgeName}</div>
+                                <div className="text-sm text-gray-400">ID: {score.judgeId}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-lg font-bold text-gray-900">{score.totalScore.toFixed(1)}/100</div>
+                                <div className="text-lg font-bold text-white">{score.totalScore.toFixed(1)}/100</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{((score.totalScore / 100) * 100).toFixed(1)}%</div>
+                                <div className="text-sm text-white">{((score.totalScore / 100) * 100).toFixed(1)}%</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-400">
                                   {new Date(score.submittedAt).toLocaleDateString()} {new Date(score.submittedAt).toLocaleTimeString()}
                                 </div>
                               </td>
@@ -1800,14 +1809,14 @@ export default function EventParticipantsPage() {
                 ) : (
                   <div className="text-center py-8">
                     <div className="text-gray-400 text-4xl mb-4">📝</div>
-                    <p className="text-gray-600">No scores submitted yet</p>
+                    <p className="text-gray-400">No scores submitted yet</p>
                   </div>
                 )}
 
                 {/* Pending Judges */}
                 {selectedPerformanceScores.pendingJudgeIds && selectedPerformanceScores.pendingJudgeIds.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Judges</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">Pending Judges</h3>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       <p className="text-yellow-800 text-sm mb-2">The following judges have not submitted scores yet:</p>
                       <div className="flex flex-wrap gap-2">
@@ -1824,7 +1833,7 @@ export default function EventParticipantsPage() {
             ) : (
               <div className="text-center py-8">
                 <div className="text-red-400 text-4xl mb-4">⚠️</div>
-                <p className="text-gray-600">Failed to load scores</p>
+                <p className="text-gray-400">Failed to load scores</p>
               </div>
             )}
           </div>
@@ -1835,8 +1844,8 @@ export default function EventParticipantsPage() {
     {/* Payment Management Modal */}
     {showPaymentModal && selectedEntry && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="p-6 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
@@ -1858,7 +1867,7 @@ export default function EventParticipantsPage() {
           
           <div className="p-6 space-y-6">
             {/* Current Payment Info */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-700 rounded-lg p-4">
               <h3 className="text-sm font-bold text-black mb-3">Current Status</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -1959,13 +1968,13 @@ export default function EventParticipantsPage() {
     {/* Entry Details Modal - simplified view to reduce on-page clutter */}
     {showEntryModal && entryModal && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="p-6 border-b border-gray-700 flex items-center justify-between">
             <div className="space-y-1">
-              <h2 className="text-xl font-bold text-gray-900">Entry Details</h2>
-              <p className="text-gray-600 text-sm">{entryModal.itemName}</p>
+              <h2 className="text-xl font-bold text-white">Entry Details</h2>
+              <p className="text-gray-400 text-sm">{entryModal.itemName}</p>
             </div>
-            <button onClick={() => setShowEntryModal(false)} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100">×</button>
+            <button onClick={() => setShowEntryModal(false)} className="text-gray-400 hover:text-gray-400 p-2 rounded-lg hover:bg-gray-100">×</button>
           </div>
 
           {/* Tabs */}
@@ -1973,15 +1982,15 @@ export default function EventParticipantsPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setEntryModalTab('overview')}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='overview'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-700 hover:bg-gray-50'}`}
+                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='overview'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-300 hover:bg-gray-700'}`}
               >Overview</button>
               <button
                 onClick={() => setEntryModalTab('dancers')}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='dancers'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-700 hover:bg-gray-50'}`}
+                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='dancers'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-300 hover:bg-gray-700'}`}
               >Dancers</button>
               <button
                 onClick={() => setEntryModalTab('payment')}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='payment'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-700 hover:bg-gray-50'}`}
+                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='payment'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-300 hover:bg-gray-700'}`}
               >Payment</button>
             </div>
           </div>
@@ -1991,21 +2000,21 @@ export default function EventParticipantsPage() {
             {entryModalTab === 'overview' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Item #</div>
-                    <div className="text-lg font-bold text-gray-900">{entryModal.itemNumber ?? 'Not assigned'}</div>
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Item #</div>
+                    <div className="text-lg font-bold text-white">{entryModal.itemNumber ?? 'Not assigned'}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Type</div>
-                    <div className="text-lg font-bold text-gray-900">{getPerformanceType(entryModal.participantIds)} • {entryModal.entryType.toUpperCase()}</div>
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Type</div>
+                    <div className="text-lg font-bold text-white">{getPerformanceType(entryModal.participantIds)} • {entryModal.entryType.toUpperCase()}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Mastery / Style</div>
-                    <div className="text-lg font-bold text-gray-900">{entryModal.mastery} • {entryModal.itemStyle}</div>
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Mastery / Style</div>
+                    <div className="text-lg font-bold text-white">{entryModal.mastery} • {entryModal.itemStyle}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Submitted</div>
-                    <div className="text-lg font-bold text-gray-900">{new Date(entryModal.submittedAt).toLocaleDateString()}</div>
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Submitted</div>
+                    <div className="text-lg font-bold text-white">{new Date(entryModal.submittedAt).toLocaleDateString()}</div>
                   </div>
                 </div>
 
@@ -2036,8 +2045,8 @@ export default function EventParticipantsPage() {
             {entryModalTab === 'dancers' && (
               <div className="space-y-3">
                 {(entryModal.participantNames && entryModal.participantNames.length>0 ? entryModal.participantNames : (entryModal.participantIds||[]).map((_,i)=>`Participant ${i+1}`)).map((n, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded p-3">
-                    <div className="font-medium text-gray-900">{n}</div>
+                  <div key={i} className="flex items-center justify-between text-sm bg-gray-700 rounded p-3">
+                    <div className="font-medium text-white">{n}</div>
                     <div className="text-blue-700 text-xs bg-blue-50 px-2 py-1 rounded">{entryModal.participantStudios?.[i] || entryModal.studioName || 'Independent'}</div>
                   </div>
                 ))}
@@ -2047,16 +2056,16 @@ export default function EventParticipantsPage() {
             {entryModalTab === 'payment' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Total Fee</div>
-                    <div className="text-lg font-bold text-gray-900">R{entryModal.calculatedFee.toFixed(2)}</div>
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Total Fee</div>
+                    <div className="text-lg font-bold text-white">R{entryModal.calculatedFee.toFixed(2)}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Status</div>
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Status</div>
                     <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entryModal.paymentStatus)}`}>{entryModal.paymentStatus.toUpperCase()}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Outstanding</div>
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Outstanding</div>
                     <div className={`text-lg font-bold ${getOutstandingBalance(entryModal)>0?'text-red-600':'text-green-600'}`}>R{getOutstandingBalance(entryModal).toFixed(2)}</div>
                   </div>
                 </div>
@@ -2072,5 +2081,14 @@ export default function EventParticipantsPage() {
       </div>
     )}
     </>
+  );
+}
+
+// Wrap the EventParticipantsPage with ThemeProvider
+export default function EventParticipantsPageWrapper() {
+  return (
+    <ThemeProvider>
+      <EventParticipantsPage />
+    </ThemeProvider>
   );
 } 
