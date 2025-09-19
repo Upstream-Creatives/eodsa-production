@@ -167,6 +167,10 @@ function AdminDashboard() {
   // Music tracking state
   const [musicTrackingData, setMusicTrackingData] = useState<any[]>([]);
   const [loadingMusicTracking, setLoadingMusicTracking] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [entryTypeFilter, setEntryTypeFilter] = useState<'all' | 'live' | 'virtual'>('all');
+  const [uploadStatusFilter, setUploadStatusFilter] = useState<'all' | 'uploaded' | 'missing' | 'no_video'>('all');
+  const [activeBackendFilter, setActiveBackendFilter] = useState<'all' | 'live' | 'virtual'>('all');
 
   // Dancer search and filter state
   const [dancerSearchTerm, setDancerSearchTerm] = useState('');
@@ -252,10 +256,26 @@ function AdminDashboard() {
     }
   };
 
-  const fetchMusicTrackingData = async () => {
+  const fetchMusicTrackingData = async (filters?: { entryType?: 'live' | 'virtual'; eventId?: string }) => {
     setLoadingMusicTracking(true);
     try {
-      const response = await fetch('/api/admin/music-tracking');
+      // Update the active backend filter state
+      const filterType = filters?.entryType || 'all';
+      setActiveBackendFilter(filterType);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (filters?.entryType) {
+        params.append('entryType', filters.entryType);
+      }
+      if (filters?.eventId) {
+        params.append('eventId', filters.eventId);
+      }
+      
+      const queryString = params.toString();
+      const url = `/api/admin/music-tracking${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await fetch(url);
       const data = await response.json();
       if (data.success) {
         setMusicTrackingData(data.entries);
@@ -2234,13 +2254,47 @@ function AdminDashboard() {
                     </div>
                     <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Music Upload Tracking</h2>
                   </div>
-                  <button
-                    onClick={fetchMusicTrackingData}
-                    disabled={loadingMusicTracking}
-                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-600 hover:to-blue-700 disabled:bg-gray-400 transition-all duration-200 font-medium"
-                  >
-                    {loadingMusicTracking ? 'Loading...' : 'Refresh Data'}
-                  </button>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                      <button
+                        onClick={() => fetchMusicTrackingData()}
+                        disabled={loadingMusicTracking}
+                        className={`px-3 py-2 text-sm font-medium transition-colors ${activeBackendFilter === 'all' 
+                          ? 'bg-blue-600 text-white' 
+                          : theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => fetchMusicTrackingData({ entryType: 'live' })}
+                        disabled={loadingMusicTracking}
+                        className={`px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300 ${activeBackendFilter === 'live' 
+                          ? 'bg-blue-600 text-white' 
+                          : theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        🎵 Live Only
+                      </button>
+                      <button
+                        onClick={() => fetchMusicTrackingData({ entryType: 'virtual' })}
+                        disabled={loadingMusicTracking}
+                        className={`px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300 ${activeBackendFilter === 'virtual' 
+                          ? 'bg-blue-600 text-white' 
+                          : theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        🎥 Virtual Only
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => fetchMusicTrackingData()}
+                      disabled={loadingMusicTracking}
+                      className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-600 hover:to-blue-700 disabled:bg-gray-400 transition-all duration-200 font-medium"
+                    >
+                      {loadingMusicTracking ? 'Loading...' : 'Refresh Data'}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="p-6">
@@ -2258,7 +2312,7 @@ function AdminDashboard() {
                 ) : (
                   <div className="space-y-6">
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                       <div className={`${theme === 'dark' ? 'bg-green-900/40 border-green-700' : 'bg-green-50 border-green-200'} rounded-lg p-4 border`}>
                         <div className="flex items-center space-x-2">
                           <span className="text-2xl">✅</span>
@@ -2292,6 +2346,56 @@ function AdminDashboard() {
                           </div>
                         </div>
                       </div>
+                      <div className={`${theme === 'dark' ? 'bg-orange-900/40 border-orange-700' : 'bg-orange-50 border-orange-200'} rounded-lg p-4 border`}>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-2xl">📹</span>
+                          <div>
+                            <p className={`text-sm ${theme === 'dark' ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Missing Videos</p>
+                            <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-orange-200' : 'text-orange-700'}`}>
+                              {musicTrackingData.filter(entry => !entry.videoExternalUrl && entry.entryType === 'virtual').length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Search and Filter Controls */}
+                    <div className="mb-6 space-y-4">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {/* Search input */}
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="Search by item name, contestant, or studio..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={`w-full px-4 py-2 rounded-lg border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-cyan-500 focus:border-transparent`}
+                          />
+                        </div>
+                        
+                        {/* Entry Type Filter */}
+                        <select
+                          value={entryTypeFilter}
+                          onChange={(e) => setEntryTypeFilter(e.target.value as 'all' | 'live' | 'virtual')}
+                          className={`px-4 py-2 rounded-lg border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-cyan-500`}
+                        >
+                          <option value="all">All Types</option>
+                          <option value="live">🎵 Live Only</option>
+                          <option value="virtual">🎥 Virtual Only</option>
+                        </select>
+                        
+                        {/* Upload Status Filter */}
+                        <select
+                          value={uploadStatusFilter}
+                          onChange={(e) => setUploadStatusFilter(e.target.value as 'all' | 'uploaded' | 'missing' | 'no_video')}
+                          className={`px-4 py-2 rounded-lg border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-cyan-500`}
+                        >
+                          <option value="all">All Status</option>
+                          <option value="uploaded">✅ Uploaded</option>
+                          <option value="missing">❌ Missing</option>
+                          <option value="no_video">🎥 No Video Link</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Entries Table */}
@@ -2315,12 +2419,39 @@ function AdminDashboard() {
                               Music Status
                             </th>
                             <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                              Video Status
+                            </th>
+                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Actions
                             </th>
                           </tr>
                         </thead>
                         <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
-                          {musicTrackingData.map((entry) => (
+                          {musicTrackingData.filter((entry) => {
+                            // Search term filter
+                            const searchMatch = !searchTerm || 
+                              entry.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.contestantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.studioName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.eodsaId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.choreographer?.toLowerCase().includes(searchTerm.toLowerCase());
+                            
+                            // Entry type filter
+                            const typeMatch = entryTypeFilter === 'all' || entry.entryType === entryTypeFilter;
+                            
+                            // Upload status filter
+                            let statusMatch = true;
+                            if (uploadStatusFilter === 'uploaded') {
+                              statusMatch = (entry.entryType === 'live' && entry.musicFileUrl) || 
+                                           (entry.entryType === 'virtual' && entry.videoExternalUrl);
+                            } else if (uploadStatusFilter === 'missing') {
+                              statusMatch = entry.entryType === 'live' && !entry.musicFileUrl;
+                            } else if (uploadStatusFilter === 'no_video') {
+                              statusMatch = entry.entryType === 'virtual' && !entry.videoExternalUrl;
+                            }
+                            
+                            return searchMatch && typeMatch && statusMatch;
+                          }).map((entry) => (
                             <tr key={entry.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
@@ -2371,6 +2502,26 @@ function AdminDashboard() {
                                   </span>
                                 )}
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {entry.entryType === 'virtual' ? (
+                                  entry.videoExternalUrl ? (
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                                        ✅ Video Link
+                                      </span>
+                                      <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[80px]`}>{entry.videoExternalType?.toUpperCase() || 'LINK'}</span>
+                                    </div>
+                                  ) : (
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
+                                      ❌ No Video Link
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
+                                    N/A (Live)
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                                 {entry.musicFileUrl && (
                                   <a
@@ -2380,6 +2531,16 @@ function AdminDashboard() {
                                     className="text-cyan-600 hover:text-cyan-900"
                                   >
                                     🎧 Play
+                                  </a>
+                                )}
+                                {entry.videoExternalUrl && (
+                                  <a
+                                    href={entry.videoExternalUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-purple-600 hover:text-purple-900"
+                                  >
+                                    🎥 Watch
                                   </a>
                                 )}
                                 <button

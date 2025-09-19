@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
 import { calculateEODSAFee } from '@/lib/types';
+import { getSql } from '@/lib/database';
 import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 // Registration fee checking moved to API calls
@@ -553,6 +554,62 @@ function EventParticipantsPage() {
         // Calculate age category based on performance type
         const performanceType = getPerformanceType(entry.participantIds);
         
+        // Calculate actual age category based on participants' ages
+        let calculatedAgeCategory = 'N/A';
+        if (entry.participantIds && entry.participantIds.length > 0) {
+          try {
+            // Get participant ages from the database
+            const sqlClient = getSql();
+            const participantAges = await Promise.all(
+              entry.participantIds.map(async (participantId) => {
+                try {
+                  const dancerResult = await sqlClient`
+                    SELECT date_of_birth FROM dancers WHERE id = ${participantId}
+                  ` as any[];
+                  
+                  if (dancerResult.length > 0 && dancerResult[0].date_of_birth) {
+                    const today = new Date();
+                    const birthDate = new Date(dancerResult[0].date_of_birth);
+                    let age = today.getFullYear() - birthDate.getFullYear();
+                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                      age--;
+                    }
+                    return age;
+                  }
+                  return null;
+                } catch (error) {
+                  console.warn(`Could not get age for participant ${participantId}:`, error);
+                  return null;
+                }
+              })
+            );
+            
+            // Filter out null values and calculate average age
+            const validAges = participantAges.filter(age => age !== null) as number[];
+            if (validAges.length > 0) {
+              const averageAge = Math.round(validAges.reduce((sum, age) => sum + age, 0) / validAges.length);
+              
+              // Determine age category based on average age
+              if (averageAge <= 4) calculatedAgeCategory = '4 & Under';
+              else if (averageAge <= 6) calculatedAgeCategory = '6 & Under';
+              else if (averageAge <= 9) calculatedAgeCategory = '7-9';
+              else if (averageAge <= 12) calculatedAgeCategory = '10-12';
+              else if (averageAge <= 14) calculatedAgeCategory = '13-14';
+              else if (averageAge <= 17) calculatedAgeCategory = '15-17';
+              else if (averageAge <= 24) calculatedAgeCategory = '18-24';
+              else if (averageAge <= 39) calculatedAgeCategory = '25-39';
+              else if (averageAge < 60) calculatedAgeCategory = '40+';
+              else calculatedAgeCategory = '60+';
+            }
+          } catch (error) {
+            console.warn('Error calculating age category for entry:', entry.id, error);
+            calculatedAgeCategory = event?.ageCategory || 'N/A';
+          }
+        } else {
+          calculatedAgeCategory = event?.ageCategory || 'N/A';
+        }
+        
         return [
           entry.itemNumber || 'Not Assigned',
           entry.eodsaId,
@@ -560,7 +617,7 @@ function EventParticipantsPage() {
           performanceType,
           entry.mastery,
           entry.itemStyle,
-          event?.ageCategory || 'N/A',
+          calculatedAgeCategory,
           entry.participantIds?.length || 1,
           participantNames,
           entry.choreographer,
