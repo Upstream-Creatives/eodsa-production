@@ -19,6 +19,9 @@ interface Performance {
   mastery?: string;
   itemStyle?: string;
   choreographer?: string;
+  ageCategory?: string;
+  performedBy?: string;
+  performedAt?: string;
 }
 
 interface Event {
@@ -116,34 +119,42 @@ export default function AnnouncerDashboard() {
     }
   };
 
-  const markAsAnnounced = async (performanceId: string, title: string) => {
+  const markAsPerformed = async (performanceId: string, title: string) => {
     try {
       const response = await fetch('/api/performances/announce', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           performanceId,
-          announcedBy: user.id
+          announcedBy: user.id,
+          status: 'completed'
         })
       });
 
       if (response.ok) {
-        // Update local state
+        // Update local state - mark as both announced and completed
         setPerformances(prev => 
           prev.map(p => 
             p.id === performanceId 
-              ? { ...p, announced: true, announcedAt: new Date().toISOString() }
+              ? { 
+                  ...p, 
+                  announced: true, 
+                  announcedAt: new Date().toISOString(),
+                  status: 'completed',
+                  performedBy: user.name,
+                  performedAt: new Date().toISOString()
+                }
               : p
           )
         );
 
-        success(`"${title}" marked as announced and removed from queue`);
+        success(`"${title}" marked as performed - stays green`);
       } else {
-        error('Failed to mark performance as announced');
+        error('Failed to mark performance as performed');
       }
     } catch (err) {
-      console.error('Error marking performance as announced:', err);
-      error('Failed to mark performance as announced');
+      console.error('Error marking performance as performed:', err);
+      error('Failed to mark performance as performed');
     }
   };
 
@@ -261,10 +272,10 @@ export default function AnnouncerDashboard() {
                   </p>
                 </div>
                 <button
-                  onClick={() => markAsAnnounced(currentPerformance.id, currentPerformance.title)}
-                  className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold transition-colors"
+                  onClick={() => markAsPerformed(currentPerformance.id, currentPerformance.title)}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors"
                 >
-                  ✅ Mark as Announced
+                  ✅ Mark as Performed
                 </button>
               </div>
             </div>
@@ -367,44 +378,68 @@ export default function AnnouncerDashboard() {
             {filteredPerformances.length > 0 ? (
               <div className="divide-y divide-gray-200">
                 {filteredPerformances.map((performance) => (
-                  <div key={performance.id} className={`p-6 ${performance.announced ? 'bg-gray-50' : ''}`}>
+                  <div key={performance.id} className={`p-6 ${performance.status === 'completed' ? 'bg-green-50' : performance.announced ? 'bg-gray-50' : ''}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-4 flex-1">
                         <div className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
+                          performance.status === 'completed' ? 'bg-green-500 text-white' :
                           performance.status === 'in_progress' ? 'bg-orange-500 text-white' :
                           performance.announced ? 'bg-gray-400 text-white' :
-                          performance.status === 'completed' ? 'bg-green-500 text-white' :
                           'bg-blue-500 text-white'
                         }`}>
                           {performance.itemNumber || '?'}
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          <h3 className={`text-lg font-semibold ${performance.announced ? 'text-gray-600 line-through' : 'text-black'}`}>
+                          <h3 className={`text-lg font-semibold ${performance.status === 'completed' ? 'text-green-800' : performance.announced ? 'text-gray-600' : 'text-black'}`}>
                             {performance.title}
                           </h3>
-                          <p className={`text-sm ${performance.announced ? 'text-gray-500' : 'text-black'}`}>
-                            by {performance.choreographer} • {performance.mastery} • {performance.itemStyle}
-                          </p>
-                          <p className={`text-sm ${performance.announced ? 'text-gray-500' : 'text-black'}`}>
-                            Performers: {performance.participantNames.join(', ')}
-                          </p>
-                          <p className={`text-xs ${performance.announced ? 'text-gray-400' : 'text-gray-600'}`}>
-                            Duration: {performance.duration}min • {performance.entryType?.toUpperCase()}
-                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
+                            <div>
+                              <p className={`text-sm ${performance.status === 'completed' ? 'text-green-700' : performance.announced ? 'text-gray-500' : 'text-black'}`}>
+                                <strong>Choreographer:</strong> {performance.choreographer}
+                              </p>
+                              <p className={`text-sm ${performance.status === 'completed' ? 'text-green-700' : performance.announced ? 'text-gray-500' : 'text-black'}`}>
+                                <strong>Style:</strong> {performance.itemStyle} • <strong>Level:</strong> {performance.mastery}
+                              </p>
+                              {performance.ageCategory && (
+                                <p className={`text-sm ${performance.status === 'completed' ? 'text-green-700' : performance.announced ? 'text-gray-500' : 'text-black'}`}>
+                                  <strong>Age Category:</strong> {performance.ageCategory}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className={`text-sm ${performance.status === 'completed' ? 'text-green-700' : performance.announced ? 'text-gray-500' : 'text-black'}`}>
+                                <strong>Performer(s):</strong> {performance.participantNames.length === 1 ? performance.participantNames[0] : `${performance.participantNames.length} performers`}
+                              </p>
+                              {performance.participantNames.length > 1 && (
+                                <p className={`text-xs ${performance.status === 'completed' ? 'text-green-600' : performance.announced ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  {performance.participantNames.join(', ')}
+                                </p>
+                              )}
+                              <p className={`text-xs ${performance.status === 'completed' ? 'text-green-600' : performance.announced ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Duration: {performance.duration}min • {performance.entryType?.toUpperCase()}
+                              </p>
+                            </div>
+                          </div>
+                          {performance.performedAt && (
+                            <p className="text-xs text-green-600 mt-2">
+                              ✅ Performed at {new Date(performance.performedAt).toLocaleTimeString()} by {performance.performedBy}
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex items-center space-x-2">
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            performance.status === 'in_progress' ? 'bg-orange-100 text-orange-800' :
                             performance.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            performance.status === 'in_progress' ? 'bg-orange-100 text-orange-800' :
                             performance.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {performance.status.toUpperCase()}
+                            {performance.status === 'completed' ? 'PERFORMED' : performance.status.toUpperCase()}
                           </span>
                           
-                          {performance.announced && (
+                          {performance.announced && performance.status !== 'completed' && (
                             <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                               ANNOUNCED
                             </span>
@@ -414,10 +449,10 @@ export default function AnnouncerDashboard() {
                       
                       {!performance.announced && performance.status === 'in_progress' && (
                         <button
-                          onClick={() => markAsAnnounced(performance.id, performance.title)}
-                          className="ml-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold transition-colors"
+                          onClick={() => markAsPerformed(performance.id, performance.title)}
+                          className="ml-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors"
                         >
-                          ✅ Mark as Announced
+                          ✅ Mark as Performed
                         </button>
                       )}
                     </div>

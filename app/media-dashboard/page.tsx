@@ -291,6 +291,12 @@ export default function MediaDashboard() {
                   ))}
                 </select>
                 <button
+                  onClick={() => window.open('https://eodsa.vercel.app/admin/rankings', '_blank')}
+                  className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors font-medium"
+                >
+                  🏆 View Rankings
+                </button>
+                <button
                   onClick={() => {
                     localStorage.removeItem('mediaSession');
                     router.push('/portal/media');

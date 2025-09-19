@@ -116,7 +116,7 @@ function AdminDashboard() {
   const [dancers, setDancers] = useState<Dancer[]>([]);
   const [studios, setStudios] = useState<Studio[]>([]);
   const [studioApplications, setStudioApplications] = useState<StudioApplication[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'judges' | 'assignments' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'staff' | 'assignments' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking'>('events');
   const [isLoading, setIsLoading] = useState(true);
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
@@ -1330,7 +1330,7 @@ function AdminDashboard() {
           <nav className="flex flex-col sm:flex-row gap-2">
             {[
               { id: 'events', label: 'Events', icon: '🏆', color: 'indigo' },
-              { id: 'judges', label: 'Judges', icon: '👨‍⚖️', color: 'purple' },
+              { id: 'staff', label: 'Staff', icon: '👥', color: 'purple' },
               { id: 'assignments', label: 'Assignments', icon: '🔗', color: 'pink' },
               { id: 'dancers', label: 'Dancers', icon: '💃', color: 'rose' },
               { id: 'studios', label: 'Studios', icon: '🏢', color: 'orange' },
@@ -1503,20 +1503,20 @@ function AdminDashboard() {
               </div>
         )}
 
-        {/* Judges Tab - Enhanced */}
-        {activeTab === 'judges' && (
+        {/* Staff Tab - Enhanced */}
+        {activeTab === 'staff' && (
           <div className="space-y-8 animate-fadeIn">
-            {/* Enhanced Judges List */}
+            {/* Enhanced Staff List */}
             <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
               <div className={`px-6 py-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white text-sm">👨‍⚖️</span>
+                      <span className="text-white text-sm">👥</span>
                   </div>
-                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Judges</h2>
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Staff Management</h2>
                     <div className={`px-3 py-1 ${theme === 'dark' ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-100 text-purple-800'} rounded-full text-sm font-medium`}>
-                      {judges.filter(j => !j.isAdmin).length} judges
+                      {judges.length} staff members
                   </div>
                 </div>
                   <button
@@ -1524,8 +1524,8 @@ function AdminDashboard() {
                     className="inline-flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
                   >
                     <span>➕</span>
-                    <span className="hidden sm:inline">Create Judge</span>
-                    <span className="sm:hidden">Create</span>
+                    <span className="hidden sm:inline">Add Staff</span>
+                    <span className="sm:hidden">Add</span>
                   </button>
               </div>
             </div>
@@ -1533,16 +1533,16 @@ function AdminDashboard() {
               {judges.length === 0 ? (
                 <div className="text-center py-12 ${themeClasses.textMuted}">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span className="text-2xl">👨‍⚖️</span>
+                    <span className="text-2xl">👥</span>
                   </div>
-                  <h3 className="text-lg font-medium mb-2">No judges yet</h3>
-                  <p className="text-sm mb-4">Create your first judge to get started!</p>
+                  <h3 className="text-lg font-medium mb-2">No staff members yet</h3>
+                  <p className="text-sm mb-4">Add your first staff member to get started!</p>
                   <button
                     onClick={() => setShowCreateJudgeModal(true)}
                     className="inline-flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
                   >
                     <span>➕</span>
-                    <span>Create First Judge</span>
+                    <span>Add First Staff Member</span>
                   </button>
                 </div>
               ) : (
@@ -1568,24 +1568,41 @@ function AdminDashboard() {
                         </td>
                           <td className={`px-6 py-4 text-sm font-medium ${themeClasses.textPrimary} hidden sm:table-cell`}>{judge.email}</td>
                           <td className="px-6 py-4">
-                            <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${
-                               judge.isAdmin ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-300' : `bg-gray-50 ${themeClasses.textSecondary} border-gray-200`
-                            }`}>
-                              {judge.isAdmin ? '👑 Admin' : '👨‍⚖️ Judge'}
-                          </span>
+                            {judge.isAdmin ? (
+                              <span className="inline-flex px-3 py-1 text-xs font-bold rounded-full border bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-300">
+                                👑 Admin
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                  👨‍⚖️ Judge
+                                </span>
+                                {/* Additional role badges can be added here based on staff roles */}
+                              </div>
+                            )}
                         </td>
                           <td className={`px-6 py-4 text-sm font-medium ${themeClasses.textSecondary} hidden md:table-cell`}>
                             {new Date(judge.createdAt).toLocaleDateString()}
                         </td>
                           <td className="px-6 py-4">
-                            {!judge.isAdmin && (
-                              <button
-                                onClick={() => handleDeleteJudge(judge.id, judge.name)}
-                                className="inline-flex items-center px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
-                              >
-                                🗑️ Delete
-                              </button>
-                            )}
+                            <div className="flex space-x-2">
+                              {!judge.isAdmin && (
+                                <>
+                                  <button
+                                    onClick={() => {/* TODO: Implement edit roles functionality */}}
+                                    className="inline-flex items-center px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors"
+                                  >
+                                    ⚙️ Roles
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteJudge(judge.id, judge.name)}
+                                    className="inline-flex items-center px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
+                                  >
+                                    🗑️ Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                       </tr>
                     ))}
@@ -1608,7 +1625,7 @@ function AdminDashboard() {
                     <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🔗</span>
                     </div>
-                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Judge Assignments</h2>
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Staff Assignments</h2>
                     <div className={`px-3 py-1 ${theme === 'dark' ? 'bg-pink-900/80 text-pink-200' : 'bg-pink-100 text-pink-800'} rounded-full text-sm font-medium`}>
                       {assignments.length} assignments
                     </div>

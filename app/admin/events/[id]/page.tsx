@@ -606,11 +606,13 @@ function EventParticipantsPage() {
           }
         }
         
+        const entryTypeLabel = entry.entryType === 'virtual' ? 'VIRTUAL' : 'LIVE';
         return [
           entry.itemNumber || 'Not Assigned',
           entry.eodsaId,
           entry.contestantName || 'Unknown',
           performanceType,
+          entryTypeLabel,
           entry.mastery,
           entry.itemStyle,
           calculatedAgeCategory,
@@ -635,6 +637,7 @@ function EventParticipantsPage() {
         'EODSA ID',
         'Contestant Name',
         'Performance Type', 
+        'Entry Type',
         'Mastery Level',
         'Style',
         'Age Category',
@@ -668,6 +671,7 @@ function EventParticipantsPage() {
         { wch: 12 }, // EODSA ID
         { wch: 20 }, // Contestant Name
         { wch: 15 }, // Performance Type
+        { wch: 12 }, // Entry Type
         { wch: 12 }, // Mastery Level
         { wch: 15 }, // Style
         { wch: 12 }, // Age Category

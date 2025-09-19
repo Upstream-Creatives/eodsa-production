@@ -19,6 +19,7 @@ interface Performance {
   choreographer?: string;
   contestantId?: string;
   eodsaId?: string;
+  ageCategory?: string;
   presence?: {
     present: boolean;
     checkedInBy?: string;
@@ -400,22 +401,39 @@ export default function RegistrationDashboard() {
                           <h3 className="text-lg font-semibold text-black">
                             {performance.title}
                           </h3>
-                          <p className="text-sm text-black">
-                            by {performance.choreographer} • {performance.mastery} • {performance.itemStyle}
-                          </p>
-                          <p className="text-sm text-black">
-                            <strong>Studio/Contestant:</strong> {performance.contestantName}
-                          </p>
-                          <p className="text-sm text-black">
-                            <strong>Performers:</strong> {performance.participantNames.join(', ')}
-                          </p>
-                          {performance.eodsaId && (
-                            <p className="text-xs text-gray-600">
-                              EODSA ID: {performance.eodsaId}
-                            </p>
-                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                            <div>
+                              <p className="text-sm text-black">
+                                <strong>Entry Name:</strong> {performance.title}
+                              </p>
+                              <p className="text-sm text-black">
+                                <strong>Choreographer:</strong> {performance.choreographer}
+                              </p>
+                              <p className="text-sm text-black">
+                                <strong>Style:</strong> {performance.itemStyle} • <strong>Level:</strong> {performance.mastery}
+                              </p>
+                              {performance.ageCategory && (
+                                <p className="text-sm text-black">
+                                  <strong>Age Category:</strong> {performance.ageCategory}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-black">
+                                <strong>Studio Name:</strong> {performance.contestantName}
+                              </p>
+                              <p className="text-sm text-black">
+                                <strong>Contestant(s):</strong> {performance.participantNames.join(', ')}
+                              </p>
+                              {performance.eodsaId && (
+                                <p className="text-xs text-gray-600">
+                                  <strong>EODSA ID:</strong> {performance.eodsaId}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                           {performance.presence?.checkedInAt && (
-                            <p className="text-xs text-green-600">
+                            <p className="text-xs text-green-600 mt-2">
                               Last updated: {new Date(performance.presence.checkedInAt).toLocaleString()}
                             </p>
                           )}
