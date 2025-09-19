@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db, unifiedDb } from '@/lib/database';
+import { db, unifiedDb, getSql } from '@/lib/database';
+import { calculateAgeOnDate, getAgeCategoryFromAge } from '@/lib/types';
 
 export async function GET(
   request: Request,
@@ -26,6 +27,58 @@ export async function GET(
     const enhancedEntries = await Promise.all(
       eventEntries.map(async (entry) => {
         try {
+          // Compute age category for this entry as of event date
+          let computedAgeCategory: string | null = null;
+          try {
+            const sql = getSql();
+            const refDate = event.eventDate ? new Date(event.eventDate) : new Date();
+            if (Array.isArray(entry.participantIds) && entry.participantIds.length > 0) {
+              const ages = await Promise.all(entry.participantIds.map(async (pid: string) => {
+                try {
+                  const rows = await sql`
+                    SELECT date_of_birth, age FROM dancers
+                    WHERE id = ${pid} OR eodsa_id = ${pid}
+                    LIMIT 1
+                  ` as any[];
+                  if (rows.length > 0) {
+                    if (rows[0].date_of_birth) {
+                      return calculateAgeOnDate(rows[0].date_of_birth, refDate);
+                    }
+                    if (typeof rows[0].age === 'number' && !Number.isNaN(rows[0].age)) {
+                      return rows[0].age as number;
+                    }
+                  }
+                } catch {}
+                return null;
+              }));
+              const valid = ages.filter(a => a !== null) as number[];
+              if (valid.length > 0) {
+                const avg = Math.round(valid.reduce((s, a) => s + a, 0) / valid.length);
+                computedAgeCategory = getAgeCategoryFromAge(avg);
+              }
+            }
+            // If no participant IDs or no valid ages, try contestantId (solo entries)
+            if (!computedAgeCategory) {
+              try {
+                const rows = await sql`
+                  SELECT date_of_birth, age FROM dancers
+                  WHERE id = ${entry.contestantId} OR eodsa_id = ${entry.contestantId}
+                  LIMIT 1
+                ` as any[];
+                if (rows.length > 0) {
+                  let age: number | null = null;
+                  if (rows[0].date_of_birth) {
+                    age = calculateAgeOnDate(rows[0].date_of_birth, refDate);
+                  } else if (typeof rows[0].age === 'number' && !Number.isNaN(rows[0].age)) {
+                    age = rows[0].age as number;
+                  }
+                  if (age !== null) {
+                    computedAgeCategory = getAgeCategoryFromAge(age);
+                  }
+                }
+              } catch {}
+            }
+          } catch {}
           // First try to get as unified system dancer
           const dancer = await unifiedDb.getDancerById(entry.contestantId);
           
@@ -66,7 +119,8 @@ export async function GET(
               studioName: dancerWithStudio?.studioName || 'Independent',
               studioId: dancerWithStudio?.studioId || null,
               studioEmail: dancerWithStudio?.studioEmail || null,
-              participantStudios: participantDetails.map(p => p.studioName || 'Independent')
+              participantStudios: participantDetails.map(p => p.studioName || 'Independent'),
+              computedAgeCategory
             };
           } else {
             // Try legacy contestant system
@@ -85,7 +139,8 @@ export async function GET(
                 studioName: 'Legacy Entry',
                 studioId: null,
                 studioEmail: null,
-                participantStudios: entry.participantIds.map(() => 'Legacy Entry')
+                participantStudios: entry.participantIds.map(() => 'Legacy Entry'),
+                computedAgeCategory
               };
             } else {
               console.error(`Could not find contestant or dancer for ID: ${entry.contestantId}`);
@@ -118,7 +173,8 @@ export async function GET(
                   studioName: matchedStudio?.name || 'Unknown',
                   studioId: matchedStudio?.id || null,
                   studioEmail: matchedStudio?.email || null,
-                  participantStudios: names.map(() => matchedStudio?.name || 'Unknown')
+                  participantStudios: names.map(() => matchedStudio?.name || 'Unknown'),
+                  computedAgeCategory
                 };
               } catch (fallbackErr) {
                 console.error('Studio fallback lookup failed:', fallbackErr);
@@ -130,7 +186,8 @@ export async function GET(
                   studioName: 'Unknown',
                   studioId: null,
                   studioEmail: null,
-                  participantStudios: (entry.participantIds || []).map(() => 'Unknown')
+                  participantStudios: (entry.participantIds || []).map(() => 'Unknown'),
+                  computedAgeCategory
                 };
               }
             }

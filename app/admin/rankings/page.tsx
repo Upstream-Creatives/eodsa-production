@@ -303,7 +303,7 @@ function AdminRankingsPage() {
   return (
     <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Header */}
-      <header className="bg-gray-800 shadow-sm border-b border-gray-700">
+      <header className={`${themeClasses.headerBg} shadow-sm border-b ${themeClasses.headerBorder}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
@@ -311,8 +311,8 @@ function AdminRankingsPage() {
                 <span className="text-white text-xl">🏆</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Nationals Rankings</h1>
-                <p className="text-sm text-gray-400">View and analyze nationals performance rankings</p>
+                <h1 className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Nationals Rankings</h1>
+                <p className={`text-sm ${themeClasses.textSecondary}`}>View and analyze nationals performance rankings</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">

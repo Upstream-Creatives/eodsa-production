@@ -5,9 +5,27 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🎼 Admin Music Tracking: Fetching approved entries...');
 
+    // Parse query parameters for filtering
+    const { searchParams } = new URL(request.url);
+    const entryTypeFilter = searchParams.get('entryType') as 'live' | 'virtual' | null;
+    const eventIdFilter = searchParams.get('eventId');
+
+    console.log(`🔍 Filters applied - entryType: ${entryTypeFilter}, eventId: ${eventIdFilter}`);
+
     // Get all approved entries
     const allEntries = await db.getAllEventEntries();
-    const approvedEntries = allEntries.filter(entry => entry.approved === true);
+    let approvedEntries = allEntries.filter(entry => entry.approved === true);
+
+    // Apply filters
+    if (entryTypeFilter) {
+      approvedEntries = approvedEntries.filter(entry => entry.entryType === entryTypeFilter);
+      console.log(`📋 Filtered to ${entryTypeFilter} entries: ${approvedEntries.length}`);
+    }
+
+    if (eventIdFilter) {
+      approvedEntries = approvedEntries.filter(entry => entry.eventId === eventIdFilter);
+      console.log(`📅 Filtered to event ${eventIdFilter}: ${approvedEntries.length}`);
+    }
 
     console.log(`📊 Found ${approvedEntries.length} approved entries`);
 

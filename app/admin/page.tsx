@@ -167,6 +167,10 @@ function AdminDashboard() {
   // Music tracking state
   const [musicTrackingData, setMusicTrackingData] = useState<any[]>([]);
   const [loadingMusicTracking, setLoadingMusicTracking] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [entryTypeFilter, setEntryTypeFilter] = useState<'all' | 'live' | 'virtual'>('all');
+  const [uploadStatusFilter, setUploadStatusFilter] = useState<'all' | 'uploaded' | 'missing' | 'no_video'>('all');
+  const [activeBackendFilter, setActiveBackendFilter] = useState<'all' | 'live' | 'virtual'>('all');
 
   // Dancer search and filter state
   const [dancerSearchTerm, setDancerSearchTerm] = useState('');
@@ -252,10 +256,26 @@ function AdminDashboard() {
     }
   };
 
-  const fetchMusicTrackingData = async () => {
+  const fetchMusicTrackingData = async (filters?: { entryType?: 'live' | 'virtual'; eventId?: string }) => {
     setLoadingMusicTracking(true);
     try {
-      const response = await fetch('/api/admin/music-tracking');
+      // Update the active backend filter state
+      const filterType = filters?.entryType || 'all';
+      setActiveBackendFilter(filterType);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (filters?.entryType) {
+        params.append('entryType', filters.entryType);
+      }
+      if (filters?.eventId) {
+        params.append('eventId', filters.eventId);
+      }
+      
+      const queryString = params.toString();
+      const url = `/api/admin/music-tracking${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await fetch(url);
       const data = await response.json();
       if (data.success) {
         setMusicTrackingData(data.entries);
@@ -1420,7 +1440,7 @@ function AdminDashboard() {
                                    event.performanceType === 'Group' ? '👥' : '🎭'} {event.performanceType}
                                 </span>
                               )}
-                            <div className="text-xs sm:text-sm text-gray-700">{event.ageCategory}</div>
+                             <div className={`text-xs sm:text-sm ${themeClasses.textSecondary}`}>{event.ageCategory}</div>
                             </div>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium">
@@ -1436,7 +1456,7 @@ function AdminDashboard() {
                               event.status === 'upcoming' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                               event.status === 'registration_open' ? 'bg-green-50 text-green-700 border-green-200' :
                               event.status === 'in_progress' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                              'bg-gray-50 text-gray-700 border-gray-200'
+                               `bg-gray-50 ${themeClasses.textSecondary} border-gray-200`
                             }`}>
                               <span className="hidden sm:inline">{event.status.replace('_', ' ').toUpperCase()}</span>
                               <span className="sm:hidden">
@@ -1448,26 +1468,26 @@ function AdminDashboard() {
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4">
                             <div className="flex items-center space-x-2">
-                              <Link
-                                href={`/admin/events/${event.id}`}
-                                className="text-indigo-500 hover:text-indigo-700 text-xs sm:text-sm font-medium"
-                              >
-                                <span className="hidden sm:inline">👥 View</span>
-                                <span className="sm:hidden">👥</span>
-                              </Link>
-                              <button
-                                onClick={() => handleEditEvent(event)}
-                                className="text-blue-500 hover:text-blue-700 text-xs sm:text-sm font-medium transition-colors"
-                                title="Edit Event"
-                              >
-                                <span className="hidden sm:inline">✏️ Edit</span>
-                                <span className="sm:hidden">✏️</span>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteEvent(event)}
-                                className="text-red-500 hover:text-red-700 text-xs sm:text-sm font-medium transition-colors"
-                                title="Delete Event"
-                              >
+                               <Link
+                                 href={`/admin/events/${event.id}`}
+                                 className={`${theme === 'dark' ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-500 hover:text-indigo-700'} text-xs sm:text-sm font-medium`}
+                               >
+                                 <span className="hidden sm:inline">👥 View</span>
+                                 <span className="sm:hidden">👥</span>
+                               </Link>
+                               <button
+                                 onClick={() => handleEditEvent(event)}
+                                 className={`${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-700'} text-xs sm:text-sm font-medium transition-colors`}
+                                 title="Edit Event"
+                               >
+                                 <span className="hidden sm:inline">✏️ Edit</span>
+                                 <span className="sm:hidden">✏️</span>
+                               </button>
+                               <button
+                                 onClick={() => handleDeleteEvent(event)}
+                                 className={`${theme === 'dark' ? 'text-red-400 hover:text-red-300' : 'text-red-500 hover:text-red-700'} text-xs sm:text-sm font-medium transition-colors`}
+                                 title="Delete Event"
+                               >
                                 <span className="hidden sm:inline">🗑️ Delete</span>
                                 <span className="sm:hidden">🗑️</span>
                               </button>
@@ -1549,7 +1569,7 @@ function AdminDashboard() {
                           <td className={`px-6 py-4 text-sm font-medium ${themeClasses.textPrimary} hidden sm:table-cell`}>{judge.email}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${
-                              judge.isAdmin ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-300' : 'bg-gray-50 text-gray-700 border-gray-200'
+                               judge.isAdmin ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-300' : `bg-gray-50 ${themeClasses.textSecondary} border-gray-200`
                             }`}>
                               {judge.isAdmin ? '👑 Admin' : '👨‍⚖️ Judge'}
                           </span>
@@ -1701,22 +1721,27 @@ function AdminDashboard() {
                         placeholder="Search dancers..."
                         value={dancerSearchTerm}
                         onChange={(e) => setDancerSearchTerm(e.target.value)}
-                        className="w-full sm:w-64 px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm ${themeClasses.textPrimary} placeholder-gray-500"
+                        className={`w-full sm:w-64 px-4 py-2 pr-10 border ${themeClasses.cardBorder} ${themeClasses.cardBg} rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted}`}
                       />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <span className="text-gray-400">🔍</span>
-                      </div>
-                    </div>
-                    
-                    <select
-                      value={dancerStatusFilter}
+                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                         <span className={`${themeClasses.textMuted}`}>🔍</span>
+                       </div>
+                     </div>
+                     
+                     <select
+                       value={dancerStatusFilter}
                       onChange={(e) => setDancerStatusFilter(e.target.value as any)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm ${themeClasses.textPrimary}"
+                       className={`px-3 py-2 border ${themeClasses.cardBorder} ${themeClasses.cardBg} rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm ${themeClasses.textPrimary}`}
+                       style={{
+                         backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
+                         color: theme === 'dark' ? '#f9fafb' : '#111827',
+                         borderColor: theme === 'dark' ? '#4b5563' : '#d1d5db'
+                       }}
                     >
-                      <option value="all">All Status</option>
-                      <option value="pending">⏳ Pending</option>
-                      <option value="approved">✅ Approved</option>
-                      <option value="rejected">❌ Rejected</option>
+                      <option value="all" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>All Status</option>
+                      <option value="pending" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>⏳ Pending</option>
+                      <option value="approved" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>✅ Approved</option>
+                      <option value="rejected" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>❌ Rejected</option>
                     </select>
                   </div>
                 </div>
@@ -1802,16 +1827,16 @@ function AdminDashboard() {
                             <td className="px-6 py-4">
                               {dancer.studioName ? (
                                 <div>
-                                  <div className="text-sm font-medium text-blue-600">🏢 {dancer.studioName}</div>
+                                  <div className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>🏢 {dancer.studioName}</div>
                                   <div className={`text-xs ${themeClasses.textMuted}`}>{dancer.studioEmail}</div>
-                                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-1">
+                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-blue-900/80 text-blue-200' : 'bg-blue-100 text-blue-800'} mt-1`}>
                                     Studio Dancer
                                   </div>
                                 </div>
                               ) : (
                                 <div>
-                                  <div className="text-sm font-medium text-purple-600">🕺 Independent</div>
-                                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mt-1">
+                                  <div className={`text-sm font-medium ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`}>🕺 Independent</div>
+                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-100 text-purple-800'} mt-1`}>
                                     Individual
                                   </div>
                                 </div>
@@ -1831,7 +1856,7 @@ function AdminDashboard() {
                             <td className="px-6 py-4">
                               {dancer.approved ? (
                                 <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
                                     ✅ Approved
                                   </span>
                                   {dancer.approvedAt && (
@@ -1842,7 +1867,7 @@ function AdminDashboard() {
                                 </div>
                               ) : dancer.rejectionReason ? (
                                 <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
                                     ❌ Rejected
                                   </span>
                                   <div className={`text-xs ${themeClasses.textMuted} mt-1`} title={dancer.rejectionReason}>
@@ -1852,7 +1877,7 @@ function AdminDashboard() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-yellow-900/80 text-yellow-200' : 'bg-yellow-100 text-yellow-800'}`}>
                                   ⏳ Pending
                                 </span>
                               )}
@@ -1877,34 +1902,34 @@ function AdminDashboard() {
                                 ) : (
                                   <div className="space-y-2">
                                     {/* Registration Fee Quick Status */}
-                                    <div className="text-xs">
-                                      <span className="font-medium text-gray-700">Reg Fee: </span>
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                        dancer.registrationFeePaid 
-                                          ? 'bg-green-100 text-green-800 border border-green-200' 
-                                          : 'bg-red-100 text-red-800 border border-red-200'
-                                      }`}>
+                                     <div className="text-xs">
+                                       <span className={`font-medium ${themeClasses.textSecondary}`}>Reg Fee: </span>
+                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                         dancer.registrationFeePaid 
+                                           ? theme === 'dark' ? 'bg-green-900/80 text-green-200 border border-green-700' : 'bg-green-100 text-green-800 border border-green-200'
+                                           : theme === 'dark' ? 'bg-red-900/80 text-red-200 border border-red-700' : 'bg-red-100 text-red-800 border border-red-200'
+                                       }`}>
                                         {dancer.registrationFeePaid ? '✅ Paid' : '❌ Not Paid'}
                                       </span>
                                     </div>
                                     
                                     {/* Action Buttons */}
                                     <div className="flex flex-col space-y-1">
-                                      <button
-                                        onClick={() => handleViewFinances(dancer)}
-                                        className="w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-colors"
-                                      >
+                                       <button
+                                         onClick={() => handleViewFinances(dancer)}
+                                         className={`w-full px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${theme === 'dark' ? 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border-blue-700' : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200'}`}
+                                       >
                                         💰 View Finances
                                       </button>
                                       
                                       {dancer.approved && (
                                         <button
                                           onClick={() => handleRegistrationFeeUpdate(dancer.id, !dancer.registrationFeePaid)}
-                                          className={`w-full px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
-                                            dancer.registrationFeePaid
-                                              ? 'bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-200'
-                                              : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-200'
-                                          }`}
+                                           className={`w-full px-3 py-1 text-xs font-medium rounded-lg transition-colors border ${
+                                             dancer.registrationFeePaid
+                                               ? theme === 'dark' ? 'bg-orange-900/80 text-orange-200 hover:bg-orange-800 border-orange-700' : 'bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-200'
+                                               : theme === 'dark' ? 'bg-green-900/80 text-green-200 hover:bg-green-800 border-green-700' : 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200'
+                                           }`}
                                         >
                                           {dancer.registrationFeePaid ? 'Mark Reg Unpaid' : 'Mark Reg Paid'}
                                         </button>
@@ -1960,22 +1985,27 @@ function AdminDashboard() {
                         placeholder="Search studios..."
                         value={studioSearchTerm}
                         onChange={(e) => setStudioSearchTerm(e.target.value)}
-                        className="w-full sm:w-64 px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm ${themeClasses.textPrimary} placeholder-gray-500"
+                        className={`w-full sm:w-64 px-4 py-2 pr-10 border ${themeClasses.cardBorder} ${themeClasses.cardBg} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted}`}
                       />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <span className="text-gray-400">🔍</span>
-                      </div>
-                    </div>
-                    
-                    <select
-                      value={studioStatusFilter}
+                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                         <span className={`${themeClasses.textMuted}`}>🔍</span>
+                       </div>
+                     </div>
+                     
+                     <select
+                       value={studioStatusFilter}
                       onChange={(e) => setStudioStatusFilter(e.target.value as any)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm ${themeClasses.textPrimary}"
+                       className={`px-3 py-2 border ${themeClasses.cardBorder} ${themeClasses.cardBg} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm ${themeClasses.textPrimary}`}
+                       style={{
+                         backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
+                         color: theme === 'dark' ? '#f9fafb' : '#111827',
+                         borderColor: theme === 'dark' ? '#4b5563' : '#d1d5db'
+                       }}
                     >
-                      <option value="all">All Status</option>
-                      <option value="pending">⏳ Pending</option>
-                      <option value="approved">✅ Approved</option>
-                      <option value="rejected">❌ Rejected</option>
+                      <option value="all" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>All Status</option>
+                      <option value="pending" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>⏳ Pending</option>
+                      <option value="approved" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>✅ Approved</option>
+                      <option value="rejected" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>❌ Rejected</option>
                     </select>
                   </div>
                 </div>
@@ -2056,7 +2086,7 @@ function AdminDashboard() {
                             <td className="px-6 py-4">
                               {studio.approved ? (
                                 <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
                                     ✅ Approved
                                   </span>
                                   {studio.approvedAt && (
@@ -2067,7 +2097,7 @@ function AdminDashboard() {
                                 </div>
                               ) : studio.rejectionReason ? (
                                 <div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
                                     ❌ Rejected
                                   </span>
                                   <div className={`text-xs ${themeClasses.textMuted} mt-1`} title={studio.rejectionReason}>
@@ -2077,7 +2107,7 @@ function AdminDashboard() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-yellow-900/80 text-yellow-200' : 'bg-yellow-100 text-yellow-800'}`}>
                                   ⏳ Pending
                                 </span>
                               )}
@@ -2099,7 +2129,7 @@ function AdminDashboard() {
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-xs text-gray-400">No actions</span>
+                                <span className={`text-xs ${themeClasses.textMuted}`}>No actions</span>
                               )}
                             </td>
                           </tr>
@@ -2226,24 +2256,61 @@ function AdminDashboard() {
         {activeTab === 'music-tracking' && (
           <div className="space-y-8 animate-fadeIn">
             <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
-              <div className={`px-6 py-4 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-b ${themeClasses.cardBorder}`}>
-                <div className="flex items-center justify-between">
+              <div className={`px-4 sm:px-6 py-4 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-b ${themeClasses.cardBorder}`}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🎼</span>
                     </div>
-                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Music Upload Tracking</h2>
+                    <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Music Upload Tracking</h2>
                   </div>
-                  <button
-                    onClick={fetchMusicTrackingData}
-                    disabled={loadingMusicTracking}
-                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-600 hover:to-blue-700 disabled:bg-gray-400 transition-all duration-200 font-medium"
-                  >
-                    {loadingMusicTracking ? 'Loading...' : 'Refresh Data'}
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                          <div className={`flex rounded-lg border overflow-hidden ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}>
+                      <button
+                        onClick={() => fetchMusicTrackingData()}
+                        disabled={loadingMusicTracking}
+                        className={`px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors touch-manipulation ${activeBackendFilter === 'all' 
+                          ? 'bg-blue-600 text-white' 
+                          : theme === 'dark' ? 'bg-gray-800 text-gray-100 hover:bg-gray-700' : 'bg-white text-gray-900 hover:bg-gray-100'
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => fetchMusicTrackingData({ entryType: 'live' })}
+                        disabled={loadingMusicTracking}
+                        className={`px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors touch-manipulation ${theme === 'dark' ? 'border-l border-gray-600' : 'border-l border-gray-300'} ${activeBackendFilter === 'live' 
+                          ? 'bg-blue-600 text-white' 
+                          : theme === 'dark' ? 'bg-gray-800 text-gray-100 hover:bg-gray-700' : 'bg-white text-gray-900 hover:bg-gray-100'
+                        }`}
+                      >
+                        <span className="hidden sm:inline">🎵 Live Only</span>
+                        <span className="sm:hidden">🎵 Live</span>
+                      </button>
+                      <button
+                        onClick={() => fetchMusicTrackingData({ entryType: 'virtual' })}
+                        disabled={loadingMusicTracking}
+                        className={`px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors touch-manipulation ${theme === 'dark' ? 'border-l border-gray-600' : 'border-l border-gray-300'} ${activeBackendFilter === 'virtual' 
+                          ? 'bg-blue-600 text-white' 
+                          : theme === 'dark' ? 'bg-gray-800 text-gray-100 hover:bg-gray-700' : 'bg-white text-gray-900 hover:bg-gray-100'
+                        }`}
+                      >
+                        <span className="hidden sm:inline">🎥 Virtual Only</span>
+                        <span className="sm:hidden">🎥 Virtual</span>
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => fetchMusicTrackingData()}
+                      disabled={loadingMusicTracking}
+                      className="px-3 sm:px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-600 hover:to-blue-700 disabled:bg-gray-400 transition-all duration-200 font-medium text-sm"
+                    >
+                      <span className="hidden sm:inline">{loadingMusicTracking ? 'Loading...' : 'Refresh Data'}</span>
+                      <span className="sm:hidden">{loadingMusicTracking ? 'Loading...' : 'Refresh'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {loadingMusicTracking ? (
                   <div className="text-center py-8">
                     <div className="animate-spin w-8 h-8 border-2 border-cyan-600 border-t-transparent rounded-full mx-auto mb-4"></div>
@@ -2258,141 +2325,289 @@ function AdminDashboard() {
                 ) : (
                   <div className="space-y-6">
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <div className={`${theme === 'dark' ? 'bg-green-900/40 border-green-700' : 'bg-green-50 border-green-200'} rounded-lg p-4 border`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                      <div className={`${theme === 'dark' ? 'bg-green-900/40 border-green-700' : 'bg-green-50 border-green-200'} rounded-lg p-3 sm:p-4 border`}>
                         <div className="flex items-center space-x-2">
-                          <span className="text-2xl">✅</span>
-                          <div>
-                            <p className={`text-sm ${theme === 'dark' ? 'text-green-300' : 'text-green-600'} font-medium`}>Music Uploaded</p>
-                            <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-green-200' : 'text-green-700'}`}>
+                          <span className="text-xl sm:text-2xl">✅</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-green-300' : 'text-green-600'} font-medium truncate`}>Music Uploaded</p>
+                            <p className={`text-xl sm:text-2xl font-bold ${theme === 'dark' ? 'text-green-200' : 'text-green-700'}`}>
                               {musicTrackingData.filter(entry => entry.musicFileUrl).length}
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className={`${theme === 'dark' ? 'bg-red-900/40 border-red-700' : 'bg-red-50 border-red-200'} rounded-lg p-4 border`}>
+                      <div className={`${theme === 'dark' ? 'bg-red-900/40 border-red-700' : 'bg-red-50 border-red-200'} rounded-lg p-3 sm:p-4 border`}>
                         <div className="flex items-center space-x-2">
-                          <span className="text-2xl">❌</span>
-                          <div>
-                            <p className={`text-sm ${theme === 'dark' ? 'text-red-300' : 'text-red-600'} font-medium`}>Missing Music</p>
-                            <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-red-200' : 'text-red-700'}`}>
+                          <span className="text-xl sm:text-2xl">❌</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-red-300' : 'text-red-600'} font-medium truncate`}>Missing Music</p>
+                            <p className={`text-xl sm:text-2xl font-bold ${theme === 'dark' ? 'text-red-200' : 'text-red-700'}`}>
                               {musicTrackingData.filter(entry => !entry.musicFileUrl && entry.entryType === 'live').length}
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className={`${theme === 'dark' ? 'bg-blue-900/40 border-blue-700' : 'bg-blue-50 border-blue-200'} rounded-lg p-4 border`}>
+                      <div className={`${theme === 'dark' ? 'bg-blue-900/40 border-blue-700' : 'bg-blue-50 border-blue-200'} rounded-lg p-3 sm:p-4 border`}>
                         <div className="flex items-center space-x-2">
-                          <span className="text-2xl">🎥</span>
-                          <div>
-                            <p className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Virtual Entries</p>
-                            <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
+                          <span className="text-xl sm:text-2xl">🎥</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-600'} font-medium truncate`}>Virtual Entries</p>
+                            <p className={`text-xl sm:text-2xl font-bold ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
                               {musicTrackingData.filter(entry => entry.entryType === 'virtual').length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`${theme === 'dark' ? 'bg-orange-900/40 border-orange-700' : 'bg-orange-50 border-orange-200'} rounded-lg p-3 sm:p-4 border`}>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xl sm:text-2xl">📹</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-orange-300' : 'text-orange-600'} font-medium truncate`}>Missing Videos</p>
+                            <p className={`text-xl sm:text-2xl font-bold ${theme === 'dark' ? 'text-orange-200' : 'text-orange-700'}`}>
+                              {musicTrackingData.filter(entry => !entry.videoExternalUrl && entry.entryType === 'virtual').length}
                             </p>
                           </div>
                         </div>
                       </div>
                     </div>
 
+                    {/* Search and Filter Controls */}
+                    <div className="mb-6 space-y-3 sm:space-y-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+                        {/* Search input */}
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="Search by item name, contestant, or studio..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={`w-full px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder:${themeClasses.textMuted}`}
+                          />
+                        </div>
+                        
+                        {/* Filter row for mobile */}
+                        <div className="flex gap-2 sm:gap-4 sm:flex-row">
+                          {/* Entry Type Filter */}
+                          <select
+                            value={entryTypeFilter}
+                            onChange={(e) => setEntryTypeFilter(e.target.value as 'all' | 'live' | 'virtual')}
+                            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-cyan-500`}
+                            style={{
+                              backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
+                              color: theme === 'dark' ? '#f9fafb' : '#111827',
+                              borderColor: theme === 'dark' ? '#4b5563' : '#d1d5db'
+                            }}
+                          >
+                            <option value="all" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>All Types</option>
+                            <option value="live" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>🎵 Live Only</option>
+                            <option value="virtual" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>🎥 Virtual Only</option>
+                          </select>
+                          
+                          {/* Upload Status Filter */}
+                          <select
+                            value={uploadStatusFilter}
+                            onChange={(e) => setUploadStatusFilter(e.target.value as 'all' | 'uploaded' | 'missing' | 'no_video')}
+                            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-cyan-500`}
+                            style={{
+                              backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
+                              color: theme === 'dark' ? '#f9fafb' : '#111827',
+                              borderColor: theme === 'dark' ? '#4b5563' : '#d1d5db'
+                            }}
+                          >
+                            <option value="all" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>All Status</option>
+                            <option value="uploaded" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>✅ Uploaded</option>
+                            <option value="missing" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>❌ Missing</option>
+                            <option value="no_video" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>🎥 No Video Link</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Entries Table */}
-                    <div className="overflow-x-auto">
-                      <table className={`min-w-full divide-y ${themeClasses.tableBorder}`}>
+                    <div className={`overflow-x-auto -mx-4 sm:mx-0 scrollbar-thin ${theme === 'dark' ? 'scrollbar-thumb-gray-600 scrollbar-track-gray-800' : 'scrollbar-thumb-gray-300 scrollbar-track-gray-100'}`}>
+                      <div className="inline-block min-w-full align-middle">
+                        <div className={`overflow-hidden shadow-sm ring-1 sm:rounded-lg ${theme === 'dark' ? 'ring-gray-600 ring-opacity-50' : 'ring-black ring-opacity-5'}`}>
+                          {/* Mobile swipe indicator */}
+                          <div className={`sm:hidden px-4 py-2 text-center ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                            <p className={`text-xs ${themeClasses.textMuted}`}>← Swipe to see more columns →</p>
+                          </div>
+                          <table className={`min-w-full divide-y ${themeClasses.tableBorder}`}>
                         <thead className={`${themeClasses.tableHeader}`}>
                           <tr>
-                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                            <th className={`px-3 sm:px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Entry Details
                             </th>
-                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                            <th className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Contestant
                             </th>
-                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                            <th className={`hidden lg:table-cell px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Event
                             </th>
-                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                            <th className={`px-3 sm:px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Type
                             </th>
-                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
-                              Music Status
+                            <th className={`px-3 sm:px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                              <span className="hidden sm:inline">Music Status</span>
+                              <span className="sm:hidden">Music</span>
                             </th>
-                            <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                            <th className={`px-3 sm:px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
+                              <span className="hidden sm:inline">Video Status</span>
+                              <span className="sm:hidden">Video</span>
+                            </th>
+                            <th className={`px-3 sm:px-6 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                               Actions
                             </th>
                           </tr>
                         </thead>
                         <tbody className={`${themeClasses.tableRow} divide-y ${themeClasses.tableBorder}`}>
-                          {musicTrackingData.map((entry) => (
+                          {musicTrackingData.filter((entry) => {
+                            // Search term filter
+                            const searchMatch = !searchTerm || 
+                              entry.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.contestantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.studioName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.eodsaId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              entry.choreographer?.toLowerCase().includes(searchTerm.toLowerCase());
+                            
+                            // Entry type filter
+                            const typeMatch = entryTypeFilter === 'all' || entry.entryType === entryTypeFilter;
+                            
+                            // Upload status filter
+                            let statusMatch = true;
+                            if (uploadStatusFilter === 'uploaded') {
+                              statusMatch = (entry.entryType === 'live' && entry.musicFileUrl) || 
+                                           (entry.entryType === 'virtual' && entry.videoExternalUrl);
+                            } else if (uploadStatusFilter === 'missing') {
+                              statusMatch = entry.entryType === 'live' && !entry.musicFileUrl;
+                            } else if (uploadStatusFilter === 'no_video') {
+                              statusMatch = entry.entryType === 'virtual' && !entry.videoExternalUrl;
+                            }
+                            
+                            return searchMatch && typeMatch && statusMatch;
+                          }).map((entry) => (
                             <tr key={entry.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div>
-                                  <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{entry.itemName}</div>
-                                  <div className={`text-sm ${themeClasses.textMuted}`}>Item #{entry.itemNumber || 'Not assigned'}</div>
-                                  <div className={`text-sm ${themeClasses.textMuted}`}>{entry.mastery} • {entry.itemStyle}</div>
+                              <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                <div className="space-y-1">
+                                  <div className={`text-sm font-medium ${themeClasses.textPrimary} truncate`}>{entry.itemName}</div>
+                                  <div className={`text-xs sm:text-sm ${themeClasses.textMuted}`}>Item #{entry.itemNumber || 'Not assigned'}</div>
+                                  <div className={`text-xs sm:text-sm ${themeClasses.textMuted}`}>{entry.mastery} • {entry.itemStyle}</div>
+                                  {/* Mobile-only content */}
+                                  <div className="sm:hidden space-y-1">
+                                    <div className={`text-xs font-medium ${themeClasses.textPrimary}`}>{entry.contestantName || 'Unknown'}</div>
+                                    <div className={`text-xs ${themeClasses.textMuted}`}>{entry.eodsaId}</div>
+                                    <div className={`text-xs ${themeClasses.textMuted}`}>{entry.studioName || 'Independent'}</div>
+                                  </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
                                 <div>
                                   <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{entry.contestantName || 'Unknown'}</div>
                                   <div className={`text-sm ${themeClasses.textMuted}`}>{entry.eodsaId}</div>
                                   <div className={`text-sm ${themeClasses.textMuted}`}>{entry.studioName || 'Independent'}</div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
                                 <div>
                                   <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{entry.eventName}</div>
                                   <div className={`text-sm ${themeClasses.textMuted}`}>{entry.eventDate ? new Date(entry.eventDate).toLocaleDateString() : 'TBD'}</div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${
                                   entry.entryType === 'live' 
                                     ? theme === 'dark' ? 'bg-blue-900/80 text-blue-200' : 'bg-blue-100 text-blue-800'
                                     : theme === 'dark' ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-100 text-purple-800'
                                 }`}>
-                                  {entry.entryType === 'live' ? '🎵 Live' : '🎥 Virtual'}
+                                  <span className="hidden sm:inline">{entry.entryType === 'live' ? '🎵 Live' : '🎥 Virtual'}</span>
+                                  <span className="sm:hidden">{entry.entryType === 'live' ? '🎵' : '🎥'}</span>
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-2 sm:px-6 py-3 sm:py-4">
                                 {entry.entryType === 'live' ? (
                                   entry.musicFileUrl ? (
-                                    <div className="flex items-center space-x-2">
-                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
-                                        ✅ Uploaded
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                                      <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                                        <span className="hidden sm:inline">✅ Uploaded</span>
+                                        <span className="sm:hidden">✅</span>
                                       </span>
-                                      <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[100px]`}>{entry.musicFileName}</span>
+                                      <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[60px] sm:max-w-[100px] mt-1 sm:mt-0`}>{entry.musicFileName}</span>
                                     </div>
                                   ) : (
-                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
-                                      ❌ Missing
+                                    <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
+                                      <span className="hidden sm:inline">❌ Missing</span>
+                                      <span className="sm:hidden">❌</span>
                                     </span>
                                   )
                                 ) : (
-                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
-                                    N/A
+                                  <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
+                                    <span className="hidden sm:inline">N/A</span>
+                                    <span className="sm:hidden">-</span>
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                {entry.musicFileUrl && (
-                                  <a
-                                    href={entry.musicFileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-cyan-600 hover:text-cyan-900"
-                                  >
-                                    🎧 Play
-                                  </a>
+                              <td className="px-2 sm:px-6 py-3 sm:py-4">
+                                {entry.entryType === 'virtual' ? (
+                                  entry.videoExternalUrl ? (
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                                      <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                                        <span className="hidden sm:inline">✅ Video Link</span>
+                                        <span className="sm:hidden">✅</span>
+                                      </span>
+                                      <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[50px] sm:max-w-[80px] mt-1 sm:mt-0`}>{entry.videoExternalType?.toUpperCase() || 'LINK'}</span>
+                                    </div>
+                                  ) : (
+                                    <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
+                                      <span className="hidden sm:inline">❌ No Video Link</span>
+                                      <span className="sm:hidden">❌</span>
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
+                                    <span className="hidden sm:inline">N/A (Live)</span>
+                                    <span className="sm:hidden">-</span>
+                                  </span>
                                 )}
-                                <button
-                                  onClick={() => window.open(`/admin/events/${entry.eventId}`, '_blank')}
-                                  className="text-indigo-600 hover:text-indigo-900"
-                                >
-                                  📋 View Entry
-                                </button>
+                              </td>
+                              <td className="px-2 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium">
+                                <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                                   {entry.musicFileUrl && (
+                                     <a
+                                       href={entry.musicFileUrl}
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       className={`${theme === 'dark' ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-600 hover:text-cyan-900'} transition-colors py-1 touch-manipulation`}
+                                     >
+                                      <span className="hidden sm:inline">🎧 Play</span>
+                                      <span className="sm:hidden">🎧</span>
+                                    </a>
+                                  )}
+                                  {entry.videoExternalUrl && (
+                                     <a
+                                       href={entry.videoExternalUrl}
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       className={`${theme === 'dark' ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-900'} transition-colors py-1 touch-manipulation`}
+                                     >
+                                       <span className="hidden sm:inline">🎥 Watch</span>
+                                       <span className="sm:hidden">🎥</span>
+                                     </a>
+                                   )}
+                                   <button
+                                     onClick={() => window.open(`/admin/events/${entry.eventId}`, '_blank')}
+                                     className={`${theme === 'dark' ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-900'} transition-colors text-left py-1 touch-manipulation`}
+                                   >
+                                    <span className="hidden sm:inline">📋 View Entry</span>
+                                    <span className="sm:hidden">📋</span>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                          </table>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2414,11 +2629,11 @@ function AdminDashboard() {
                   <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">🎭</span>
                   </div>
-                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Create New Event</h2>
+                  <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Create New Event</h2>
                 </div>
                 <button
                   onClick={() => setShowCreateEventModal(false)}
-                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2428,7 +2643,7 @@ function AdminDashboard() {
             <form onSubmit={handleCreateEvent} className="p-6">
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Event Name</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Event Name</label>
                     <input
                       type="text"
                     value={newEvent.name}
@@ -2440,7 +2655,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Venue</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Venue</label>
                   <input
                     type="text"
                     value={newEvent.venue}
@@ -2452,7 +2667,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Description</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Description</label>
                   <textarea
                     value={newEvent.description}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
@@ -2464,7 +2679,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Competition</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Competition</label>
                   <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 ${themeClasses.textPrimary} font-medium text-base">
                     EODSA Nationals
                   </div>
@@ -2473,7 +2688,7 @@ function AdminDashboard() {
 
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Event Date</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Event Date</label>
                   <input
                     type="datetime-local"
                     value={newEvent.eventDate}
@@ -2484,7 +2699,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">End Date</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>End Date</label>
                   <input
                     type="datetime-local"
                     value={newEvent.eventEndDate}
@@ -2495,7 +2710,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Registration Deadline</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Registration Deadline</label>
                   <input
                     type="datetime-local"
                     value={newEvent.registrationDeadline}
@@ -2508,7 +2723,7 @@ function AdminDashboard() {
 
 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Performance Types</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Performance Types</label>
                   <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 ${themeClasses.textPrimary} font-medium text-base">
                     🎭 Creates All Performance Types (Solo, Duet, Trio, Group)
                   </div>
@@ -2535,7 +2750,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowCreateEventModal(false)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -2582,7 +2797,7 @@ function AdminDashboard() {
                     setEditingEvent(null);
                     setUpdateEventMessage('');
                   }}
-                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2597,7 +2812,7 @@ function AdminDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Event Name *</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Event Name *</label>
                   <input
                     type="text"
                     value={editEventData.name}
@@ -2608,7 +2823,7 @@ function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Region *</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Region *</label>
                   <select
                     value={editEventData.region}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, region: e.target.value }))}
@@ -2623,7 +2838,7 @@ function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Event Date *</label>
                   <input
                     type="date"
                     value={editEventData.eventDate}
@@ -2634,7 +2849,7 @@ function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Date</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Event End Date</label>
                   <input
                     type="date"
                     value={editEventData.eventEndDate}
@@ -2644,7 +2859,7 @@ function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Registration Deadline *</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Registration Deadline *</label>
                   <input
                     type="date"
                     value={editEventData.registrationDeadline}
@@ -2655,7 +2870,7 @@ function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Status</label>
                   <select
                     value={editEventData.status}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, status: e.target.value }))}
@@ -2670,7 +2885,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Venue *</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Venue *</label>
                   <input
                     type="text"
                     value={editEventData.venue}
@@ -2681,7 +2896,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Description</label>
                   <textarea
                     value={editEventData.description}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, description: e.target.value }))}
@@ -2713,7 +2928,7 @@ function AdminDashboard() {
                     setEditingEvent(null);
                     setUpdateEventMessage('');
                   }}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -2757,7 +2972,7 @@ function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => setShowCreateJudgeModal(false)}
-                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2767,7 +2982,7 @@ function AdminDashboard() {
             <form onSubmit={handleCreateJudge} className="p-6">
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Judge Name</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Judge Name</label>
                   <input
                     type="text"
                       value={newJudge.name}
@@ -2782,7 +2997,7 @@ function AdminDashboard() {
                   </div>
                   
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Email</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Email</label>
                     <input
                       type="email"
                       value={newJudge.email}
@@ -2794,7 +3009,7 @@ function AdminDashboard() {
                   </div>
                   
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Password</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Password</label>
                     <input
                       type="password"
                       value={newJudge.password}
@@ -2839,7 +3054,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowCreateJudgeModal(false)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -2882,7 +3097,7 @@ function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => setShowAssignJudgeModal(false)}
-                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2892,7 +3107,7 @@ function AdminDashboard() {
             <form onSubmit={handleAssignJudge} className="p-6">
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Judge</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Select Judge</label>
                   <select
                     value={assignment.judgeId}
                     onChange={(e) => setAssignment(prev => ({ ...prev, judgeId: e.target.value }))}
@@ -2907,7 +3122,7 @@ function AdminDashboard() {
                 </div>
                 
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Event</label>
+                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Select Event</label>
                   <select
                     value={assignment.eventId}
                     onChange={(e) => setAssignment(prev => ({ ...prev, eventId: e.target.value }))}
@@ -2944,7 +3159,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowAssignJudgeModal(false)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -2988,7 +3203,7 @@ function AdminDashboard() {
                   </div>
                 <button
                   onClick={() => setShowEmailTestModal(false)}
-                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors"
+                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -3010,7 +3225,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowEmailTestModal(false)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
                 >
                   Cancel
                 </button>

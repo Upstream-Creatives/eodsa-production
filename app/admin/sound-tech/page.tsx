@@ -200,7 +200,7 @@ function SoundTechPage() {
   return (
     <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Header */}
-      <div className="bg-gray-800 shadow">
+      <div className={`${themeClasses.headerBg} shadow border-b ${themeClasses.headerBorder}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
@@ -208,8 +208,8 @@ function SoundTechPage() {
                 <span className="text-white text-xl">🎵</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Sound Tech Dashboard</h1>
-                <p className="text-gray-300">Manage music files for live performances</p>
+                <h1 className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Sound Tech Dashboard</h1>
+                <p className={`${themeClasses.textSecondary}`}>Manage music files for live performances</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">

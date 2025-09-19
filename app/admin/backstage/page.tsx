@@ -147,20 +147,20 @@ export default function BackstageEventSelector() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading events...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-gray-900 text-xl">Loading events...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 p-6">
+      <div className="bg-white border-b border-gray-200 p-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-purple-400">🎭 Backstage Control Center</h1>
-            <p className="text-gray-300 mt-1">
+            <h1 className="text-3xl font-bold text-purple-600">🎭 Backstage Control Center</h1>
+            <p className="text-gray-700 mt-1">
               Select an event to manage live performances and program order
             </p>
           </div>
@@ -168,7 +168,7 @@ export default function BackstageEventSelector() {
           <div className="flex items-center space-x-4">
             <Link
               href="/admin"
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold transition-colors"
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-colors"
             >
               ← Back to Admin
             </Link>
@@ -180,14 +180,14 @@ export default function BackstageEventSelector() {
       <div className="p-6">
         {events.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-xl mb-4">No events found</div>
-            <p className="text-gray-500">Create events in the admin dashboard to manage them here.</p>
+            <div className="text-gray-500 text-xl mb-4">No events found</div>
+            <p className="text-gray-600">Create events in the admin dashboard to manage them here.</p>
           </div>
         ) : (
           <>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Select Event to Manage</h2>
-              <div className="text-gray-400">
+              <div className="text-gray-600">
                 {events.length} event{events.length !== 1 ? 's' : ''} available
               </div>
             </div>
@@ -208,8 +208,8 @@ export default function BackstageEventSelector() {
                     className={`
                       p-6 rounded-lg border-2 cursor-pointer transition-all duration-300 transform hover:scale-105
                       ${selectedEvent === event.id 
-                        ? 'border-purple-400 bg-purple-600/20' 
-                        : 'border-gray-600 bg-gray-700/50 hover:border-purple-400 hover:bg-purple-600/10'
+                        ? 'border-purple-400 bg-purple-50' 
+                        : 'border-gray-200 bg-white hover:border-purple-400 hover:bg-purple-50'
                       }
                     `}
                     onMouseEnter={() => setSelectedEvent(event.id)}
@@ -220,14 +220,14 @@ export default function BackstageEventSelector() {
                       <div className={`px-3 py-1 rounded-full text-sm font-semibold ${getEventStatusColor(event)}`}>
                         {getEventStatusText(event)}
                       </div>
-                      <div className="text-gray-400 text-sm">
+                      <div className="text-gray-600 text-sm">
                         {event.performanceType}
                       </div>
                     </div>
 
                     {/* Event Info */}
-                    <h3 className="text-xl font-bold mb-2 text-white">{event.name}</h3>
-                    <div className="space-y-2 text-sm text-gray-300 mb-4">
+                    <h3 className="text-xl font-bold mb-2 text-gray-900">{event.name}</h3>
+                    <div className="space-y-2 text-sm text-gray-700 mb-4">
                       <div className="flex items-center">
                         <span className="w-16">📅 Date:</span>
                         <span>{new Date(event.eventDate).toLocaleDateString()}</span>
@@ -243,7 +243,7 @@ export default function BackstageEventSelector() {
                     </div>
 
                     {/* Performance Stats */}
-                    <div className="border-t border-gray-600 pt-4">
+                    <div className="border-t border-gray-200 pt-4">
                       <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
                           <div className="text-2xl font-bold text-blue-400">{stats.totalEntries}</div>

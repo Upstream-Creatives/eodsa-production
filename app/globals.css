@@ -30,6 +30,13 @@
 }
 
 :root {
+  /* Light theme defaults (higher contrast for readability) */
+  --background: #ffffff;
+  --foreground: #0f172a; /* slate-900 */
+}
+
+/* Dark theme overrides applied via [data-theme="dark"] attribute */
+[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
 }

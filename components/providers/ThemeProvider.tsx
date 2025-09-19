@@ -47,6 +47,18 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   }, [theme, mounted]);
 
+  // Reflect theme on the document for global CSS variables
+  useEffect(() => {
+    if (!mounted) return;
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme, mounted]);
+
   const toggleTheme = () => {
     setThemeState(prev => prev === 'light' ? 'dark' : 'light');
   };
@@ -97,11 +109,11 @@ export const getThemeClasses = (theme: Theme) => {
     
     // Cards and containers
     cardBg: theme === 'dark' 
-      ? 'bg-gray-800/80' 
-      : 'bg-white/80',
+      ? 'bg-gray-800/90' 
+      : 'bg-white/95',
     cardBorder: theme === 'dark' 
-      ? 'border-gray-700' 
-      : 'border-indigo-100',
+      ? 'border-gray-600' 
+      : 'border-gray-300',
     
     // Navigation
     navBg: theme === 'dark' 
@@ -117,11 +129,11 @@ export const getThemeClasses = (theme: Theme) => {
     textMuted: theme === 'dark' ? 'text-gray-400' : 'text-gray-500',
     
     // Tables
-    tableHeader: theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50/80',
-    tableHeaderText: theme === 'dark' ? 'text-gray-200' : 'text-gray-700',
-    tableRow: theme === 'dark' ? 'bg-gray-800' : 'bg-white/50',
-    tableRowHover: theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-indigo-50/50',
-    tableBorder: theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200',
+    tableHeader: theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50',
+    tableHeaderText: theme === 'dark' ? 'text-gray-100' : 'text-gray-900',
+    tableRow: theme === 'dark' ? 'bg-gray-800' : 'bg-white',
+    tableRowHover: theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50',
+    tableBorder: theme === 'dark' ? 'divide-gray-600' : 'divide-gray-300',
     
     // Modals
     modalBg: theme === 'dark' ? 'bg-gray-800' : 'bg-white',

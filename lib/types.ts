@@ -230,6 +230,31 @@ export const AGE_CATEGORIES = [
   '60+'
 ];
 
+// Helper: map a numeric age to an AGE_CATEGORIES bucket
+export function getAgeCategoryFromAge(age: number): string {
+  if (age <= 4) return '4 & Under';
+  if (age <= 6) return '6 & Under';
+  if (age <= 9) return '7-9';
+  if (age <= 12) return '10-12';
+  if (age <= 14) return '13-14';
+  if (age <= 17) return '15-17';
+  if (age <= 24) return '18-24';
+  if (age <= 39) return '25-39';
+  if (age < 60) return '40+';
+  return '60+';
+}
+
+// Helper: compute age from a birth date relative to a reference date (defaults to today)
+export function calculateAgeOnDate(dateOfBirth: Date | string, referenceDate: Date = new Date()): number {
+  const dob = typeof dateOfBirth === 'string' ? new Date(dateOfBirth) : dateOfBirth;
+  let age = referenceDate.getFullYear() - dob.getFullYear();
+  const monthDiff = referenceDate.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 export const REGIONS = [
   'Nationals'
 ];

@@ -5,7 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
 import { calculateEODSAFee } from '@/lib/types';
+import { getSql } from '@/lib/database';
 import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { calculateAgeOnDate, getAgeCategoryFromAge } from '@/lib/types';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 // Registration fee checking moved to API calls
 
@@ -553,6 +555,57 @@ function EventParticipantsPage() {
         // Calculate age category based on performance type
         const performanceType = getPerformanceType(entry.participantIds);
         
+        // Calculate actual age category based on participants' ages.
+        // Prefer server-supplied computedAgeCategory when available.
+        let calculatedAgeCategory = (entry as any).computedAgeCategory || 'N/A';
+        const needsClientCalc = !calculatedAgeCategory || ['n/a', 'all', 'all ages'].includes(String(calculatedAgeCategory).toLowerCase());
+        if (needsClientCalc && entry.participantIds && entry.participantIds.length > 0) {
+          try {
+            // Get participant ages from the database
+            const sqlClient = getSql();
+            const participantAges = await Promise.all(
+              entry.participantIds.map(async (participantId) => {
+                try {
+                  const dancerResult = await sqlClient`
+                    SELECT date_of_birth FROM dancers 
+                    WHERE id = ${participantId} OR eodsa_id = ${participantId}
+                    LIMIT 1
+                  ` as any[];
+                  
+                  if (dancerResult.length > 0 && dancerResult[0].date_of_birth) {
+                    // Age should be calculated as of the event date for category grouping
+                    const referenceDate = event?.eventDate ? new Date(event.eventDate) : new Date();
+                    return calculateAgeOnDate(dancerResult[0].date_of_birth, referenceDate);
+                  }
+                  return null;
+                } catch (error) {
+                  console.warn(`Could not get age for participant ${participantId}:`, error);
+                  return null;
+                }
+              })
+            );
+            
+            // Filter out null values and calculate average age
+            const validAges = participantAges.filter(age => age !== null) as number[];
+            if (validAges.length > 0) {
+              const averageAge = Math.round(validAges.reduce((sum, age) => sum + age, 0) / validAges.length);
+              calculatedAgeCategory = getAgeCategoryFromAge(averageAge);
+            }
+          } catch (error) {
+            console.warn('Error calculating age category for entry:', entry.id, error);
+            calculatedAgeCategory = event?.ageCategory || 'N/A';
+          }
+        } else if (needsClientCalc) {
+          calculatedAgeCategory = event?.ageCategory || 'N/A';
+        }
+
+        // Fallback to entry-provided ageCategory if calculation did not yield a bucket
+        if (!calculatedAgeCategory || String(calculatedAgeCategory).toLowerCase() === 'n/a' || String(calculatedAgeCategory).toLowerCase() === 'all' || String(calculatedAgeCategory).toLowerCase() === 'all ages') {
+          if ((entry as any).ageCategory && (entry as any).ageCategory !== 'All' && (entry as any).ageCategory !== 'All Ages') {
+            calculatedAgeCategory = (entry as any).ageCategory;
+          }
+        }
+        
         return [
           entry.itemNumber || 'Not Assigned',
           entry.eodsaId,
@@ -560,7 +613,7 @@ function EventParticipantsPage() {
           performanceType,
           entry.mastery,
           entry.itemStyle,
-          event?.ageCategory || 'N/A',
+          calculatedAgeCategory,
           entry.participantIds?.length || 1,
           participantNames,
           entry.choreographer,
@@ -1126,18 +1179,18 @@ function EventParticipantsPage() {
 
     <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Enhanced Header */}
-      <header className="bg-gray-800/90 backdrop-blur-lg shadow-xl border-b border-gray-700">
+      <header className={`${themeClasses.headerBg} backdrop-blur-lg shadow-xl border-b ${themeClasses.headerBorder}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-8">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <span className="text-white text-xl">👥</span>
+                <span className={`${themeClasses.textPrimary} text-xl`}>👥</span>
               </div>
               <div>
                 <h1 className="text-3xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                   Event Participants
                 </h1>
-                <p className="text-gray-400 font-medium">{event?.name || 'Loading...'}</p>
+                <p className={`${themeClasses.textSecondary} font-medium`}>{event?.name || 'Loading...'}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -1158,13 +1211,13 @@ function EventParticipantsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Event Details Card */}
         {event && (
-          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-gray-700">
+          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border ${themeClasses.cardBorder}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-sm">🏆</span>
+                  <span className={`${themeClasses.textPrimary} text-sm`}>🏆</span>
                 </div>
-                <h2 className="text-xl font-bold text-white">Event Details</h2>
+                <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Event Details</h2>
               </div>
               
               {/* Excel Export Button */}
@@ -1179,19 +1232,19 @@ function EventParticipantsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="font-semibold text-gray-300">Date</p>
-                <p className="text-gray-300">{new Date(event.eventDate).toLocaleDateString()}</p>
+                <p className={`font-semibold ${themeClasses.textSecondary}`}>Date</p>
+                <p className={`${themeClasses.textSecondary}`}>{new Date(event.eventDate).toLocaleDateString()}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-300">Venue</p>
-                <p className="text-gray-300">{event.venue}</p>
+                <p className={`font-semibold ${themeClasses.textSecondary}`}>Venue</p>
+                <p className={`${themeClasses.textSecondary}`}>{event.venue}</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-300">Entries</p>
-                <p className="text-gray-300">{entries.length} total</p>
+                <p className={`font-semibold ${themeClasses.textSecondary}`}>Entries</p>
+                <p className={`${themeClasses.textSecondary}`}>{entries.length} total</p>
                 {entries.length > 0 && (
                   <div className="space-y-1">
-                    <div className="text-xs text-gray-400">
+                    <div className={`text-xs ${themeClasses.textMuted}`}>
                       {getPerformanceStats().solo > 0 && `${getPerformanceStats().solo} Solo`}
                       {getPerformanceStats().duet > 0 && (getPerformanceStats().solo > 0 ? `, ${getPerformanceStats().duet} Duet` : `${getPerformanceStats().duet} Duet`)}
                       {getPerformanceStats().trio > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 ? `, ${getPerformanceStats().trio} Trio` : `${getPerformanceStats().trio} Trio`)}
@@ -1209,20 +1262,20 @@ function EventParticipantsPage() {
 
         {/* Performance Type Filter Tabs */}
         {entries.length > 0 && (
-          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-700 mb-6">
+          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl border ${themeClasses.cardBorder} mb-6`}>
             <div className="px-6 py-4">
-              <h3 className="text-lg font-semibold text-white mb-4">Filter Entries</h3>
+              <h3 className={`text-lg font-semibold ${themeClasses.textPrimary} mb-4`}>Filter Entries</h3>
               
               {/* Performance Type Filters */}
               <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Performance Type:</h4>
+                <h4 className={`text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Performance Type:</h4>
                 <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setPerformanceTypeFilter('all')}
                   className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                     performanceTypeFilter === 'all'
                       ? 'bg-indigo-600 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
+                      : `bg-gray-100 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} hover:bg-gray-200`
                   }`}
                 >
                   All Entries ({entries.length})
@@ -1280,14 +1333,14 @@ function EventParticipantsPage() {
               
               {/* Entry Type Filters */}
               <div>
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Entry Type:</h4>
+                <h4 className={`text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Entry Type:</h4>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setEntryTypeFilter('all')}
                     className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                       entryTypeFilter === 'all'
                         ? 'bg-indigo-600 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
+                        : `bg-gray-100 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} hover:bg-gray-200`
                     }`}
                   >
                     All Types ({entries.length})
@@ -1323,10 +1376,10 @@ function EventParticipantsPage() {
         )}
 
         {/* Participants List */}
-        <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-gray-700 mb-8">
-          <div className="px-6 py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b border-gray-700">
+        <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder} mb-8`}>
+          <div className={`px-6 py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b ${themeClasses.cardBorder}`}>
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">
+              <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>
                 {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
                   ? 'All Participants & Entries'
                   : `${performanceTypeFilter === 'all' ? 'All' : performanceTypeFilter.charAt(0).toUpperCase() + performanceTypeFilter.slice(1)} ${entryTypeFilter === 'all' ? '' : entryTypeFilter.charAt(0).toUpperCase() + entryTypeFilter.slice(1)} Entries`
@@ -1345,7 +1398,7 @@ function EventParticipantsPage() {
                 <div className="hidden md:flex items-center space-x-1">
                   <button
                     onClick={() => setPaymentFilter('all')}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='all'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-300 hover:bg-gray-700'}`}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='all' ? (theme === 'dark' ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-100 text-gray-900 border-gray-300') : (theme === 'dark' ? 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')}`}
                   >All</button>
                   <button
                     onClick={() => setPaymentFilter('paid')}
@@ -1385,23 +1438,23 @@ function EventParticipantsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-600">
-                <thead className="bg-gray-700/80">
+              <table className={`min-w-full divide-y ${themeClasses.tableBorder}`}>
+                <thead className={`${themeClasses.tableHeader}`}>
                   <tr>
-                    <th className="px-3 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider w-24">Item #</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Performance</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Payment</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider hidden md:table-cell">Submitted</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Actions</th>
+                    <th className={`px-3 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider w-24`}>Item #</th>
+                    <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Performance</th>
+                    <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Type</th>
+                    <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Payment</th>
+                    <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden md:table-cell`}>Submitted</th>
+                    <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Status</th>
+                    <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white/50 divide-y divide-gray-600">
+                <tbody className={`divide-y ${themeClasses.tableBorder}`}>
                   {filteredEntries.map((entry) => {
                     const performanceType = getPerformanceType(entry.participantIds);
                     return (
-                    <tr key={entry.id} className="hover:bg-indigo-50/50 transition-colors duration-200">
+                    <tr key={entry.id} className={`${themeClasses.tableRow} ${themeClasses.tableRowHover} transition-colors duration-200`}>
                       <td className="px-3 py-4 whitespace-nowrap w-24">
                         {editingItemNumber === entry.id ? (
                           <div className="flex flex-col space-y-1">
@@ -1413,7 +1466,7 @@ function EventParticipantsPage() {
                                 if (e.key === 'Enter') handleItemNumberSave(entry.id);
                                 if (e.key === 'Escape') handleItemNumberCancel();
                               }}
-                              className="w-16 px-2 py-1 text-xs text-white bg-white border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className={`w-16 px-2 py-1 text-xs ${themeClasses.textPrimary} bg-white border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500`}
                               placeholder="Item #"
                               min="1"
                               autoFocus
@@ -1428,7 +1481,7 @@ function EventParticipantsPage() {
                               </button>
                               <button
                                 onClick={handleItemNumberCancel}
-                                className="px-2 py-1 text-[10px] bg-gray-7000 text-white rounded hover:bg-gray-600"
+                                className="px-2 py-1 text-[10px] bg-gray-500 text-white rounded hover:bg-gray-600"
                               >
                                 ✕
                               </button>
@@ -1444,7 +1497,7 @@ function EventParticipantsPage() {
                                 <div className="text-base font-bold text-indigo-600">
                                   #{entry.itemNumber}
                                 </div>
-                                <div className="text-[10px] text-gray-400">
+                                <div className={`${themeClasses.textMuted} text-[10px]`}>
                                   Click to reassign
                                 </div>
                               </div>
@@ -1453,7 +1506,7 @@ function EventParticipantsPage() {
                                 <div className="text-xs font-medium text-orange-600">
                                   Click to assign
                             </div>
-                                <div className="text-[10px] text-gray-400">
+                                <div className={`${themeClasses.textMuted} text-[10px]`}>
                               Program Order
                             </div>
                               </div>
@@ -1465,16 +1518,16 @@ function EventParticipantsPage() {
                       {/* Performance column (now 2nd) */}
                       <td className="px-6 py-4">
                         <div className="space-y-0.5">
-                          <div className="text-xs text-gray-400">
+                          <div className={`${themeClasses.textMuted} text-xs`}>
                             Studio: {entry.studioName || entry.contestantName || entry.eodsaId || 'N/A'}
                           </div>
-                          <div className="text-sm font-semibold text-white">{entry.itemName}</div>
+                          <div className={`text-sm font-semibold ${themeClasses.textPrimary}`}>{entry.itemName}</div>
                           {entry.participantNames && entry.participantNames.length > 0 ? (
-                            <div className="text-xs text-gray-300">
+                            <div className={`${themeClasses.textSecondary} text-xs`}>
                               {entry.participantNames.join(', ')}
                             </div>
                           ) : (
-                            <div className="text-xs text-gray-300">
+                            <div className={`${themeClasses.textSecondary} text-xs`}>
                               {entry.participantIds.map((_, i) => `Participant ${i + 1}`).join(', ')}
                             </div>
                           )}
@@ -1495,7 +1548,7 @@ function EventParticipantsPage() {
                             }`}>
                               {entry.entryType === 'live' ? '🎵 LIVE' : '📹 VIRTUAL'}
                             </span>
-                            <span className="text-xs text-gray-400">
+                            <span className={`${themeClasses.textMuted} text-xs`}>
                               {entry.participantIds.length} participant{entry.participantIds.length !== 1 ? 's' : ''}
                             </span>
                           </div>
@@ -1504,13 +1557,13 @@ function EventParticipantsPage() {
                       
                       <td className="px-6 py-4">
                         <div className="space-y-1">
-                            <div className="text-sm font-bold text-white">R{entry.calculatedFee.toFixed(2)}</div>
+                            <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>R{entry.calculatedFee.toFixed(2)}</div>
                             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entry.paymentStatus)}`}>
                               {entry.paymentStatus.toUpperCase()}
                             </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300 hidden md:table-cell">
+                      <td className={`px-6 py-4 text-sm ${themeClasses.textSecondary} hidden md:table-cell`}>
                         {new Date(entry.submittedAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
