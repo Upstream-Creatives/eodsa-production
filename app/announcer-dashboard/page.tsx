@@ -23,6 +23,7 @@ interface Performance {
   ageCategory?: string;
   musicFileUrl?: string;
   musicFileName?: string;
+  announcerNotes?: string | null;
   performedBy?: string;
   performedAt?: string;
 }
@@ -117,6 +118,12 @@ export default function AnnouncerDashboard() {
         });
         
         setPerformances(sortedPerformances);
+        // Initialize notes map from server-persisted announcer notes so they appear after refresh
+        const initialNotes: Record<string, string> = {};
+        for (const p of sortedPerformances as any[]) {
+          if (p.announcerNotes) initialNotes[p.id] = p.announcerNotes;
+        }
+        setNotesByPerformance(initialNotes);
 
         // Load presence for each performance (registration check-in)
         try {
@@ -146,7 +153,7 @@ export default function AnnouncerDashboard() {
       });
       if (res.ok) {
         // Reflect saved note locally if the performance list carries it
-        setPerformances(prev => prev.map(p => p.id === performanceId ? { ...p, announcerNotes: note } as any : p));
+        setPerformances(prev => prev.map(p => p.id === performanceId ? { ...p, announcerNotes: note, announced: true, announcedAt: new Date().toISOString() } as any : p));
         success('Announcement note saved');
       } else {
         const msg = await res.json().catch(() => ({} as any));
@@ -168,6 +175,15 @@ export default function AnnouncerDashboard() {
       });
 
       if (response.ok) {
+        // Persist status on the server as completed
+        try {
+          await fetch(`/api/performances/${performanceId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'completed' })
+          });
+        } catch {}
+
         // Update local state - mark as both announced and completed
         setPerformances(prev => 
           prev.map(p => 
@@ -592,7 +608,11 @@ export default function AnnouncerDashboard() {
                     {/* Announcement Notes */}
                     <div className="mt-3">
                       <textarea
-                        value={notesByPerformance[performance.id] || ''}
+                        value={
+                          (notesByPerformance[performance.id] !== undefined
+                            ? notesByPerformance[performance.id]
+                            : (performance.announcerNotes || ''))
+                        }
                         onChange={(e) => setNotesByPerformance(prev => ({ ...prev, [performance.id]: e.target.value }))}
                         placeholder="Announcement notes…"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black"
@@ -659,7 +679,11 @@ export default function AnnouncerDashboard() {
                   <div>
                     <label className="block text-2xl font-semibold text-black mb-3">Announcement notes</label>
                     <textarea
-                      value={notesByPerformance[activePrompt.id] || ''}
+                      value={
+                        (notesByPerformance[activePrompt.id] !== undefined
+                          ? notesByPerformance[activePrompt.id]
+                          : (activePrompt.announcerNotes || ''))
+                      }
                       onChange={(e) => setNotesByPerformance(prev => ({ ...prev, [activePrompt!.id]: e.target.value }))}
                       placeholder="Script or notes the announcer reads…"
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl text-2xl text-black"

@@ -230,12 +230,62 @@ export async function POST(request: NextRequest) {
         SELECT id FROM event_entries WHERE payment_id = ${webhookData.m_payment_id} LIMIT 1
       `;
       if (priorEntries.length > 0) {
-        console.log(`🛑 Entries already exist for payment ${webhookData.m_payment_id}. Skipping auto-creation.`);
+        console.log(`🛑 Entries already exist for payment ${webhookData.m_payment_id}. Ensuring performances exist for each approved entry...`);
+
+        // Ensure a Performance exists for each approved entry tied to this payment
+        try {
+          const { db, unifiedDb } = await import('@/lib/database');
+
+          const paidEntries = await sql`
+            SELECT id, event_id, contestant_id, item_name, participant_ids, estimated_duration,
+                   choreographer, mastery, item_style, item_number
+            FROM event_entries
+            WHERE payment_id = ${webhookData.m_payment_id} AND approved = TRUE
+          ` as any[];
+
+          for (const entry of paidEntries) {
+            const existingPerf = await sql`SELECT id FROM performances WHERE event_entry_id = ${entry.id} LIMIT 1` as any[];
+            if (existingPerf.length > 0) continue;
+
+            // Build participant names via unified dancer records when possible
+            const participantNames: string[] = [];
+            try {
+              const ids = JSON.parse(entry.participant_ids || '[]');
+              for (let i = 0; i < ids.length; i++) {
+                try {
+                  const dancer = await unifiedDb.getDancerById(ids[i]);
+                  participantNames.push(dancer?.name || `Participant ${i + 1}`);
+                } catch {
+                  participantNames.push(`Participant ${i + 1}`);
+                }
+              }
+            } catch {
+              participantNames.push('Participant 1');
+            }
+
+            await db.createPerformance({
+              eventId: entry.event_id,
+              eventEntryId: entry.id,
+              contestantId: entry.contestant_id,
+              title: entry.item_name,
+              participantNames,
+              duration: entry.estimated_duration || 0,
+              choreographer: entry.choreographer,
+              mastery: entry.mastery,
+              itemStyle: entry.item_style,
+              status: 'scheduled',
+              itemNumber: entry.item_number || null as any
+            });
+          }
+        } catch (ensureErr) {
+          console.warn('⚠️ Failed ensuring performances for existing paid entries:', ensureErr);
+        }
+
         await sql`
           INSERT INTO payment_logs (payment_id, event_type, event_data, ip_address, user_agent)
           VALUES (
             ${webhookData.m_payment_id}, 'duplicate_webhook_skipped',
-            ${JSON.stringify({ reason: 'entries already exist for this payment_id' })},
+            ${JSON.stringify({ reason: 'entries already exist for this payment_id', ensured_performances: true })},
             ${clientIP}, ${request.headers.get('user-agent') || 'webhook'}
           )
         `;
@@ -258,7 +308,7 @@ export async function POST(request: NextRequest) {
           }
           
           // Import the database module to create entries
-          const { db } = await import('@/lib/database');
+          const { db, unifiedDb } = await import('@/lib/database');
           
           const createdEntries = [];
           
@@ -303,6 +353,47 @@ export async function POST(request: NextRequest) {
                 SET payment_id = ${webhookData.m_payment_id}
                 WHERE id = ${eventEntry.id}
               `;
+
+              // Auto-create performance for this approved entry (idempotent)
+              try {
+                const existingPerformances = await db.getAllPerformances();
+                const alreadyExists = existingPerformances.some(p => p.eventEntryId === eventEntry.id);
+                if (!alreadyExists) {
+                  // Build participant names via unified dancer records when possible
+                  const participantNames: string[] = [];
+                  try {
+                    for (let i = 0; i < entry.participantIds.length; i++) {
+                      const pid = entry.participantIds[i];
+                      try {
+                        const dancer = await unifiedDb.getDancerById(pid);
+                        if (dancer?.name) {
+                          participantNames.push(dancer.name);
+                          continue;
+                        }
+                      } catch {}
+                      participantNames.push(`Participant ${i + 1}`);
+                    }
+                  } catch {
+                    entry.participantIds.forEach((_: any, i: number) => participantNames.push(`Participant ${i + 1}`));
+                  }
+
+                  await db.createPerformance({
+                    eventId: entry.eventId,
+                    eventEntryId: eventEntry.id,
+                    contestantId: entry.contestantId,
+                    title: entry.itemName,
+                    participantNames,
+                    duration: entry.estimatedDuration || 0,
+                    choreographer: entry.choreographer,
+                    mastery: entry.mastery,
+                    itemStyle: entry.itemStyle,
+                    status: 'scheduled',
+                    itemNumber: undefined
+                  });
+                }
+              } catch (perfErr) {
+                console.warn('⚠️ Failed to auto-create performance for entry', eventEntry.id, perfErr);
+              }
 
               createdEntries.push({
                 entryId: eventEntry.id,

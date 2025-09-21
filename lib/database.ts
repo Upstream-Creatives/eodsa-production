@@ -654,8 +654,16 @@ export const db = {
     const id = Date.now().toString();
     
     await sqlClient`
-      INSERT INTO performances (id, event_id, event_entry_id, contestant_id, title, participant_names, duration, choreographer, mastery, item_style, scheduled_time, status)
-      VALUES (${id}, ${performance.eventId}, ${performance.eventEntryId}, ${performance.contestantId}, ${performance.title}, ${JSON.stringify(performance.participantNames)}, ${performance.duration}, ${performance.choreographer}, ${performance.mastery}, ${performance.itemStyle}, ${performance.scheduledTime || null}, ${performance.status})
+      INSERT INTO performances (
+        id, event_id, event_entry_id, contestant_id, title, participant_names, duration,
+        choreographer, mastery, item_style, scheduled_time, status, item_number
+      )
+      VALUES (
+        ${id}, ${performance.eventId}, ${performance.eventEntryId}, ${performance.contestantId}, ${performance.title},
+        ${JSON.stringify(performance.participantNames)}, ${performance.duration}, ${performance.choreographer},
+        ${performance.mastery}, ${performance.itemStyle}, ${performance.scheduledTime || null}, ${performance.status},
+        ${performance.itemNumber || null}
+      )
     `;
     
     return { ...performance, id };
@@ -1673,7 +1681,7 @@ export const db = {
         ee.video_external_type,
         ee.participant_ids
       FROM performances p 
-      JOIN contestants c ON p.contestant_id = c.id 
+      LEFT JOIN contestants c ON p.contestant_id = c.id 
       LEFT JOIN event_entries ee ON p.event_entry_id = ee.id
       WHERE p.event_id = ${eventId}
       ORDER BY p.scheduled_time ASC
