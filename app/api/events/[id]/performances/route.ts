@@ -28,10 +28,17 @@ export async function GET(
       itemNumber: p.itemNumber
     })));
 
-    return NextResponse.json({
-      success: true,
-      performances
-    });
+    // Include virtualItemNumber by joining entries (if present)
+    try {
+      const entries = await db.getAllEventEntries();
+      const withVirtual = performances.map((p: any) => {
+        const entry = entries.find(e => e.id === p.eventEntryId);
+        return entry && entry.virtualItemNumber ? { ...p, virtualItemNumber: entry.virtualItemNumber } : p;
+      });
+      return NextResponse.json({ success: true, performances: withVirtual });
+    } catch {
+      return NextResponse.json({ success: true, performances });
+    }
   } catch (error) {
     console.error('Error fetching event performances:', error);
     return NextResponse.json(

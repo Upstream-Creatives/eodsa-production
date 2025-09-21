@@ -95,6 +95,7 @@ export interface EventEntry {
   approved: boolean;
   qualifiedForNationals: boolean;
   itemNumber?: number; // NEW: Item Number for program order
+  virtualItemNumber?: number; // NEW: Independent Virtual program number
   // EODSA Nationals Entry Form fields
   itemName: string;
   choreographer: string;

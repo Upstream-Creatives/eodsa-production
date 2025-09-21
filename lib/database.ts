@@ -50,6 +50,7 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS item_number INTEGER`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_reference TEXT`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_date TEXT`;
+    await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS virtual_item_number INTEGER`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_end_date TEXT`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS item_number INTEGER`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS withdrawn_from_judging BOOLEAN DEFAULT FALSE`;
@@ -492,6 +493,7 @@ export const db = {
       approved: row.approved,
       qualifiedForNationals: row.qualified_for_nationals,
       itemNumber: row.item_number,
+      virtualItemNumber: row.virtual_item_number,
       itemName: row.item_name,
       choreographer: row.choreographer,
       mastery: row.mastery,

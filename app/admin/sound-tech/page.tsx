@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import MusicPlayer from '@/components/MusicPlayer';
 import { useToast } from '@/components/ui/simple-toast';
 import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import RealtimeUpdates from '@/components/RealtimeUpdates';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface EventEntry {
@@ -197,7 +198,16 @@ function SoundTechPage() {
     );
   }
 
+  const handleRealtimeReorder = async () => {
+    // Simply refetch to reflect latest item numbers synced to entries
+    await fetchData();
+  };
+
   return (
+    <RealtimeUpdates
+      eventId={selectedEvent !== 'all' ? selectedEvent : ''}
+      onPerformanceReorder={handleRealtimeReorder}
+    >
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-white shadow border-b border-gray-200">
@@ -355,8 +365,9 @@ function SoundTechPage() {
                               {entry.itemName}
                             </h3>
                             <p className="text-sm text-black">
-                              by {entry.choreographer} • {getPerformanceType(entry.participantIds)}
+                              {getPerformanceType(entry.participantIds)} • {entry.itemStyle}
                             </p>
+                            {/* Age category not stored on entry; omit to avoid type errors */}
                             <p className="text-xs text-gray-600">
                               {getEventName(entry.eventId)} • {entry.participantNames?.join(', ')}
                             </p>
@@ -371,6 +382,11 @@ function SoundTechPage() {
                               className="max-w-2xl"
                               showDownload={true}
                             />
+                          </div>
+                        )}
+                        {!entry.musicFileUrl && (
+                          <div className="mt-4 p-3 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-md text-sm">
+                            Upload outstanding — no track uploaded yet.
                           </div>
                         )}
                       </div>
@@ -402,9 +418,9 @@ function SoundTechPage() {
                         </button>
                         
                         <div className="text-right text-xs text-gray-600">
-                          <div>Mastery: {entry.mastery}</div>
-                          <div>Style: {entry.itemStyle}</div>
-                          <div>Duration: {entry.estimatedDuration}min</div>
+                          <div className={`${entry.musicFileUrl ? 'text-green-700' : 'text-red-700'}`}>
+                            {entry.musicFileUrl ? 'Music uploaded' : 'Upload outstanding'}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -508,6 +524,7 @@ function SoundTechPage() {
         ) : null}
       </div>
     </div>
+    </RealtimeUpdates>
   );
 }
 

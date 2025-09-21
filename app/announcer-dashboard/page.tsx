@@ -289,6 +289,9 @@ export default function AnnouncerDashboard() {
       eventId={selectedEvent}
       onPerformanceReorder={handlePerformanceReorder}
       onPerformanceStatus={handlePerformanceStatus}
+      onPresenceUpdate={(data) => {
+        setPresenceByPerformance(prev => ({ ...prev, [data.performanceId]: { present: data.present, checkedInAt: data.checkedInAt, checkedInBy: data.checkedInBy } }));
+      }}
     >
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
@@ -499,9 +502,16 @@ export default function AnnouncerDashboard() {
                                   {performance.participantNames.join(', ')}
                                 </p>
                               )}
-                              <p className={`text-xs ${performance.status === 'completed' ? 'text-green-600' : performance.announced ? 'text-gray-400' : 'text-gray-600'}`}>
-                                Duration: {performance.duration}min • {performance.entryType?.toUpperCase()}
-                              </p>
+                          <p className={`text-xs ${performance.status === 'completed' ? 'text-green-600' : performance.announced ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {performance.entryType?.toUpperCase()}
+                            {presenceByPerformance[performance.id]?.present !== undefined && (
+                              <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                presenceByPerformance[performance.id]?.present ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {presenceByPerformance[performance.id]?.present ? 'Music Check-in OK' : 'Check-in Pending'}
+                              </span>
+                            )}
+                          </p>
                             </div>
                           </div>
                           {performance.performedAt && (
@@ -642,7 +652,7 @@ export default function AnnouncerDashboard() {
                 </div>
 
                 <div className="mt-10">
-                  <div className="text-xl text-gray-500 mb-4">Next up</ndiv>
+                  <div className="text-xl text-gray-500 mb-4">Next up</div>
                   <div className="flex items-center space-x-4">
                     {performances.filter(p => !activePrompt || p.id !== activePrompt.id).filter(p => p.status !== 'completed').slice(0, 3).map(p => (
                       <div key={p.id} className="px-4 py-3 border border-gray-200 rounded-xl bg-white shadow-sm text-xl text-gray-800">

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import RealtimeUpdates from '@/components/RealtimeUpdates';
 import { useRouter } from 'next/navigation';
 import MusicPlayer from '@/components/MusicPlayer';
 import VideoPlayer from '@/components/VideoPlayer';
@@ -43,6 +42,7 @@ interface Performance {
   musicFileName?: string;
   videoExternalUrl?: string;
   videoExternalType?: 'youtube' | 'vimeo' | 'other';
+  performanceTypeLabel?: 'Solo' | 'Duet' | 'Trio' | 'Group';
 }
 
 interface Score {
@@ -646,11 +646,6 @@ export default function JudgeDashboard() {
   };
 
     return (
-      <RealtimeUpdates
-        eventId={selectedEventId || assignments[0]?.eventId || ''}
-        onPerformanceReorder={handlePerformanceReorder}
-        onPerformanceStatus={handlePerformanceStatus}
-      >
       <div className="min-h-screen bg-gray-50">
       {/* Professional Header */}
       <div className="bg-white shadow-sm border-b">
@@ -978,7 +973,6 @@ export default function JudgeDashboard() {
                   </button>
                 </div>
       </div>
-      </RealtimeUpdates>
     );
           })()
         )}
@@ -1106,7 +1100,9 @@ export default function JudgeDashboard() {
                                 {performance.itemNumber || '?'}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-black text-lg md:text-lg mobile-performance-title truncate uppercase">{performance.title}</h3>
+                                <h3 className="font-bold text-black text-lg md:text-lg mobile-performance-title truncate uppercase">
+                                  #{performance.itemNumber || '?'} — {performance.title}
+                                </h3>
                                 <p className="text-black mobile-performance-details truncate text-xs sm:text-sm hidden sm:block">{performance.participantNames.join(', ')}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   {performance.mastery && (

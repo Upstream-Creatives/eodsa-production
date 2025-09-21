@@ -173,6 +173,18 @@ export default function RegistrationDashboard() {
           )
         );
 
+        // Broadcast presence update for realtime dashboards
+        try {
+          const { socketClient } = await import('@/lib/socket-client');
+          socketClient.emit('presence:update' as any, {
+            performanceId,
+            eventId: selectedEvent,
+            present: !currentlyPresent,
+            checkedInBy: user.id,
+            checkedInAt: new Date().toISOString()
+          } as any);
+        } catch {}
+
         const action = !currentlyPresent ? 'checked in' : 'marked absent';
         success(`"${title}" ${action} successfully`);
       } else {

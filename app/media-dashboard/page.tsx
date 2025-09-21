@@ -151,15 +151,15 @@ export default function MediaDashboard() {
       const performancesData = await performancesRes.json();
       
       if (performancesData.success) {
-        // Sort by item number, then by creation time
-        const sortedPerformances = performancesData.performances.sort((a: Performance, b: Performance) => {
-          if (a.itemNumber && b.itemNumber) {
-            return a.itemNumber - b.itemNumber;
-          } else if (a.itemNumber && !b.itemNumber) {
-            return -1;
-          } else if (!a.itemNumber && b.itemNumber) {
-            return 1;
-          }
+        // Virtual program: sort by virtualItemNumber if entryType is virtual and virtualItemNumber exists
+        const sortedPerformances = performancesData.performances.sort((a: any, b: any) => {
+          const aIsVirtual = a.entryType === 'virtual';
+          const bIsVirtual = b.entryType === 'virtual';
+          const aNum = aIsVirtual && a.virtualItemNumber ? a.virtualItemNumber : a.itemNumber;
+          const bNum = bIsVirtual && b.virtualItemNumber ? b.virtualItemNumber : b.itemNumber;
+          if (aNum && bNum) return aNum - bNum;
+          if (aNum && !bNum) return -1;
+          if (!aNum && bNum) return 1;
           return a.title.localeCompare(b.title);
         });
         
@@ -194,6 +194,9 @@ export default function MediaDashboard() {
       )
     );
   };
+
+  // Ensure realtime reorder and status updates are wired via RealtimeUpdates wrapper
+  // (already present above in JSX)
 
   const getContestantDetails = (contestantId: string) => {
     return contestants.find(c => c.id === contestantId);

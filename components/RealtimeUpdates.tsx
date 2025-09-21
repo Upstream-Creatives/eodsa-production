@@ -8,6 +8,7 @@ interface RealtimeUpdatesProps {
   onPerformanceReorder?: (performances: any[]) => void;
   onPerformanceStatus?: (data: any) => void;
   onEventControl?: (data: any) => void;
+  onPresenceUpdate?: (data: any) => void;
   children?: React.ReactNode;
 }
 
@@ -16,6 +17,7 @@ export default function RealtimeUpdates({
   onPerformanceReorder,
   onPerformanceStatus,
   onEventControl,
+  onPresenceUpdate,
   children
 }: RealtimeUpdatesProps) {
   const [notifications, setNotifications] = useState<string[]>([]);
@@ -53,18 +55,27 @@ export default function RealtimeUpdates({
       }
     };
 
+    const handlePresence = (data: any) => {
+      if (data.eventId === eventId && onPresenceUpdate) {
+        onPresenceUpdate(data);
+        addNotification(`👥 Presence: ${data.present ? 'Present' : 'Absent'}`);
+      }
+    };
+
     socket.on('performance:reorder' as any, handleReorder as any);
     socket.on('performance:status' as any, handleStatus as any);
     socket.on('event:control' as any, handleEventControl as any);
     socket.on('notification' as any, handleNotification as any);
+    socket.on('presence:update' as any, handlePresence as any);
 
     return () => {
       socket.off('performance:reorder' as any, handleReorder as any);
       socket.off('performance:status' as any, handleStatus as any);
       socket.off('event:control' as any, handleEventControl as any);
       socket.off('notification' as any, handleNotification as any);
+      socket.off('presence:update' as any, handlePresence as any);
     };
-  }, [socket.connected, eventId, onPerformanceReorder, onPerformanceStatus, onEventControl]);
+  }, [socket.connected, eventId, onPerformanceReorder, onPerformanceStatus, onEventControl, onPresenceUpdate]);
 
   const addNotification = (message: string) => {
     setNotifications(prev => [...prev.slice(-4), message]); // Keep last 5
