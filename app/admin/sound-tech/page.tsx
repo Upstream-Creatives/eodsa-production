@@ -37,6 +37,8 @@ interface EventEntry {
   videoExternalUrl?: string;
   videoExternalType?: string;
   eventName?: string;
+  // From performances mapping when single event selected
+  musicCue?: 'onstage' | 'offstage';
 }
 
 interface Event {
@@ -92,15 +94,17 @@ function SoundTechPage() {
             const perfRes = await fetch(`/api/events/${selectedEvent}/performances`);
             const perfData = await perfRes.json();
             if (perfData.success) {
-              const map = new Map<string, number>();
+              const numMap = new Map<string, number>();
+              const cueMap = new Map<string, 'onstage' | 'offstage'>();
               for (const p of perfData.performances) {
                 if (p.eventEntryId && p.itemNumber) {
-                  map.set(p.eventEntryId, p.itemNumber);
+                  numMap.set(p.eventEntryId, p.itemNumber);
                 }
+                if (p.eventEntryId && p.musicCue) cueMap.set(p.eventEntryId, p.musicCue);
               }
               baseEntries = baseEntries.map((e: any) => (
-                e.eventId === selectedEvent && map.has(e.id)
-                  ? { ...e, itemNumber: map.get(e.id) }
+                e.eventId === selectedEvent
+                  ? { ...e, itemNumber: numMap.get(e.id) ?? e.itemNumber, musicCue: cueMap.get(e.id) }
                   : e
               ));
             }
@@ -242,12 +246,14 @@ function SoundTechPage() {
       const perfRes = await fetch(`/api/events/${selectedEvent}/performances`);
       const perfData = await perfRes.json();
       if (perfData.success) {
-        const map = new Map<string, number>();
+        const numMap = new Map<string, number>();
+        const cueMap = new Map<string, 'onstage' | 'offstage'>();
         for (const p of perfData.performances) {
-          if (p.eventEntryId && p.itemNumber) map.set(p.eventEntryId, p.itemNumber);
+          if (p.eventEntryId && p.itemNumber) numMap.set(p.eventEntryId, p.itemNumber);
+          if (p.eventEntryId && p.musicCue) cueMap.set(p.eventEntryId, p.musicCue);
         }
         setEntries(prev => prev.map((e: any) => (
-          e.eventId === selectedEvent && map.has(e.id) ? { ...e, itemNumber: map.get(e.id) } : e
+          e.eventId === selectedEvent ? { ...e, itemNumber: numMap.get(e.id) ?? e.itemNumber, musicCue: cueMap.get(e.id) ?? e.musicCue } : e
         )));
       }
     } catch {
@@ -259,6 +265,26 @@ function SoundTechPage() {
     <RealtimeUpdates
       eventId={selectedEvent !== 'all' ? selectedEvent : ''}
       onPerformanceReorder={handleRealtimeReorder}
+      onPerformanceMusicCue={async (data) => {
+        // Update in place for specific event; if in All, fetch the single performance to map
+        if (selectedEvent && selectedEvent !== 'all') {
+          setEntries(prev => prev.map((e: any) => (
+            e.eventId === selectedEvent && e.id === data.performanceId ? e : e
+          )));
+          // We map by eventEntry; refresh mapping quickly
+          await handleRealtimeReorder();
+        } else {
+          try {
+            const perfRes = await fetch(`/api/performances/${data.performanceId}`);
+            const perfData = await perfRes.json();
+            if (perfData.success) {
+              setEntries(prev => prev.map((e: any) => (
+                e.id === perfData.performance.eventEntryId ? { ...e, musicCue: perfData.performance.musicCue } : e
+              )));
+            }
+          } catch {}
+        }
+      }}
     >
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -418,6 +444,11 @@ function SoundTechPage() {
                             </h3>
                             <p className="text-sm text-black">
                               {getPerformanceType(entry.participantIds)} • Style: {entry.itemStyle}
+                              {entry.musicCue && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800">
+                                  {entry.musicCue === 'onstage' ? 'Music: Onstage' : 'Music: Offstage'}
+                                </span>
+                              )}
                             </p>
                             {/* Age category not stored on entry; omit to avoid type errors */}
                             <p className="text-xs text-gray-600">

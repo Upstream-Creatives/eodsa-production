@@ -653,16 +653,21 @@ export const db = {
     const sqlClient = getSql();
     const id = Date.now().toString();
     
+    // Ensure optional music cue column exists
+    try {
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS music_cue TEXT`;
+    } catch {}
+
     await sqlClient`
       INSERT INTO performances (
         id, event_id, event_entry_id, contestant_id, title, participant_names, duration,
-        choreographer, mastery, item_style, scheduled_time, status, item_number
+        choreographer, mastery, item_style, scheduled_time, status, item_number, music_cue
       )
       VALUES (
         ${id}, ${performance.eventId}, ${performance.eventEntryId}, ${performance.contestantId}, ${performance.title},
         ${JSON.stringify(performance.participantNames)}, ${performance.duration}, ${performance.choreographer},
         ${performance.mastery}, ${performance.itemStyle}, ${performance.scheduledTime || null}, ${performance.status},
-        ${performance.itemNumber || null}
+        ${performance.itemNumber || null}, ${((performance as any).musicCue) || null}
       )
     `;
     
@@ -693,7 +698,8 @@ export const db = {
       itemStyle: row.item_style,
       scheduledTime: row.scheduled_time,
       status: row.status,
-      contestantName: row.contestant_name
+      contestantName: row.contestant_name,
+      musicCue: row.music_cue || null
     })) as (Performance & { contestantName: string })[];
   },
 
@@ -724,7 +730,8 @@ export const db = {
       itemStyle: row.item_style,
       scheduledTime: row.scheduled_time,
       status: row.status,
-      contestantName: row.contestant_name
+      contestantName: row.contestant_name,
+      musicCue: row.music_cue || null
     } as Performance & { contestantName: string };
   },
 
@@ -754,6 +761,20 @@ export const db = {
     await sqlClient`
       UPDATE performances 
       SET status = ${status}
+      WHERE id = ${performanceId}
+    `;
+    return true;
+  },
+
+  async updatePerformanceMusicCue(performanceId: string, musicCue: 'onstage' | 'offstage') {
+    const sqlClient = getSql();
+    // Ensure column exists
+    try {
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS music_cue TEXT`;
+    } catch {}
+    await sqlClient`
+      UPDATE performances
+      SET music_cue = ${musicCue}
       WHERE id = ${performanceId}
     `;
     return true;
@@ -1741,7 +1762,8 @@ export const db = {
         musicFileName: row.music_file_name,
         videoExternalUrl: row.video_external_url,
         videoExternalType: row.video_external_type,
-        announcerNotes: row.announcer_notes || null
+        announcerNotes: row.announcer_notes || null,
+        musicCue: row.music_cue || null
       } as Performance & { contestantName: string };
     }));
 

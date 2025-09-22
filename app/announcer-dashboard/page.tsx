@@ -24,6 +24,7 @@ interface Performance {
   musicFileUrl?: string;
   musicFileName?: string;
   announcerNotes?: string | null;
+  musicCue?: 'onstage' | 'offstage';
   performedBy?: string;
   performedAt?: string;
 }
@@ -325,6 +326,9 @@ export default function AnnouncerDashboard() {
       eventId={selectedEvent}
       onPerformanceReorder={handlePerformanceReorder}
       onPerformanceStatus={handlePerformanceStatus}
+      onPerformanceMusicCue={(data) => {
+        setPerformances(prev => prev.map(p => p.id === data.performanceId ? { ...p, musicCue: data.musicCue } : p));
+      }}
       onPresenceUpdate={(data) => {
         setPresenceByPerformance(prev => ({ ...prev, [data.performanceId]: { present: data.present, checkedInAt: data.checkedInAt, checkedInBy: data.checkedInBy } }));
       }}
@@ -525,6 +529,11 @@ export default function AnnouncerDashboard() {
                               <p className={`text-sm ${performance.status === 'completed' ? 'text-green-700' : performance.announced ? 'text-gray-500' : 'text-black'}`}>
                                 <strong>Style:</strong> {performance.itemStyle} • <strong>Level:</strong> {performance.mastery}
                               </p>
+                              {performance.musicCue && (
+                                <p className={`text-sm ${performance.status === 'completed' ? 'text-green-700' : performance.announced ? 'text-gray-500' : 'text-black'}`}>
+                                  <strong>Music cue:</strong> {performance.musicCue === 'onstage' ? 'Onstage (start when in position)' : 'Offstage (start while walking on)'}
+                                </p>
+                              )}
                               {performance.ageCategory && (
                                 <p className={`text-sm ${performance.status === 'completed' ? 'text-green-700' : performance.announced ? 'text-gray-500' : 'text-black'}`}>
                                   <strong>Age Category:</strong> {performance.ageCategory}

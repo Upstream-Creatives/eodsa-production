@@ -35,6 +35,7 @@ interface Performance {
   entryType?: 'live' | 'virtual';
   musicFileUrl?: string;
   videoExternalUrl?: string;
+  musicCue?: 'onstage' | 'offstage';
 }
 
 interface Event {
@@ -49,11 +50,13 @@ interface Event {
 function SortablePerformanceItem({ 
   performance, 
   updatePerformanceStatus, 
-  onPlayMusic 
+  onPlayMusic,
+  onUpdateMusicCue
 }: { 
   performance: Performance; 
   updatePerformanceStatus: (id: string, status: Performance['status']) => void;
   onPlayMusic: (performance: Performance) => void;
+  onUpdateMusicCue: (id: string, cue: 'onstage' | 'offstage') => void;
 }) {
   const {
     attributes,
@@ -143,6 +146,23 @@ function SortablePerformanceItem({
                 {performance.entryType === 'live' ? '🎵' : performance.entryType === 'virtual' ? '📹' : '🚫'}
               </span>
             </button>
+          )}
+
+          {/* Music Cue Toggle */}
+          {!isDragging && (
+            <div className="flex items-center space-x-2 mr-2">
+              <span className="text-xs text-gray-200">Music:</span>
+              <label className={`px-2 py-1 text-xs rounded cursor-pointer ${performance.musicCue === 'onstage' ? 'bg-green-600' : 'bg-gray-600'}`}
+                onClick={() => onUpdateMusicCue(performance.id, 'onstage')}
+                title="Music starts when contestant is on stage">
+                Onstage
+              </label>
+              <label className={`px-2 py-1 text-xs rounded cursor-pointer ${performance.musicCue === 'offstage' ? 'bg-green-600' : 'bg-gray-600'}`}
+                onClick={() => onUpdateMusicCue(performance.id, 'offstage')}
+                title="Music starts while contestant walks on">
+                Offstage
+              </label>
+            </div>
           )}
 
           {/* Status buttons with full lifecycle control */}
@@ -393,6 +413,32 @@ export default function BackstageDashboard() {
       console.error('Error loading event data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const updateMusicCue = async (performanceId: string, cue: 'onstage' | 'offstage') => {
+    try {
+      const res = await fetch(`/api/performances/${performanceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ musicCue: cue })
+      });
+      if (res.ok) {
+        setPerformances(prev => prev.map(p => p.id === performanceId ? { ...p, musicCue: cue } : p));
+        // Broadcast to other dashboards
+        socket.emit('performance:music_cue', {
+          eventId,
+          performanceId,
+          musicCue: cue,
+          timestamp: new Date().toISOString()
+        });
+        success(`Music cue set to ${cue}`);
+      } else {
+        error('Failed to update music cue');
+      }
+    } catch (e) {
+      console.error('Error updating music cue:', e);
+      error('Failed to update music cue');
     }
   };
 
@@ -755,6 +801,7 @@ export default function BackstageDashboard() {
                   performance={performance}
                   updatePerformanceStatus={updatePerformanceStatus}
                   onPlayMusic={handlePlayMusic}
+                  onUpdateMusicCue={updateMusicCue}
                 />
               ))}
             </div>

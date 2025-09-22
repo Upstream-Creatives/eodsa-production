@@ -130,6 +130,8 @@ export interface Performance {
   choreographer: string;
   mastery: string; // UPDATED: New mastery levels
   itemStyle: string;
+  // NEW: Music cue preference to guide sound start timing
+  musicCue?: 'onstage' | 'offstage';
 }
 
 export interface Judge {

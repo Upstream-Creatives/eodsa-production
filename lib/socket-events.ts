@@ -19,6 +19,14 @@ export interface SocketEvents {
     timestamp: string;
   };
 
+  // Performance music cue updates
+  'performance:music_cue': {
+    performanceId: string;
+    eventId: string;
+    musicCue: 'onstage' | 'offstage';
+    timestamp: string;
+  };
+
   // New entry added
   'entry:created': {
     eventId: string;

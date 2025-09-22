@@ -7,6 +7,7 @@ interface RealtimeUpdatesProps {
   eventId: string;
   onPerformanceReorder?: (performances: any[]) => void;
   onPerformanceStatus?: (data: any) => void;
+  onPerformanceMusicCue?: (data: { performanceId: string; musicCue: 'onstage' | 'offstage'; eventId?: string }) => void;
   onEventControl?: (data: any) => void;
   onPresenceUpdate?: (data: any) => void;
   children?: React.ReactNode;
@@ -16,6 +17,7 @@ export default function RealtimeUpdates({
   eventId,
   onPerformanceReorder,
   onPerformanceStatus,
+  onPerformanceMusicCue,
   onEventControl,
   onPresenceUpdate,
   children
@@ -42,6 +44,13 @@ export default function RealtimeUpdates({
       }
     };
 
+    const handleMusicCue = (data: any) => {
+      if ((!eventId || data.eventId === eventId) && onPerformanceMusicCue) {
+        onPerformanceMusicCue(data);
+        addNotification(`🎵 Music cue: ${data.musicCue}`);
+      }
+    };
+
     const handleEventControl = (data: any) => {
       if ((!eventId || data.eventId === eventId) && onEventControl) {
         onEventControl(data);
@@ -64,6 +73,7 @@ export default function RealtimeUpdates({
 
     socket.on('performance:reorder' as any, handleReorder as any);
     socket.on('performance:status' as any, handleStatus as any);
+    socket.on('performance:music_cue' as any, handleMusicCue as any);
     socket.on('event:control' as any, handleEventControl as any);
     socket.on('notification' as any, handleNotification as any);
     socket.on('presence:update' as any, handlePresence as any);
@@ -71,6 +81,7 @@ export default function RealtimeUpdates({
     return () => {
       socket.off('performance:reorder' as any, handleReorder as any);
       socket.off('performance:status' as any, handleStatus as any);
+      socket.off('performance:music_cue' as any, handleMusicCue as any);
       socket.off('event:control' as any, handleEventControl as any);
       socket.off('notification' as any, handleNotification as any);
       socket.off('presence:update' as any, handlePresence as any);
