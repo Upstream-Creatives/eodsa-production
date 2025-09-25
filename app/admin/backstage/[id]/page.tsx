@@ -98,16 +98,6 @@ function SortablePerformanceItem({
         ${selectedForMove === performance.id ? 'ring-4 ring-yellow-400' : ''}
       `}
     >
-      {/* Desktop drag area */}
-      <div
-        {...listeners}
-        className="hidden md:block absolute inset-0 cursor-grab active:cursor-grabbing"
-        style={{
-          WebkitTouchCallout: 'none',
-          WebkitUserSelect: 'none',
-          touchAction: isDragging ? 'none' : 'manipulation',
-        }}
-      />
       
       {/* Mobile/Desktop responsive content */}
       <div className="p-3 md:p-4">
@@ -115,6 +105,20 @@ function SortablePerformanceItem({
         <div className="md:hidden">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-3">
+              {/* Drag handle for ALL devices (large touch target) */}
+              <button
+                aria-label="Drag to reorder"
+                {...listeners}
+                className="w-10 h-16 rounded-lg bg-gray-600 text-white flex flex-col items-center justify-center active:cursor-grabbing cursor-grab select-none"
+                style={{
+                  WebkitTouchCallout: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: isDragging ? 'none' : 'manipulation',
+                }}
+              >
+                <span className="text-lg leading-none">⋮</span>
+                <span className="text-lg leading-none -mt-1">⋮</span>
+              </button>
               {/* Compact item number */}
               <div className={`w-16 h-16 rounded-lg flex flex-col items-center justify-center font-bold border-2 ${
                 performance.status === 'completed' ? 'bg-green-500 border-green-400 text-white'
@@ -241,6 +245,35 @@ function SortablePerformanceItem({
 
           {/* Desktop controls */}
           <div className="flex items-center space-x-2">
+            {/* Desktop select + arrow controls (unified with mobile) */}
+            <button
+              onClick={() => setSelectedForMove(selectedForMove === performance.id ? null : performance.id)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                selectedForMove === performance.id 
+                  ? 'bg-yellow-400 text-black' 
+                  : 'bg-gray-600 text-white hover:bg-gray-500'
+              }`}
+            >
+              {selectedForMove === performance.id ? 'Selected' : 'Select'}
+            </button>
+            {selectedForMove === performance.id && (
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => movePerformanceUp(performance.id)}
+                  disabled={performances.findIndex(p => p.id === performance.id) === 0}
+                  className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={() => movePerformanceDown(performance.id)}
+                  disabled={performances.findIndex(p => p.id === performance.id) === performances.length - 1}
+                  className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  ↓
+                </button>
+              </div>
+            )}
             {/* Music/Video Play Button */}
             {!isDragging && (
               <button
@@ -272,10 +305,7 @@ function SortablePerformanceItem({
               {performance.status.toUpperCase()}
             </div>
 
-            {/* Drag indicator */}
-            <div className="text-gray-300 p-3 rounded-lg bg-gray-600 text-white">
-              <div className="text-xl font-bold">⋮⋮</div>
-            </div>
+            {/* No drag indicator; selection + arrows used on all devices */}
           </div>
         </div>
       </div>
