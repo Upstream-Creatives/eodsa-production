@@ -36,7 +36,8 @@ export default function RealtimeUpdates({
   useEffect(() => {
     if (!socket.connected) return;
 
-    const withinScope = (data: any) => (!strictEvent && !eventId) || (data?.eventId === eventId);
+    // If strictEvent is true but eventId is empty (e.g., "All"), treat as wildcard
+    const withinScope = (data: any) => (!strictEvent || !eventId) || (data?.eventId === eventId);
 
     const handleReorder = (data: any) => {
       if (withinScope(data) && onPerformanceReorder) {
