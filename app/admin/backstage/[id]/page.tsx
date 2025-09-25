@@ -53,12 +53,22 @@ function SortablePerformanceItem({
   performance, 
   updatePerformanceStatus, 
   onPlayMusic,
-  onUpdateMusicCue
+  onUpdateMusicCue,
+  selectedForMove,
+  movePerformanceUp,
+  movePerformanceDown,
+  setSelectedForMove,
+  performances
 }: { 
   performance: Performance; 
   updatePerformanceStatus: (id: string, status: Performance['status']) => void;
   onPlayMusic: (performance: Performance) => void;
   onUpdateMusicCue: (id: string, cue: 'onstage' | 'offstage') => void;
+  selectedForMove: string | null;
+  movePerformanceUp: (id: string) => void;
+  movePerformanceDown: (id: string) => void;
+  setSelectedForMove: (id: string | null) => void;
+  performances: Performance[];
 }) {
   const {
     attributes,
@@ -872,6 +882,11 @@ export default function BackstageDashboard() {
                   updatePerformanceStatus={updatePerformanceStatus}
                   onPlayMusic={handlePlayMusic}
                   onUpdateMusicCue={updateMusicCue}
+                  selectedForMove={selectedForMove}
+                  movePerformanceUp={movePerformanceUp}
+                  movePerformanceDown={movePerformanceDown}
+                  setSelectedForMove={setSelectedForMove}
+                  performances={performances}
                 />
               ))}
             </div>
