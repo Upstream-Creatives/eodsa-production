@@ -149,6 +149,24 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_by TEXT`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_at TEXT`;
 
+    // GABRIEL'S SCORE APPROVAL TABLE
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS score_approvals (
+        id TEXT PRIMARY KEY,
+        performance_id TEXT NOT NULL,
+        judge_id TEXT NOT NULL,
+        judge_name TEXT NOT NULL,
+        performance_title TEXT NOT NULL,
+        score_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        approved_by TEXT,
+        approved_at TEXT,
+        rejected BOOLEAN DEFAULT FALSE,
+        rejection_reason TEXT,
+        created_at TEXT NOT NULL
+      )
+    `;
+
     console.log('✅ Database schema is up to date.');
     
     // Return the database object for use in API routes
@@ -1005,9 +1023,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.id = ${eventId}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.id = ${eventId} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else {
@@ -1035,6 +1054,7 @@ export const db = {
               JOIN events e ON p.event_id = e.id
               JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN scores s ON p.id = s.performance_id
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
               WHERE e.id = ${eventId}
               GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
               HAVING COUNT(s.id) > 0
@@ -1068,9 +1088,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else if (region && ageCategory) {
@@ -1095,9 +1116,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region} AND e.age_category = ${ageCategory}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else if (region) {
@@ -1122,9 +1144,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.region = ${region} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else {
@@ -1149,8 +1172,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         }
@@ -1253,8 +1278,10 @@ export const db = {
         FROM events e
         JOIN performances p ON e.id = p.event_id
         LEFT JOIN scores s ON p.id = s.performance_id
+        LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+        WHERE sa.id IS NOT NULL
         GROUP BY e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, e.venue
-        HAVING COUNT(DISTINCT s.id) > 0
+        HAVING COUNT(DISTINCT sa.id) > 0
         ORDER BY e.event_date DESC, e.name
       ` as any[];
       
