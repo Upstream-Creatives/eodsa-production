@@ -361,20 +361,34 @@ export default function JudgeDashboard() {
           const performancesData = await performancesResponse.json();
           const perfs: any[] = performancesData.performances || [];
           await Promise.all(perfs.map(async (performance: any) => {
-            // Fetch judge's score and overall scoring status concurrently
-            const [scoreRes, statusRes] = await Promise.all([
-              fetch(`/api/scores/${performance.id}/${judgeId}`),
-              fetch(`/api/scores/performance/${performance.id}`)
-            ]);
-            const scoreData = await scoreRes.json().catch(() => ({}));
-            const scoringStatusData = await statusRes.json().catch(() => ({}));
-            allPerformances.push({
-              ...performance,
-              hasScore: scoreData.success && scoreData.score,
-              judgeScore: scoreData.score,
-              isFullyScored: scoringStatusData.success ? scoringStatusData.scoringStatus.isFullyScored : false,
-              scoringStatus: scoringStatusData.success ? scoringStatusData.scoringStatus : null
-            });
+            try {
+              // Fetch judge's score and overall scoring status concurrently
+              const [scoreRes, statusRes] = await Promise.all([
+                fetch(`/api/scores/${performance.id}/${judgeId}`).catch(() => ({ ok: false, json: () => Promise.resolve({}) })),
+                fetch(`/api/scores/performance/${performance.id}`).catch(() => ({ ok: false, json: () => Promise.resolve({}) }))
+              ]);
+              
+              const scoreData = scoreRes.ok ? await scoreRes.json().catch(() => ({})) : {};
+              const scoringStatusData = statusRes.ok ? await statusRes.json().catch(() => ({})) : {};
+              
+              allPerformances.push({
+                ...performance,
+                hasScore: scoreData.success && scoreData.score,
+                judgeScore: scoreData.score,
+                isFullyScored: scoringStatusData.success ? scoringStatusData.scoringStatus?.isFullyScored : false,
+                scoringStatus: scoringStatusData.success ? scoringStatusData.scoringStatus : null
+              });
+            } catch (error) {
+              console.warn(`Failed to load score data for performance ${performance.id}:`, error);
+              // Add performance without score data
+              allPerformances.push({
+                ...performance,
+                hasScore: false,
+                judgeScore: null,
+                isFullyScored: false,
+                scoringStatus: null
+              });
+            }
           }));
         }));
         

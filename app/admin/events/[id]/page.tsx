@@ -871,13 +871,16 @@ function EventParticipantsPage() {
           performanceTitle,
           ...data.scoringStatus
         });
+      } else if (response.status === 404) {
+        showAlert('Performance not found or no scoring data available', 'warning');
+        setShowScoresModal(false);
       } else {
         showAlert('Failed to load performance scores', 'error');
         setShowScoresModal(false);
       }
     } catch (error) {
       console.error('Error loading scores:', error);
-      showAlert('Failed to load performance scores', 'error');
+      showAlert('Network error loading performance scores', 'error');
       setShowScoresModal(false);
     } finally {
       setLoadingScores(false);
