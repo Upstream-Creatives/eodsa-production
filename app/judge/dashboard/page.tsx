@@ -354,6 +354,14 @@ export default function JudgeDashboard() {
         const assignmentsData = await assignmentsResponse.json();
         setAssignments(assignmentsData.assignments || []);
         
+        // Join judge rooms for all assigned events
+        import('@/lib/socket-client').then(({ socketClient }) => {
+          (assignmentsData.assignments || []).forEach((assignment: any) => {
+            socketClient.joinAsJudge(assignment.eventId, judgeId);
+            console.log(`⚖️ Joined judge room for event: ${assignment.eventId}`);
+          });
+        });
+        
         // Load ALL performances for all assigned events (batched and parallelized)
         const allPerformances: PerformanceWithScore[] = [];
         await Promise.all((assignmentsData.assignments || []).map(async (assignment: any) => {

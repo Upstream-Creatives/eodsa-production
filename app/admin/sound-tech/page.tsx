@@ -39,6 +39,7 @@ interface EventEntry {
   eventName?: string;
   // From performances mapping when single event selected
   musicCue?: 'onstage' | 'offstage';
+  performanceOrder?: number;
 }
 
 interface Event {
@@ -72,6 +73,16 @@ function SoundTechPage() {
 
     fetchData();
   }, [router]);
+
+  // Join sound room for real-time updates
+  useEffect(() => {
+    if (selectedEvent && selectedEvent !== 'all') {
+      import('@/lib/socket-client').then(({ socketClient }) => {
+        socketClient.joinAsSound(selectedEvent);
+        console.log(`🎵 Joined sound room for event: ${selectedEvent}`);
+      });
+    }
+  }, [selectedEvent]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -152,8 +163,11 @@ function SoundTechPage() {
     
     return matchesEvent && matchesEntryType && matchesSearch;
   });
-  // Sort consistently by program order then name
+  // Sort consistently by performance order (from backstage), fallback to item number then name
   const sortedFilteredEntries = [...filteredEntries].sort((a, b) => {
+    // Primary: Use performance order from backstage if available
+    if (a.performanceOrder && b.performanceOrder) return a.performanceOrder - b.performanceOrder;
+    // Fallback: Use item number if performance order not available  
     if (a.itemNumber && b.itemNumber) return a.itemNumber - b.itemNumber;
     if (a.itemNumber && !b.itemNumber) return -1;
     if (!a.itemNumber && b.itemNumber) return 1;
@@ -237,7 +251,7 @@ function SoundTechPage() {
   }
 
   const handleRealtimeReorder = async () => {
-    // Update item numbers from the latest performances without disrupting filters
+    // Update item numbers and performance order from the latest performances without disrupting filters
     if (!selectedEvent || selectedEvent === 'all') {
       await fetchData();
       return;
@@ -248,13 +262,34 @@ function SoundTechPage() {
       if (perfData.success) {
         const numMap = new Map<string, number>();
         const cueMap = new Map<string, 'onstage' | 'offstage'>();
+        const orderMap = new Map<string, number>();
         for (const p of perfData.performances) {
           if (p.eventEntryId && p.itemNumber) numMap.set(p.eventEntryId, p.itemNumber);
           if (p.eventEntryId && p.musicCue) cueMap.set(p.eventEntryId, p.musicCue);
+          if (p.eventEntryId && p.performanceOrder) orderMap.set(p.eventEntryId, p.performanceOrder);
         }
-        setEntries(prev => prev.map((e: any) => (
-          e.eventId === selectedEvent ? { ...e, itemNumber: numMap.get(e.id) ?? e.itemNumber, musicCue: cueMap.get(e.id) ?? e.musicCue } : e
-        )));
+        setEntries(prev => {
+          const updated = prev.map((e: any) => (
+            e.eventId === selectedEvent 
+              ? { 
+                  ...e, 
+                  itemNumber: numMap.get(e.id) ?? e.itemNumber, 
+                  musicCue: cueMap.get(e.id) ?? e.musicCue,
+                  performanceOrder: orderMap.get(e.id) ?? e.performanceOrder
+                } 
+              : e
+          ));
+          // Re-sort by performance order if available, fallback to item number
+          return updated.sort((a, b) => {
+            if (a.performanceOrder && b.performanceOrder) {
+              return a.performanceOrder - b.performanceOrder;
+            }
+            if (a.itemNumber && b.itemNumber) {
+              return a.itemNumber - b.itemNumber;
+            }
+            return a.itemName.localeCompare(b.itemName);
+          });
+        });
       }
     } catch {
       await fetchData();

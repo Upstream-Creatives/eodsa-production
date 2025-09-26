@@ -23,7 +23,6 @@ import {
 import {CSS} from '@dnd-kit/utilities';
 import { useBackstageSocket } from '@/hooks/useSocket';
 import { useToast } from '@/components/ui/simple-toast';
-import BackstageMusicPlayer from '@/components/BackstageMusicPlayer';
 
 interface Performance {
   id: string;
@@ -52,7 +51,6 @@ interface Event {
 function SortablePerformanceItem({ 
   performance, 
   updatePerformanceStatus, 
-  onPlayMusic,
   onUpdateMusicCue,
   selectedForMove,
   movePerformanceUp,
@@ -62,7 +60,6 @@ function SortablePerformanceItem({
 }: { 
   performance: Performance; 
   updatePerformanceStatus: (id: string, status: Performance['status']) => void;
-  onPlayMusic: (performance: Performance) => void;
   onUpdateMusicCue: (id: string, cue: 'onstage' | 'offstage') => void;
   selectedForMove: string | null;
   movePerformanceUp: (id: string) => void;
@@ -90,7 +87,8 @@ function SortablePerformanceItem({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`relative rounded-xl border-2 transition-all duration-150 select-none
+      {...listeners}
+      className={`relative rounded-xl border-2 transition-all duration-150 select-none cursor-grab active:cursor-grabbing
         ${isDragging ? 'z-50 shadow-2xl scale-105' : ''}
         ${performance.status === 'completed' ? 'bg-green-700 border-green-500' 
         : performance.status === 'in_progress' ? 'bg-blue-700 border-blue-500'
@@ -117,7 +115,10 @@ function SortablePerformanceItem({
               
               {/* Mobile select button */}
               <button
-                onClick={() => setSelectedForMove(selectedForMove === performance.id ? null : performance.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedForMove(selectedForMove === performance.id ? null : performance.id);
+                }}
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   selectedForMove === performance.id 
                     ? 'bg-yellow-400 text-black' 
@@ -132,14 +133,20 @@ function SortablePerformanceItem({
             {selectedForMove === performance.id && (
               <div className="flex space-x-2">
                 <button
-                  onClick={() => movePerformanceUp(performance.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    movePerformanceUp(performance.id);
+                  }}
                   disabled={performances.findIndex(p => p.id === performance.id) === 0}
                   className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   ↑
                 </button>
                 <button
-                  onClick={() => movePerformanceDown(performance.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    movePerformanceDown(performance.id);
+                  }}
                   disabled={performances.findIndex(p => p.id === performance.id) === performances.length - 1}
                   className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
@@ -158,18 +165,6 @@ function SortablePerformanceItem({
 
           {/* Mobile action buttons */}
           <div className="flex flex-wrap gap-2">
-            {performance.musicFileUrl && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPlayMusic(performance);
-                }}
-                className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm"
-              >
-                🎵 Play
-              </button>
-            )}
-            
             <button 
               onClick={(e) => {
                 e.stopPropagation();
@@ -317,27 +312,22 @@ function SortablePerformanceItem({
                 </button>
               </div>
             )}
-            {/* Music/Video Play Button */}
-            {!isDragging && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPlayMusic(performance);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-                className={`p-3 rounded-lg transition-all duration-150 border-2 ${
-                  performance.entryType === 'live' && performance.musicFileUrl
-                    ? 'bg-green-600 hover:bg-green-700 border-green-400 text-white'
-                    : performance.entryType === 'virtual' && performance.videoExternalUrl
-                    ? 'bg-blue-600 hover:bg-blue-700 border-blue-400 text-white'
-                    : 'bg-gray-600 border-gray-500 text-gray-300 opacity-50 cursor-not-allowed'
-                }`}
-                disabled={!performance.musicFileUrl && !performance.videoExternalUrl}
-              >
-                {performance.entryType === 'live' ? '🎵' : performance.entryType === 'virtual' ? '📹' : '🚫'}
-              </button>
-            )}
+
+            {/* On-stage/Off-stage Toggle - Desktop */}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateMusicCue(performance.id, performance.musicCue === 'onstage' ? 'offstage' : 'onstage');
+              }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                performance.musicCue === 'onstage' 
+                  ? 'bg-green-600 text-white border-2 border-green-400' 
+                  : 'bg-gray-600 text-white border-2 border-gray-500 hover:bg-gray-500'
+              }`}
+              title={`Currently ${performance.musicCue || 'offstage'} - Click to toggle`}
+            >
+              {performance.musicCue === 'onstage' ? '🎭 Onstage' : '📴 Offstage'}
+            </button>
 
             {/* Performance Status Controls */}
             <div className="flex items-center space-x-2">
@@ -418,28 +408,29 @@ export default function BackstageDashboard() {
   const [currentPerformance, setCurrentPerformance] = useState<Performance | null>(null);
   const [eventStatus, setEventStatus] = useState<'waiting' | 'active' | 'paused' | 'completed'>('waiting');
   
-  // Music Player State
-  const [musicPlayerOpen, setMusicPlayerOpen] = useState(false);
-  const [selectedPerformance, setSelectedPerformance] = useState<Performance | null>(null);
+  // No music player needed on Backstage - that's for Sound Tech dashboard
   // Mobile Reordering State
   const [selectedForMove, setSelectedForMove] = useState<string | null>(null);
 
   // Socket connection for real-time updates
   const socket = useBackstageSocket(eventId);
 
-  // @dnd-kit sensors for drag interactions - optimized for iPhone/mobile
+  // @dnd-kit sensors for drag interactions - iPad-optimized touch handling
   const sensors = useSensors(
+    // Mouse/Desktop sensor with minimal activation distance
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3, // Very small distance for immediate response
+        distance: 8, // Slightly higher to prevent accidental drags on iPad
       },
     }),
+    // Touch sensor specifically tuned for iPad drag & drop
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 50, // Minimal delay for instant mobile response
-        tolerance: 12, // Higher tolerance for finger precision
+        delay: 100, // iPad needs slightly more delay to distinguish tap vs drag
+        tolerance: 15, // Higher tolerance for finger size on iPad
       },
     }),
+    // Keyboard accessibility
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -725,23 +716,7 @@ export default function BackstageDashboard() {
     success(`Event ${action}ed`);
   };
 
-  const handlePlayMusic = (performance: Performance) => {
-    setSelectedPerformance(performance);
-    setMusicPlayerOpen(true);
-    
-    // Log the media access for debugging
-    console.log('🎵 Opening music player for:', {
-      title: performance.title,
-      entryType: performance.entryType,
-      hasMusic: !!performance.musicFileUrl,
-      hasVideo: !!performance.videoExternalUrl
-    });
-  };
-
-  const closeMusicPlayer = () => {
-    setMusicPlayerOpen(false);
-    setSelectedPerformance(null);
-  };
+  // Music player functions removed - Backstage doesn't need to play music/videos
 
   // Mobile reordering functions
   const movePerformanceUp = async (performanceId: string) => {
@@ -929,7 +904,7 @@ export default function BackstageDashboard() {
           <div>
             <h2 className="text-2xl font-bold">Performance Order</h2>
             <p className="text-sm text-gray-400 mt-1">
-              <span className="md:hidden">Select a card and use ↑↓ buttons</span><span className="hidden md:inline">Use the grip to drag</span> to reorder performances. Item numbers stay locked, only performance order changes!
+              <span className="md:hidden">Drag anywhere on a card to reorder, or use Select + ↑↓ buttons</span><span className="hidden md:inline">Drag anywhere on a card to reorder</span>. Item numbers stay locked, only performance order changes!
             </p>
           </div>
           <div className="text-right">
@@ -969,12 +944,11 @@ export default function BackstageDashboard() {
         {performances.length > 0 && (
           <div className="bg-purple-600/10 border border-purple-600/50 rounded-lg p-4 mb-6">
             <p className="text-purple-300 text-sm">
-              <span className="font-semibold">💡 How to test:</span> Click and drag anywhere on a performance card to reorder. 
+              <span className="font-semibold">💡 How to use:</span> Drag anywhere on a performance card to reorder (works on iPad, mouse, touch). Select + ↑↓ buttons also available. 
               Item numbers stay locked (for judges), only the performance order changes and syncs across dashboards!
             </p>
             <p className="text-purple-300 text-sm mt-2">
-              <span className="font-semibold">🎵 Music Player:</span> Click the 🎵 button on live entries to play music, 
-              or 📹 button on virtual entries to open video links. Full controls with play/pause/seek/volume!
+              <span className="font-semibold">🎭 Backstage Control:</span> Use On-stage/Off-stage toggles and status buttons (▶️ Start, ⏸️ Pause, ✅ Complete) to manage performances.
             </p>
           </div>
         )}
@@ -994,7 +968,6 @@ export default function BackstageDashboard() {
                   key={performance.id}
                   performance={performance}
                   updatePerformanceStatus={updatePerformanceStatus}
-                  onPlayMusic={handlePlayMusic}
                   onUpdateMusicCue={updateMusicCue}
                   selectedForMove={selectedForMove}
                   movePerformanceUp={movePerformanceUp}
@@ -1008,12 +981,7 @@ export default function BackstageDashboard() {
         </DndContext>
       </div>
 
-      {/* Music Player Modal */}
-      <BackstageMusicPlayer
-        isOpen={musicPlayerOpen}
-        onClose={closeMusicPlayer}
-        performance={selectedPerformance}
-      />
+      {/* Music player removed - not needed on Backstage dashboard */}
     </div>
   );
 }

@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/simple-toast';
 import RealtimeUpdates from '@/components/RealtimeUpdates';
-import MusicUpload from '@/components/MusicUpload';
-import MusicPlayer from '@/components/MusicPlayer';
-import VideoPlayer from '@/components/VideoPlayer';
 
 interface Performance {
   id: string;
@@ -100,6 +97,16 @@ export default function MediaDashboard() {
   useEffect(() => {
     if (selectedEvent) {
       fetchEventData();
+    }
+  }, [selectedEvent]);
+
+  // Join media room for real-time updates
+  useEffect(() => {
+    if (selectedEvent) {
+      import('@/lib/socket-client').then(({ socketClient }) => {
+        socketClient.joinAsMedia(selectedEvent);
+        console.log(`📸 Joined media room for event: ${selectedEvent}`);
+      });
     }
   }, [selectedEvent]);
 
@@ -544,80 +551,36 @@ export default function MediaDashboard() {
                             📋 View Details
                           </button>
                           
-                          {performance.entryType === 'live' && performance.musicFileUrl && (
-                            <a
-                              href={performance.musicFileUrl}
-                              download={performance.musicFileName || `${performance.title}.mp3`}
-                              className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors text-center"
-                            >
-                              🎵 Download Music
-                            </a>
-                          )}
-                          
-                          {performance.entryType === 'virtual' && performance.videoExternalUrl && (
-                            <a
-                              href={performance.videoExternalUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors text-center"
-                            >
-                              📹 Watch Video
-                            </a>
-                          )}
+                          {/* Media Dashboard is view-only - no download/play buttons */}
                         </div>
                       </div>
                       
-                      {/* Inline media preview */}
+                      {/* Media view-only section */}
                       {performance.entryType === 'live' && (
                         <div className="mt-4">
                           {performance.musicFileUrl ? (
-                            <MusicPlayer
-                              musicUrl={performance.musicFileUrl}
-                              filename={performance.musicFileName || `${performance.title}.mp3`}
-                              className="max-w-2xl"
-                              showDownload={false}
-                            />
+                            <div className="p-3 border border-green-200 bg-green-50 text-green-800 rounded-md text-sm">
+                              🎵 Music file available: {performance.musicFileName || `${performance.title}.mp3`}
+                            </div>
                           ) : (
-                            <div className="mb-2 p-3 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-md text-sm">
-                              Track missing — upload below.
+                            <div className="p-3 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-md text-sm">
+                              🎵 Music file not uploaded yet
                             </div>
                           )}
-                          <MusicUpload
-                            currentFile={performance.musicFileUrl ? { url: performance.musicFileUrl, originalFilename: performance.musicFileName } as any : null}
-                            variant="light"
-                            compact
-                            onUploadSuccess={async (file) => {
-                              try {
-                                await fetch(`/api/admin/entries/${(performance as any).eventEntryId}`, {
-                                  method: 'PUT',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    musicFileUrl: file.url,
-                                    musicFileName: file.originalFilename
-                                  })
-                                });
-                                // Emit realtime update
-                                try {
-                                  const { socketClient } = await import('@/lib/socket-client');
-                                  socketClient.emit('entry:music_updated' as any, {
-                                    eventId: selectedEvent,
-                                    entryId: (performance as any).eventEntryId,
-                                    musicFileUrl: file.url,
-                                    musicFileName: file.originalFilename,
-                                    timestamp: new Date().toISOString()
-                                  } as any);
-                                } catch {}
-                                // Reflect immediately
-                                setPerformances(prev => prev.map(p => (
-                                  p.id === performance.id ? { ...p, musicFileUrl: file.url, musicFileName: file.originalFilename } : p
-                                )));
-                                success('Music uploaded and saved');
-                              } catch (e) {
-                                error('Failed to save uploaded music');
-                              }
-                            }}
-                            onUploadError={(err) => error(err)}
-                          />
+                        </div>
+                      )}
+                      
+                      {performance.entryType === 'virtual' && (
+                        <div className="mt-4">
+                          {performance.videoExternalUrl ? (
+                            <div className="p-3 border border-purple-200 bg-purple-50 text-purple-800 rounded-md text-sm">
+                              📹 Video link provided: {performance.videoExternalType?.toUpperCase()} format
+                            </div>
+                          ) : (
+                            <div className="p-3 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-md text-sm">
+                              📹 Video link not provided yet
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -721,12 +684,14 @@ export default function MediaDashboard() {
                     {selectedPerformance.entryType === 'live' && selectedPerformance.musicFileUrl && (
                       <div className="mb-4">
                         <h5 className="font-medium text-black mb-2">Music File</h5>
-                        <MusicPlayer
-                          musicUrl={selectedPerformance.musicFileUrl}
-                          filename={selectedPerformance.musicFileName || `${selectedPerformance.title}.mp3`}
-                          className="w-full"
-                          showDownload={true}
-                        />
+                        <div className="p-4 bg-green-50 rounded-lg">
+                          <p className="text-sm text-green-900 mb-2">
+                            <strong>🎵 Music File Available</strong>
+                          </p>
+                          <p className="text-xs text-green-700 break-all">
+                            {selectedPerformance.musicFileName || `${selectedPerformance.title}.mp3`}
+                          </p>
+                        </div>
                       </div>
                     )}
                     
@@ -735,19 +700,11 @@ export default function MediaDashboard() {
                         <h5 className="font-medium text-black mb-2">Video Link</h5>
                         <div className="p-4 bg-purple-50 rounded-lg">
                           <p className="text-sm text-purple-900 mb-2">
-                            <strong>{selectedPerformance.videoExternalType?.toUpperCase()} Video</strong>
+                            <strong>📹 {selectedPerformance.videoExternalType?.toUpperCase()} Video Available</strong>
                           </p>
-                          <p className="text-xs text-purple-700 mb-3 break-all">
-                            {selectedPerformance.videoExternalUrl}
+                          <p className="text-xs text-purple-700 break-all">
+                            Video link has been provided by the contestant
                           </p>
-                          <a
-                            href={selectedPerformance.videoExternalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors"
-                          >
-                            📹 Watch Video
-                          </a>
                         </div>
                       </div>
                     )}
