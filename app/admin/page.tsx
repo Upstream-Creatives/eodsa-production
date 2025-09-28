@@ -116,7 +116,7 @@ function AdminDashboard() {
   const [dancers, setDancers] = useState<Dancer[]>([]);
   const [studios, setStudios] = useState<Studio[]>([]);
   const [studioApplications, setStudioApplications] = useState<StudioApplication[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'judges' | 'assignments' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'staff' | 'assignments' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking'>('events');
   const [isLoading, setIsLoading] = useState(true);
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
@@ -171,6 +171,7 @@ function AdminDashboard() {
   const [entryTypeFilter, setEntryTypeFilter] = useState<'all' | 'live' | 'virtual'>('all');
   const [uploadStatusFilter, setUploadStatusFilter] = useState<'all' | 'uploaded' | 'missing' | 'no_video'>('all');
   const [activeBackendFilter, setActiveBackendFilter] = useState<'all' | 'live' | 'virtual'>('all');
+  const [videoLinkDrafts, setVideoLinkDrafts] = useState<Record<string, string>>({});
 
   // Dancer search and filter state
   const [dancerSearchTerm, setDancerSearchTerm] = useState('');
@@ -184,6 +185,7 @@ function AdminDashboard() {
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
   const [showEditEventModal, setShowEditEventModal] = useState(false);
   const [showCreateJudgeModal, setShowCreateJudgeModal] = useState(false);
+  const [showJudgePassword, setShowJudgePassword] = useState(false);
   const [showFinancialModal, setShowFinancialModal] = useState(false);
   const [selectedDancerFinances, setSelectedDancerFinances] = useState<any>(null);
   const [loadingFinances, setLoadingFinances] = useState(false);
@@ -288,6 +290,83 @@ function AdminDashboard() {
     } finally {
       setLoadingMusicTracking(false);
     }
+  };
+
+  const bulkClearMusic = async () => {
+    const targets = musicTrackingData.filter(e => e.entryType === 'live' && !e.videoExternalUrl && !e.musicFileUrl);
+    if (targets.length === 0) {
+      warning('No live entries without music in current filter');
+      return;
+    }
+    if (!confirm(`Remove music from ${targets.length} entries? This allows contestants to re-upload.`)) return;
+
+    try {
+      const session = localStorage.getItem('adminSession');
+      const adminId = session ? JSON.parse(session).id : undefined;
+      if (!adminId) { error('Admin session required'); return; }
+
+      let done = 0, failed = 0;
+      for (const entry of targets) {
+        try {
+          await fetch(`/api/admin/entries/${entry.id}/remove-music`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminId })
+          });
+          done++;
+        } catch {
+          failed++;
+        }
+      }
+      info(`Cleared ${done} entries${failed ? `, ${failed} failed` : ''}`);
+      await fetchMusicTrackingData({ entryType: activeBackendFilter === 'all' ? undefined : activeBackendFilter });
+    } catch (e) {
+      error('Bulk clear failed');
+    }
+  };
+
+  const bulkClearVideos = async () => {
+    const targets = musicTrackingData.filter(e => e.entryType === 'virtual' && e.videoExternalUrl);
+    if (targets.length === 0) { warning('No virtual entries with links in current filter'); return; }
+    if (!confirm(`Remove video links from ${targets.length} entries?`)) return;
+    try {
+      let done = 0, failed = 0;
+      for (const entry of targets) {
+        try {
+          const res = await fetch(`/api/admin/entries/${entry.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoExternalUrl: '' })
+          });
+          if (res.ok) done++; else failed++;
+        } catch { failed++; }
+      }
+      info(`Cleared ${done} video links${failed ? `, ${failed} failed` : ''}`);
+      await fetchMusicTrackingData({ entryType: activeBackendFilter === 'all' ? undefined : activeBackendFilter });
+    } catch { error('Bulk clear videos failed'); }
+  };
+
+  const exportProgramCsv = () => {
+    const rows = [['Item #','Title','Contestant','Participants','Type','Style','Level','Event','Music','Video']];
+    for (const e of musicTrackingData) {
+      rows.push([
+        e.itemNumber || '',
+        e.itemName || '',
+        e.contestantName || '',
+        Array.isArray(e.participantNames) ? e.participantNames.join('; ') : '',
+        e.entryType || '',
+        e.itemStyle || '',
+        e.mastery || '',
+        e.eventName || '',
+        e.musicFileUrl ? 'Yes' : 'No',
+        e.videoExternalUrl ? 'Yes' : 'No'
+      ]);
+    }
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'program-order.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -1296,6 +1375,14 @@ function AdminDashboard() {
                 <span className="font-medium">Rankings</span>
               </Link>
 
+              <Link 
+                href="/admin/scoring-approval"
+                className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg sm:rounded-xl hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
+              >
+                <span className="text-sm sm:text-base">⚖️</span>
+                <span className="font-medium">Score Approval</span>
+              </Link>
+
               <button
                 onClick={handleLogout}
                 className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg sm:rounded-xl hover:from-red-600 hover:to-pink-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
@@ -1330,7 +1417,7 @@ function AdminDashboard() {
           <nav className="flex flex-col sm:flex-row gap-2">
             {[
               { id: 'events', label: 'Events', icon: '🏆', color: 'indigo' },
-              { id: 'judges', label: 'Judges', icon: '👨‍⚖️', color: 'purple' },
+              { id: 'staff', label: 'Staff', icon: '👥', color: 'purple' },
               { id: 'assignments', label: 'Assignments', icon: '🔗', color: 'pink' },
               { id: 'dancers', label: 'Dancers', icon: '💃', color: 'rose' },
               { id: 'studios', label: 'Studios', icon: '🏢', color: 'orange' },
@@ -1503,20 +1590,20 @@ function AdminDashboard() {
               </div>
         )}
 
-        {/* Judges Tab - Enhanced */}
-        {activeTab === 'judges' && (
+        {/* Staff Tab - Enhanced */}
+        {activeTab === 'staff' && (
           <div className="space-y-8 animate-fadeIn">
-            {/* Enhanced Judges List */}
+            {/* Enhanced Staff List */}
             <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
               <div className={`px-6 py-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-b ${themeClasses.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white text-sm">👨‍⚖️</span>
+                      <span className="text-white text-sm">👥</span>
                   </div>
-                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Judges</h2>
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Staff Management</h2>
                     <div className={`px-3 py-1 ${theme === 'dark' ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-100 text-purple-800'} rounded-full text-sm font-medium`}>
-                      {judges.filter(j => !j.isAdmin).length} judges
+                      {judges.length} staff members
                   </div>
                 </div>
                   <button
@@ -1524,8 +1611,8 @@ function AdminDashboard() {
                     className="inline-flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
                   >
                     <span>➕</span>
-                    <span className="hidden sm:inline">Create Judge</span>
-                    <span className="sm:hidden">Create</span>
+                    <span className="hidden sm:inline">Add Staff</span>
+                    <span className="sm:hidden">Add</span>
                   </button>
               </div>
             </div>
@@ -1533,16 +1620,16 @@ function AdminDashboard() {
               {judges.length === 0 ? (
                 <div className="text-center py-12 ${themeClasses.textMuted}">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span className="text-2xl">👨‍⚖️</span>
+                    <span className="text-2xl">👥</span>
                   </div>
-                  <h3 className="text-lg font-medium mb-2">No judges yet</h3>
-                  <p className="text-sm mb-4">Create your first judge to get started!</p>
+                  <h3 className="text-lg font-medium mb-2">No staff members yet</h3>
+                  <p className="text-sm mb-4">Add your first staff member to get started!</p>
                   <button
                     onClick={() => setShowCreateJudgeModal(true)}
                     className="inline-flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
                   >
                     <span>➕</span>
-                    <span>Create First Judge</span>
+                    <span>Add First Staff Member</span>
                   </button>
                 </div>
               ) : (
@@ -1568,24 +1655,41 @@ function AdminDashboard() {
                         </td>
                           <td className={`px-6 py-4 text-sm font-medium ${themeClasses.textPrimary} hidden sm:table-cell`}>{judge.email}</td>
                           <td className="px-6 py-4">
-                            <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${
-                               judge.isAdmin ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-300' : `bg-gray-50 ${themeClasses.textSecondary} border-gray-200`
-                            }`}>
-                              {judge.isAdmin ? '👑 Admin' : '👨‍⚖️ Judge'}
-                          </span>
+                            {judge.isAdmin ? (
+                              <span className="inline-flex px-3 py-1 text-xs font-bold rounded-full border bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-300">
+                                👑 Admin
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                  👨‍⚖️ Judge
+                                </span>
+                                {/* Additional role badges can be added here based on staff roles */}
+                              </div>
+                            )}
                         </td>
                           <td className={`px-6 py-4 text-sm font-medium ${themeClasses.textSecondary} hidden md:table-cell`}>
                             {new Date(judge.createdAt).toLocaleDateString()}
                         </td>
                           <td className="px-6 py-4">
-                            {!judge.isAdmin && (
-                              <button
-                                onClick={() => handleDeleteJudge(judge.id, judge.name)}
-                                className="inline-flex items-center px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
-                              >
-                                🗑️ Delete
-                              </button>
-                            )}
+                            <div className="flex space-x-2">
+                              {!judge.isAdmin && (
+                                <>
+                                  <button
+                                    onClick={() => {/* TODO: Implement edit roles functionality */}}
+                                    className="inline-flex items-center px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors"
+                                  >
+                                    ⚙️ Roles
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteJudge(judge.id, judge.name)}
+                                    className="inline-flex items-center px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
+                                  >
+                                    🗑️ Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                       </tr>
                     ))}
@@ -1608,7 +1712,7 @@ function AdminDashboard() {
                     <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🔗</span>
                     </div>
-                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Judge Assignments</h2>
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Staff Assignments</h2>
                     <div className={`px-3 py-1 ${theme === 'dark' ? 'bg-pink-900/80 text-pink-200' : 'bg-pink-100 text-pink-800'} rounded-full text-sm font-medium`}>
                       {assignments.length} assignments
                     </div>
@@ -2428,6 +2532,61 @@ function AdminDashboard() {
                     <div className={`overflow-x-auto -mx-4 sm:mx-0 scrollbar-thin ${theme === 'dark' ? 'scrollbar-thumb-gray-600 scrollbar-track-gray-800' : 'scrollbar-thumb-gray-300 scrollbar-track-gray-100'}`}>
                       <div className="inline-block min-w-full align-middle">
                         <div className={`overflow-hidden shadow-sm ring-1 sm:rounded-lg ${theme === 'dark' ? 'ring-gray-600 ring-opacity-50' : 'ring-black ring-opacity-5'}`}>
+                          <div className="px-4 py-2 flex justify-end gap-2">
+                            <button
+                              onClick={bulkClearMusic}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700"
+                              title="Clear music for all currently filtered live entries needing uploads"
+                            >
+                              Clear Music (Filtered)
+                            </button>
+                            <button
+                              onClick={bulkClearVideos}
+                              className="ml-2 px-3 py-1.5 bg-purple-600 text-white rounded-md text-xs font-semibold hover:bg-purple-700"
+                              title="Clear video links for all currently filtered virtual entries"
+                            >
+                              Clear Videos (Filtered)
+                            </button>
+                            <button
+                              onClick={exportProgramCsv}
+                              className="ml-2 px-3 py-1.5 bg-gray-800 text-white rounded-md text-xs font-semibold hover:bg-black"
+                              title="Export current program view to CSV"
+                            >
+                              Export Program CSV
+                            </button>
+                            <select
+                              onChange={(e) => {
+                                const val = e.target.value; (async () => { try { await (async () => {
+                                  const eventId = val; if (!eventId) return;
+                                  if (!confirm('Archive media for this event? This clears music and video links.')) return;
+                                  try {
+                                    const session = localStorage.getItem('adminSession');
+                                    const adminId = session ? JSON.parse(session).id : undefined;
+                                    // Clear music
+                                    const musicTargets = musicTrackingData.filter(e => e.eventId === eventId && e.entryType === 'live' && e.musicFileUrl);
+                                    for (const entry of musicTargets) {
+                                      await fetch(`/api/admin/entries/${entry.id}/remove-music`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId }) });
+                                    }
+                                    // Clear videos
+                                    const videoTargets = musicTrackingData.filter(e => e.eventId === eventId && e.entryType === 'virtual' && e.videoExternalUrl);
+                                    for (const entry of videoTargets) {
+                                      await fetch(`/api/admin/entries/${entry.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoExternalUrl: '' }) });
+                                    }
+                                    success('Event media archived');
+                                    await fetchMusicTrackingData({ eventId });
+                                  } catch { error('Archiving failed'); }
+                                })(); } catch {} })();
+                              }}
+                              className="ml-2 px-2 py-1.5 border rounded-md text-xs"
+                              defaultValue=""
+                              title="Archive clears music and videos for selected event"
+                            >
+                              <option value="" disabled>Archive Event Media…</option>
+                              {events.map(ev => (
+                                <option key={ev.id} value={ev.id}>{ev.name}</option>
+                              ))}
+                            </select>
+                          </div>
                           {/* Mobile swipe indicator */}
                           <div className={`sm:hidden px-4 py-2 text-center ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                             <p className={`text-xs ${themeClasses.textMuted}`}>← Swipe to see more columns →</p>
@@ -2548,20 +2707,96 @@ function AdminDashboard() {
                               </td>
                               <td className="px-2 sm:px-6 py-3 sm:py-4">
                                 {entry.entryType === 'virtual' ? (
-                                  entry.videoExternalUrl ? (
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                                      <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
-                                        <span className="hidden sm:inline">✅ Video Link</span>
-                                        <span className="sm:hidden">✅</span>
+                                  <div className="space-y-1">
+                                    {entry.videoExternalUrl ? (
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                                        <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                                          <span className="hidden sm:inline">✅ Video Link</span>
+                                          <span className="sm:hidden">✅</span>
+                                        </span>
+                                        <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[80px] mt-1 sm:mt-0`}>{entry.videoExternalType?.toUpperCase() || 'LINK'}</span>
+                                      </div>
+                                    ) : (
+                                      <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
+                                        <span className="hidden sm:inline">❌ No Video Link</span>
+                                        <span className="sm:hidden">❌</span>
                                       </span>
-                                      <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[50px] sm:max-w-[80px] mt-1 sm:mt-0`}>{entry.videoExternalType?.toUpperCase() || 'LINK'}</span>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="url"
+                                        placeholder={entry.videoExternalUrl ? 'Replace link…' : 'Paste YouTube/Vimeo link…'}
+                                        value={videoLinkDrafts[entry.id] ?? ''}
+                                        onChange={(e) => setVideoLinkDrafts(prev => ({ ...prev, [entry.id]: e.target.value }))}
+                                        className={`w-40 sm:w-56 px-2 py-1 text-xs rounded border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary}`}
+                                      />
+                                      <button
+                                        onClick={async () => {
+                                          const url = (videoLinkDrafts[entry.id] || '').trim();
+                                          if (!url) { error('Enter a video link first'); return; }
+                                          try {
+                                            const res = await fetch(`/api/admin/entries/${entry.id}`, {
+                                              method: 'PUT',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ videoExternalUrl: url })
+                                            });
+                                            const data = await res.json();
+                                            if (res.ok && data.success) {
+                                              success('Video link saved');
+                                              setVideoLinkDrafts(prev => ({ ...prev, [entry.id]: '' }));
+                                              try {
+                                                const { socketClient } = await import('@/lib/socket-client');
+                                                socketClient.emit('entry:video_updated' as any, {
+                                                  eventId: entry.eventId,
+                                                  entryId: entry.id,
+                                                  videoExternalUrl: url,
+                                                  timestamp: new Date().toISOString()
+                                                } as any);
+                                              } catch {}
+                                              await fetchMusicTrackingData({ entryType: activeBackendFilter === 'all' ? undefined : activeBackendFilter });
+                                            } else {
+                                              error(data?.error || 'Failed to save video link');
+                                            }
+                                          } catch (e) {
+                                            error('Network error saving link');
+                                          }
+                                        }}
+                                        className="px-2 py-1 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                                      >Save</button>
+                                      {entry.videoExternalUrl && (
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              const res = await fetch(`/api/admin/entries/${entry.id}`, {
+                                                method: 'PUT',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ videoExternalUrl: '' })
+                                              });
+                                              const data = await res.json();
+                                              if (res.ok && data.success) {
+                                                success('Video link removed');
+                                                try {
+                                                  const { socketClient } = await import('@/lib/socket-client');
+                                                  socketClient.emit('entry:video_updated' as any, {
+                                                    eventId: entry.eventId,
+                                                    entryId: entry.id,
+                                                    videoExternalUrl: '',
+                                                    timestamp: new Date().toISOString()
+                                                  } as any);
+                                                } catch {}
+                                                await fetchMusicTrackingData({ entryType: activeBackendFilter === 'all' ? undefined : activeBackendFilter });
+                                              } else {
+                                                error(data?.error || 'Failed to remove video link');
+                                              }
+                                            } catch (e) {
+                                              error('Network error removing link');
+                                            }
+                                          }}
+                                          className={`px-2 py-1 text-xs rounded ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                                        >Clear</button>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
-                                      <span className="hidden sm:inline">❌ No Video Link</span>
-                                      <span className="sm:hidden">❌</span>
-                                    </span>
-                                  )
+                                  </div>
                                 ) : (
                                   <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
                                     <span className="hidden sm:inline">N/A (Live)</span>
@@ -2600,6 +2835,7 @@ function AdminDashboard() {
                                     <span className="hidden sm:inline">📋 View Entry</span>
                                     <span className="sm:hidden">📋</span>
                                   </button>
+                                  {/* Bulk action seed: individual clear button available above. A dedicated Bulk Clear panel can iterate IDs from current filter. */}
                                 </div>
                               </td>
                             </tr>
@@ -3010,16 +3246,26 @@ function AdminDashboard() {
                   
                 <div className="lg:col-span-1">
                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Password</label>
+                  <div className="relative">
                     <input
-                      type="password"
+                      type={showJudgePassword ? 'text' : 'password'}
                       value={newJudge.password}
                       onChange={(e) => setNewJudge(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
+                      className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
                       required
                       minLength={6}
                       placeholder="Minimum 6 characters"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowJudgePassword(v => !v)}
+                      className="absolute inset-y-0 right-2 my-1 px-3 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                      aria-label="Toggle password visibility"
+                    >
+                      {showJudgePassword ? '🙈' : '👁️'}
+                    </button>
                   </div>
+                </div>
                   
                 <div className="lg:col-span-1 flex items-center justify-center lg:justify-start">
                   <div className="flex items-center">
@@ -3085,19 +3331,19 @@ function AdminDashboard() {
 
       {/* Assign Judge Modal */}
       {showAssignJudgeModal && (
-        <div className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/30">
-            <div className="p-6 border-b border-gray-200/50">
+        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/70' : 'bg-black/30'} backdrop-blur-sm flex items-center justify-center p-4 z-50`}>
+          <div className={`${themeClasses.modalBg} rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border ${themeClasses.modalBorder}`}>
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700/50' : 'border-gray-200/50'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">🔗</span>
                   </div>
-                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Assign Judge to Event</h2>
+                  <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Assign Judge to Event</h2>
                 </div>
                 <button
                   onClick={() => setShowAssignJudgeModal(false)}
-                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
+                  className={`${themeClasses.textMuted} p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-white/10 hover:text-gray-200' : 'hover:bg-gray-100/50 hover:text-gray-700'} transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -3111,7 +3357,7 @@ function AdminDashboard() {
                   <select
                     value={assignment.judgeId}
                     onChange={(e) => setAssignment(prev => ({ ...prev, judgeId: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium ${theme === 'dark' ? 'bg-gray-800/90 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`}
                     required
                   >
                     <option value="">Choose a judge</option>
@@ -3126,7 +3372,7 @@ function AdminDashboard() {
                   <select
                     value={assignment.eventId}
                     onChange={(e) => setAssignment(prev => ({ ...prev, eventId: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 text-base font-medium ${theme === 'dark' ? 'bg-gray-800/90 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`}
                     required
                   >
                     <option value="">Choose an event</option>
@@ -3155,11 +3401,11 @@ function AdminDashboard() {
               </div>
           )}
 
-              <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+              <div className={`flex justify-end space-x-4 mt-8 pt-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
                 <button
                   type="button"
                   onClick={() => setShowAssignJudgeModal(false)}
-                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
+                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-white/10' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} rounded-xl transition-colors font-medium`}
                 >
                   Cancel
                 </button>

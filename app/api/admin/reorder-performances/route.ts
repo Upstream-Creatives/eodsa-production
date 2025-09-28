@@ -13,37 +13,34 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Validate that all performances have required fields
+    // Validate that all performances have required fields (Gabriel's requirement)
     for (const perf of performances) {
-      if (!perf.id || typeof perf.itemNumber !== 'number') {
+      if (!perf.id || typeof perf.performanceOrder !== 'number') {
         return NextResponse.json(
-          { error: 'Each performance must have id and itemNumber' },
+          { error: 'Each performance must have id and performanceOrder' },
           { status: 400 }
         );
       }
     }
 
-    // Update item numbers for all performances
+    // GABRIEL'S REQUIREMENT: Update performance order only, keep item numbers locked
     let updateCount = 0;
     
-    for (const performance of performances) {
+    // We expect the incoming payload to include performance ids and new performance orders.
+    // Update ONLY the performanceOrder, keeping itemNumber unchanged (locked after admin assignment).
+    for (const perf of performances) {
       try {
-        // Update both event_entries and performances tables
-        await db.updateEventEntry(performance.id, { 
-          itemNumber: performance.itemNumber 
-        });
+        // Validate performanceOrder
+        if (typeof perf.performanceOrder !== 'number' || perf.performanceOrder < 1) continue;
 
-        // Also update the corresponding performance record
-        const allPerformances = await db.getAllPerformances();
-        const performanceRecord = allPerformances.find(p => p.eventEntryId === performance.id);
+        // Update ONLY performance order, not itemNumber (Gabriel's requirement)
+        await db.updatePerformanceOrder(perf.id, perf.performanceOrder);
         
-        if (performanceRecord) {
-          await db.updatePerformanceItemNumber(performanceRecord.id, performance.itemNumber);
-        }
+        // Do NOT update event entry's itemNumber - that stays locked for judging reference
 
         updateCount++;
       } catch (error) {
-        console.error(`Error updating performance ${performance.id}:`, error);
+        console.error(`Error updating performance order for ${perf.id}:`, error);
         // Continue with other updates even if one fails
       }
     }

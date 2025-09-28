@@ -4,7 +4,7 @@ import { db } from '@/lib/database';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { performanceId, announcedBy } = body;
+    const { performanceId, announcedBy, note } = body;
 
     if (!performanceId || !announcedBy) {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await db.markPerformanceAnnounced(performanceId, announcedBy);
+    const result = await db.markPerformanceAnnounced(performanceId, announcedBy, note);
 
     return NextResponse.json({
       success: true,

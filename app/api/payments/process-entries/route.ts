@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { autoMarkRegistrationForParticipants } from '@/lib/registration-fee-tracker';
-import { db } from '@/lib/database';
+import { db, unifiedDb } from '@/lib/database';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -113,6 +113,48 @@ export async function POST(request: NextRequest) {
           SET payment_id = ${payment_id}
           WHERE id = ${eventEntry.id}
         `;
+
+        // Auto-create performance for this approved entry (idempotent)
+        try {
+          const existingPerformances = await db.getAllPerformances();
+          const alreadyExists = existingPerformances.some(p => p.eventEntryId === eventEntry.id);
+          if (!alreadyExists) {
+            // Build participant names using unified dancers when available
+            const participantNames: string[] = [];
+            try {
+              for (let i = 0; i < entry.participantIds.length; i++) {
+                const pid = entry.participantIds[i];
+                try {
+                  const dancer = await unifiedDb.getDancerById(pid);
+                  if (dancer?.name) {
+                    participantNames.push(dancer.name);
+                    continue;
+                  }
+                } catch {}
+                participantNames.push(`Participant ${i + 1}`);
+              }
+            } catch {
+              // Fallback
+              entry.participantIds.forEach((_, i) => participantNames.push(`Participant ${i + 1}`));
+            }
+
+            await db.createPerformance({
+              eventId: entry.eventId,
+              eventEntryId: eventEntry.id,
+              contestantId: entry.contestantId,
+              title: entry.itemName,
+              participantNames,
+              duration: entry.estimatedDuration || 0,
+              choreographer: entry.choreographer,
+              mastery: entry.mastery,
+              itemStyle: entry.itemStyle,
+              status: 'scheduled',
+              itemNumber: undefined
+            });
+          }
+        } catch (perfErr) {
+          console.warn('⚠️ Failed to auto-create performance for entry', eventEntry.id, perfErr);
+        }
 
         // Auto-mark registration fees as paid for all participants since entry is paid
         if (entry.participantIds && entry.participantIds.length > 0 && entry.mastery) {

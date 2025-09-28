@@ -1441,10 +1441,7 @@ export default function StudioDashboardPage() {
                             <span className="text-gray-400">Mastery:</span>
                             <span className="text-white ml-2">{entry.mastery}</span>
                           </div>
-                          <div>
-                            <span className="text-gray-400">Duration:</span>
-                            <span className="text-white ml-2">{entry.estimatedDuration} min</span>
-                          </div>
+                          {/* Duration hidden by request */}
                           <div>
                             <span className="text-gray-400">Fee:</span>
                             <span className="text-white ml-2">R{entry.calculatedFee}</span>
@@ -1543,10 +1540,7 @@ export default function StudioDashboardPage() {
                             <span className="text-gray-400 block">Mastery:</span>
                             <span className="text-white">{entry.mastery}</span>
                           </div>
-                          <div className="bg-gray-800/40 p-3 rounded-lg">
-                            <span className="text-gray-400 block">Duration:</span>
-                            <span className="text-white">{entry.estimatedDuration} min</span>
-                          </div>
+                          {/* Duration hidden by request */}
                         </div>
 
                         {/* Group Information */}

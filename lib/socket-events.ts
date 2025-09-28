@@ -19,6 +19,14 @@ export interface SocketEvents {
     timestamp: string;
   };
 
+  // Performance music cue updates
+  'performance:music_cue': {
+    performanceId: string;
+    eventId: string;
+    musicCue: 'onstage' | 'offstage';
+    timestamp: string;
+  };
+
   // New entry added
   'entry:created': {
     eventId: string;
@@ -30,6 +38,23 @@ export interface SocketEvents {
     eventId: string;
     entryId: string;
     updates: any;
+  };
+
+  // Music file added/changed for an entry
+  'entry:music_updated': {
+    eventId: string;
+    entryId: string;
+    musicFileUrl?: string;
+    musicFileName?: string;
+    timestamp: string;
+  };
+
+  // Video link added/changed for a virtual entry
+  'entry:video_updated': {
+    eventId: string;
+    entryId: string;
+    videoExternalUrl?: string;
+    timestamp: string;
   };
 
   // Event control commands from backstage

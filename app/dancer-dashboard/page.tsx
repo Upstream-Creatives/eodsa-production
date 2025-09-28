@@ -165,7 +165,7 @@ function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession })
                       <p className="text-gray-300">Event: <span className="text-white font-medium">{entry.eventName}</span></p>
                       <p className="text-gray-300">Style: <span className="text-white font-medium">{entry.itemStyle}</span></p>
                       <p className="text-gray-300">Mastery: <span className="text-white font-medium">{entry.mastery}</span></p>
-                      <p className="text-gray-300">Duration: <span className="text-white font-medium">{entry.estimatedDuration} min</span></p>
+                      {/* Duration hidden by request */}
                     </div>
                     
                     {/* Group Info */}
@@ -354,7 +354,7 @@ function VideoUploadSection({ dancerSession }: { dancerSession: DancerSession })
                       <p className="text-gray-300">Event: <span className="text-white font-medium">{entry.eventName}</span></p>
                       <p className="text-gray-300">Style: <span className="text-white font-medium">{entry.itemStyle}</span></p>
                       <p className="text-gray-300">Mastery: <span className="text-white font-medium">{entry.mastery}</span></p>
-                      <p className="text-gray-300">Duration: <span className="text-white font-medium">{entry.estimatedDuration} min</span></p>
+                      {/* Duration hidden by request */}
                     </div>
                     
                     {/* Group Info */}
@@ -569,7 +569,7 @@ function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSes
                       <p className="text-gray-300">Event: <span className="text-white font-medium">{entry.eventName}</span></p>
                       <p className="text-gray-300">Style: <span className="text-white font-medium">{entry.itemStyle}</span></p>
                       <p className="text-gray-300">Mastery: <span className="text-white font-medium">{entry.mastery}</span></p>
-                      <p className="text-gray-300">Duration: <span className="text-white font-medium">{entry.estimatedDuration} min</span></p>
+                      {/* Duration hidden by request */}
                       {entry.region && (
                         <p className="text-gray-300">Region: <span className="text-white font-medium">{entry.region}</span></p>
                       )}

@@ -14,19 +14,20 @@ class SocketClient {
     const socketUrl = url || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
     
     console.log('🔌 Connecting to WebSocket server:', socketUrl);
+    console.log('🔧 Environment SOCKET_URL:', process.env.NEXT_PUBLIC_SOCKET_URL);
 
     this.socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // Polling first for Render.com
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
+      reconnectionAttempts: 15, // More attempts for Render.com
+      reconnectionDelay: 2000, // Longer delay
+      reconnectionDelayMax: 10000, // Longer max delay
+      timeout: 60000, // Much longer timeout for Render.com cold starts
       forceNew: false,
-      // Railway optimization
+      // Render.com optimizations
       upgrade: true,
-      rememberUpgrade: true
+      rememberUpgrade: false // Don't remember upgrades on Render.com
     });
 
     this.socket.on('connect', () => {
@@ -39,6 +40,17 @@ class SocketClient {
 
     this.socket.on('connect_error', (error: Error) => {
       console.error('🚫 Socket connection error:', error);
+      
+      // For Render.com, try to reconnect with polling only if websocket fails
+      if (error.message.includes('timeout') || error.message.includes('websocket')) {
+        console.log('🔄 Retrying with polling transport only...');
+        setTimeout(() => {
+          if (this.socket && !this.socket.connected) {
+            this.socket.io.opts.transports = ['polling'];
+            this.socket.connect();
+          }
+        }, 3000);
+      }
     });
 
     return this.socket;
@@ -49,6 +61,42 @@ class SocketClient {
       this.socket.disconnect();
       this.socket = null;
     }
+  }
+
+  // Force connection with polling only (fallback for Render.com issues)
+  connectPollingOnly(url?: string) {
+    if (this.socket?.connected) {
+      return this.socket;
+    }
+
+    const socketUrl = url || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+    
+    console.log('🔌 Connecting with polling only to:', socketUrl);
+
+    this.socket = io(socketUrl, {
+      transports: ['polling'], // Polling only
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 3000,
+      reconnectionDelayMax: 15000,
+      timeout: 120000, // Very long timeout
+      forceNew: true // Force new connection
+    });
+
+    this.socket.on('connect', () => {
+      console.log('🔌 Connected to socket server (polling only)');
+    });
+
+    this.socket.on('disconnect', () => {
+      console.log('❌ Disconnected from socket server');
+    });
+
+    this.socket.on('connect_error', (error: Error) => {
+      console.error('🚫 Socket connection error (polling only):', error);
+    });
+
+    return this.socket;
   }
 
   // Join specific event rooms

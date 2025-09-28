@@ -10,6 +10,7 @@ export default function AdminPortalPage() {
     email: '',
     password: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -161,16 +162,26 @@ export default function AdminPortalPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </div>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-3 border border-white/20 rounded-lg sm:rounded-xl bg-white/5 backdrop-blur-sm text-white placeholder-emerald-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300 text-sm"
-                    placeholder="••••••••••••"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className="block w-full pl-10 pr-12 py-3 border border-white/20 rounded-lg sm:rounded-xl bg-white/5 backdrop-blur-sm text-white placeholder-emerald-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300 text-sm"
+                      placeholder="••••••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute inset-y-0 right-2 my-1 px-3 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10"
+                      aria-label="Toggle password visibility"
+                    >
+                      {showPassword ? '🙈' : '👁️'}
+                    </button>
+                  </div>
                 </div>
               </div>
 

@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const entryId = id;
-    const { itemNumber } = await request.json();
+    const { itemNumber, programType } = await request.json();
 
     // Validate input
     if (!itemNumber || itemNumber < 1) {
@@ -31,8 +31,12 @@ export async function PUT(
       );
     }
 
-    // Update the entry with the item number
-    await db.updateEventEntry(entryId, { itemNumber });
+    // Update the entry with the item number (support separate numbering for virtual program)
+    const entryUpdates: any = { itemNumber };
+    if (programType === 'virtual') {
+      entryUpdates.virtualItemNumber = itemNumber;
+    }
+    await db.updateEventEntry(entryId, entryUpdates);
 
     // AUTO-SYNC: Update the corresponding performance as well
     try {

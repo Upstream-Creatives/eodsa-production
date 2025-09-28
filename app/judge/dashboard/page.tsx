@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import RealtimeUpdates from '@/components/RealtimeUpdates';
 import { useRouter } from 'next/navigation';
 import MusicPlayer from '@/components/MusicPlayer';
 import VideoPlayer from '@/components/VideoPlayer';
@@ -36,12 +37,14 @@ interface Performance {
   itemStyle?: string;
   mastery?: string;
   itemNumber?: number;
+  performanceOrder?: number;
   // PHASE 2: Live vs Virtual Entry Support
   entryType?: 'live' | 'virtual';
   musicFileUrl?: string;
   musicFileName?: string;
   videoExternalUrl?: string;
   videoExternalType?: 'youtube' | 'vimeo' | 'other';
+  performanceTypeLabel?: 'Solo' | 'Duet' | 'Trio' | 'Group';
 }
 
 interface Score {
@@ -287,10 +290,12 @@ export default function JudgeDashboard() {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'scored' | 'completed'>('all');
+  const [entryTypeFilter, setEntryTypeFilter] = useState<'all' | 'live' | 'virtual'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [performancesPerPage] = useState(8);
   const [searchTerm, setSearchTerm] = useState('');
   const [itemNumberSearch, setItemNumberSearch] = useState('');
+  const [lastSyncAt, setLastSyncAt] = useState('');
   const router = useRouter();
   const { showAlert } = useAlert();
 
@@ -331,7 +336,14 @@ export default function JudgeDashboard() {
 
   useEffect(() => {
     filterAndLoadPerformances();
-  }, [performances, filterStatus, searchTerm, itemNumberSearch]);
+  }, [performances, filterStatus, entryTypeFilter, searchTerm, itemNumberSearch]);
+
+  useEffect(() => {
+    const onFocus = () => setLastSyncAt(new Date().toLocaleTimeString());
+    const hb = setInterval(() => setLastSyncAt(new Date().toLocaleTimeString()), 15000);
+    if (typeof window !== 'undefined') window.addEventListener('focus', onFocus);
+    return () => { clearInterval(hb); if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus); };
+  }, []);
 
   const loadJudgeData = async (judgeId: string) => {
     setIsLoading(true);
@@ -342,36 +354,60 @@ export default function JudgeDashboard() {
         const assignmentsData = await assignmentsResponse.json();
         setAssignments(assignmentsData.assignments || []);
         
-        // Load ALL performances for all assigned nationals events
+        // Join judge rooms for all assigned events
+        import('@/lib/socket-client').then(({ socketClient }) => {
+          (assignmentsData.assignments || []).forEach((assignment: any) => {
+            socketClient.joinAsJudge(assignment.eventId, judgeId);
+            console.log(`⚖️ Joined judge room for event: ${assignment.eventId}`);
+          });
+        });
+        
+        // Load ALL performances for all assigned events (batched and parallelized)
         const allPerformances: PerformanceWithScore[] = [];
-        for (const assignment of assignmentsData.assignments || []) {
+        await Promise.all((assignmentsData.assignments || []).map(async (assignment: any) => {
           const performancesResponse = await fetch(`/api/events/${assignment.eventId}/performances`);
-          if (performancesResponse.ok) {
-            const performancesData = await performancesResponse.json();
-            
-            // Check score status for each performance
-            for (const performance of performancesData.performances || []) {
-              // Check if this judge has scored this performance
-              const scoreResponse = await fetch(`/api/scores/${performance.id}/${judgeId}`);
-              const scoreData = await scoreResponse.json();
+          if (!performancesResponse.ok) return;
+          const performancesData = await performancesResponse.json();
+          const perfs: any[] = performancesData.performances || [];
+          await Promise.all(perfs.map(async (performance: any) => {
+            try {
+              // Fetch judge's score and overall scoring status concurrently
+              const [scoreRes, statusRes] = await Promise.all([
+                fetch(`/api/scores/${performance.id}/${judgeId}`).catch(() => ({ ok: false, json: () => Promise.resolve({}) })),
+                fetch(`/api/scores/performance/${performance.id}`).catch(() => ({ ok: false, json: () => Promise.resolve({}) }))
+              ]);
               
-              // Check the complete scoring status (all judges)
-              const scoringStatusResponse = await fetch(`/api/scores/performance/${performance.id}`);
-              const scoringStatusData = await scoringStatusResponse.json();
+              const scoreData = scoreRes.ok ? await scoreRes.json().catch(() => ({})) : {};
+              const scoringStatusData = statusRes.ok ? await statusRes.json().catch(() => ({})) : {};
               
               allPerformances.push({
                 ...performance,
                 hasScore: scoreData.success && scoreData.score,
                 judgeScore: scoreData.score,
-                isFullyScored: scoringStatusData.success ? scoringStatusData.scoringStatus.isFullyScored : false,
+                isFullyScored: scoringStatusData.success ? scoringStatusData.scoringStatus?.isFullyScored : false,
                 scoringStatus: scoringStatusData.success ? scoringStatusData.scoringStatus : null
               });
+            } catch (error) {
+              console.warn(`Failed to load score data for performance ${performance.id}:`, error);
+              // Add performance without score data
+              allPerformances.push({
+                ...performance,
+                hasScore: false,
+                judgeScore: null,
+                isFullyScored: false,
+                scoringStatus: null
+              });
             }
-          }
-        }
+          }));
+        }));
         
-        // Sort by item number for program order
+        // Sort by performance order (backstage sequence), fallback to item number
         allPerformances.sort((a, b) => {
+          // Primary sort: performanceOrder (backstage sequence)
+          if (a.performanceOrder && b.performanceOrder) {
+            return a.performanceOrder - b.performanceOrder;
+          }
+          // Fallback to item number if performanceOrder missing
           if (a.itemNumber && b.itemNumber) {
             return a.itemNumber - b.itemNumber;
           } else if (a.itemNumber && !b.itemNumber) {
@@ -399,6 +435,13 @@ export default function JudgeDashboard() {
     
     // IMPORTANT: Always exclude withdrawn performances from judge view
     filtered = filtered.filter(p => !p.withdrawnFromJudging);
+    
+    // NEW: Filter by entry type (Live/Virtual)
+    if (entryTypeFilter === 'live') {
+      filtered = filtered.filter(p => p.entryType === 'live');
+    } else if (entryTypeFilter === 'virtual') {
+      filtered = filtered.filter(p => p.entryType === 'virtual');
+    }
     
     // MAIN CHANGE: By default, hide performances this judge has already scored
     // This makes scored items disappear from the judge's view automatically
@@ -622,7 +665,7 @@ export default function JudgeDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="bg-gray-50 flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-16 h-16 bg-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
             <span className="text-white text-lg">⚖️</span>
@@ -633,8 +676,51 @@ export default function JudgeDashboard() {
     );
   }
 
-    return (
-      <div className="min-h-screen bg-gray-50">
+  const handlePerformanceReorder = (reordered: any[]) => {
+    setPerformances(prev => {
+      const updateMap = new Map(reordered.map(r => [r.id, r]));
+      const updated = prev.map(p => {
+        if (updateMap.has(p.id)) {
+          const update = updateMap.get(p.id)!;
+          return { 
+            ...p, 
+            itemNumber: update.itemNumber || p.itemNumber, // Keep permanent item number (for scoring)
+            performanceOrder: update.performanceOrder // Update performance order from backstage
+          };
+        }
+        return p;
+      });
+      
+      // Re-sort after updating performance orders
+      updated.sort((a, b) => {
+        // Primary sort: performanceOrder (backstage sequence)
+        if (a.performanceOrder && b.performanceOrder) {
+          return a.performanceOrder - b.performanceOrder;
+        }
+        // Fallback to item number if performanceOrder missing
+        if (a.itemNumber && b.itemNumber) {
+          return a.itemNumber - b.itemNumber;
+        } else if (a.itemNumber && !b.itemNumber) {
+          return -1;
+        } else if (!a.itemNumber && b.itemNumber) {
+          return 1;
+        } else {
+          return a.title.localeCompare(b.title);
+        }
+      });
+      
+      return updated;
+    });
+  };
+
+  const handlePerformanceStatus = (data: any) => {
+    setPerformances(prev => prev.map(p => p.id === data.performanceId ? { ...p, status: data.status } : p));
+  };
+
+  return (
+    <>
+      <RealtimeUpdates eventId="" strictEvent={false} onPerformanceReorder={handlePerformanceReorder} onPerformanceStatus={handlePerformanceStatus}>
+      <div className="bg-gray-50">
       {/* Professional Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 mobile-header">
@@ -663,8 +749,9 @@ export default function JudgeDashboard() {
                 </button>
                 </div>
               </div>
-              </div>
             </div>
+          </div>
+        </div>
 
       {/* Alert Messages */}
       {successMessage && (
@@ -744,10 +831,7 @@ export default function JudgeDashboard() {
                         <p className={`font-semibold text-${colorTheme.text}`}>{selectedPerformance.mastery}</p>
                       </div>
                     )}
-                    <div>
-                      <p className="text-gray-600">Duration</p>
-                      <p className="font-semibold text-gray-900">{selectedPerformance.duration} minutes</p>
-                    </div>
+                    {/* Duration hidden by request */}
                     <div>
                       <p className="text-gray-600">Entry Type</p>
                       <p className="font-semibold text-gray-900 flex items-center">
@@ -972,6 +1056,7 @@ export default function JudgeDashboard() {
             <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
               <div className="flex flex-col gap-3 mb-4 md:mb-6">
                 <h2 className="text-lg md:text-xl font-bold text-black">Event Assignments</h2>
+                <span className="text-xs text-gray-500">Live updating… Last sync {lastSyncAt || '—'}</span>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <span className="text-xs md:text-sm text-black font-medium">
                     {getCompletionStats().scored} of {getCompletionStats().total} scored ({getCompletionStats().percentage}%)
@@ -1013,7 +1098,7 @@ export default function JudgeDashboard() {
             {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 mb-4 md:mb-6 mobile-hide-quick-actions">
               <h3 className="text-base md:text-lg font-semibold text-black mb-3 md:mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-3">
                   <label className="text-xs md:text-sm font-medium text-black">Jump to Item:</label>
                   <div className="flex space-x-2">
@@ -1040,7 +1125,7 @@ export default function JudgeDashboard() {
                 </div>
                 
                 <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-3">
-                  <label className="text-xs md:text-sm font-medium text-black">Filter:</label>
+                  <label className="text-xs md:text-sm font-medium text-black">Status:</label>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value as 'all' | 'scored' | 'completed')}
@@ -1049,6 +1134,19 @@ export default function JudgeDashboard() {
                     <option value="all">To Score</option>
                     <option value="scored">My Scores</option>
                     <option value="completed">Fully Completed</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-3">
+                  <label className="text-xs md:text-sm font-medium text-black">Type:</label>
+                  <select
+                    value={entryTypeFilter}
+                    onChange={(e) => setEntryTypeFilter(e.target.value as 'all' | 'live' | 'virtual')}
+                    className="px-2 py-1 md:px-3 md:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs md:text-sm"
+                  >
+                    <option value="all">All Entries</option>
+                    <option value="live">Live Only</option>
+                    <option value="virtual">Virtual Only</option>
                   </select>
                 </div>
                 
@@ -1088,7 +1186,9 @@ export default function JudgeDashboard() {
                                 {performance.itemNumber || '?'}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-black text-lg md:text-lg mobile-performance-title truncate uppercase">{performance.title}</h3>
+                                <h3 className="font-bold text-black text-lg md:text-lg mobile-performance-title truncate uppercase">
+                                  #{performance.itemNumber || '?'} — {performance.title}
+                                </h3>
                                 <p className="text-black mobile-performance-details truncate text-xs sm:text-sm hidden sm:block">{performance.participantNames.join(', ')}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   {performance.mastery && (
@@ -1096,6 +1196,13 @@ export default function JudgeDashboard() {
                                       {performance.mastery}
                                     </span>
                                   )}
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    performance.entryType === 'virtual' 
+                                      ? 'bg-purple-100 text-purple-800' 
+                                      : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {performance.entryType === 'virtual' ? '📹 Virtual' : '🎭 Live'}
+                                  </span>
                                   <button 
                                     className="sm:hidden text-xs text-blue-600 underline"
                                     onClick={(e) => {
@@ -1189,6 +1296,7 @@ export default function JudgeDashboard() {
           </>
         )}
       </div>
-    </div>
+    </RealtimeUpdates>
+    </>
   );
 } 

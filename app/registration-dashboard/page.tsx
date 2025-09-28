@@ -12,6 +12,7 @@ interface Performance {
   participantNames: string[];
   duration: number;
   itemNumber?: number;
+  performanceOrder?: number;
   status: 'scheduled' | 'ready' | 'hold' | 'in_progress' | 'completed' | 'cancelled';
   entryType?: 'live' | 'virtual';
   mastery?: string;
@@ -19,6 +20,7 @@ interface Performance {
   choreographer?: string;
   contestantId?: string;
   eodsaId?: string;
+  ageCategory?: string;
   presence?: {
     present: boolean;
     checkedInBy?: string;
@@ -44,6 +46,7 @@ export default function RegistrationDashboard() {
   const [performances, setPerformances] = useState<Performance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [presenceFilter, setPresenceFilter] = useState<string>('all');
   const [checkingIn, setCheckingIn] = useState<Set<string>>(new Set());
 
@@ -69,6 +72,19 @@ export default function RegistrationDashboard() {
       fetchEventData();
     }
   }, [selectedEvent]);
+
+  // Debounce search for smoother typing - prevent black screen issues
+  useEffect(() => {
+    const h = setTimeout(() => {
+      try {
+        setDebouncedSearch(searchTerm);
+      } catch (error) {
+        console.error('Search error:', error);
+        setDebouncedSearch(''); // Reset on error
+      }
+    }, 300);
+    return () => clearTimeout(h);
+  }, [searchTerm]);
 
   const fetchEvents = async () => {
     try {
@@ -101,8 +117,13 @@ export default function RegistrationDashboard() {
       const performancesData = await performancesRes.json();
       
       if (performancesData.success) {
-        // Sort by item number, then by creation time
+        // Sort by performance order (backstage sequence), fallback to item number
         const sortedPerformances = performancesData.performances.sort((a: Performance, b: Performance) => {
+          // Primary sort: performanceOrder (backstage sequence)
+          if (a.performanceOrder && b.performanceOrder) {
+            return a.performanceOrder - b.performanceOrder;
+          }
+          // Fallback to item number if performanceOrder missing
           if (a.itemNumber && b.itemNumber) {
             return a.itemNumber - b.itemNumber;
           } else if (a.itemNumber && !b.itemNumber) {
@@ -172,6 +193,18 @@ export default function RegistrationDashboard() {
           )
         );
 
+        // Broadcast presence update for realtime dashboards
+        try {
+          const { socketClient } = await import('@/lib/socket-client');
+          socketClient.emit('presence:update' as any, {
+            performanceId,
+            eventId: selectedEvent,
+            present: !currentlyPresent,
+            checkedInBy: user.id,
+            checkedInAt: new Date().toISOString()
+          } as any);
+        } catch {}
+
         const action = !currentlyPresent ? 'checked in' : 'marked absent';
         success(`"${title}" ${action} successfully`);
       } else {
@@ -193,7 +226,11 @@ export default function RegistrationDashboard() {
     setPerformances(prev => {
       const reorderedWithPresence = reorderedPerformances.map((reordered: any) => {
         const existing = prev.find(p => p.id === reordered.id);
-        return existing ? { ...existing, itemNumber: reordered.itemNumber } : reordered;
+        return existing ? { 
+          ...existing, 
+          itemNumber: reordered.itemNumber || existing.itemNumber, // Keep permanent item number
+          performanceOrder: reordered.performanceOrder // Update performance order
+        } : reordered;
       });
       return reorderedWithPresence;
     });
@@ -210,19 +247,31 @@ export default function RegistrationDashboard() {
     );
   };
 
+  // Show all live entries (solos, duets, trios, groups) - hide only virtual entries
   const filteredPerformances = performances.filter(perf => {
+    const isLive = (perf.entryType || 'live') === 'live';
     const matchesPresence = presenceFilter === 'all' || 
       (presenceFilter === 'present' && perf.presence?.present) ||
       (presenceFilter === 'absent' && !perf.presence?.present);
     
-    const matchesSearch = searchTerm === '' || 
-      perf.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      perf.contestantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      perf.participantNames.some(name => name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (perf.itemNumber && perf.itemNumber.toString().includes(searchTerm)) ||
-      (perf.eodsaId && perf.eodsaId.toLowerCase().includes(searchTerm.toLowerCase()));
+    const q = (debouncedSearch || '').toLowerCase();
+    const matchesSearch = !debouncedSearch || debouncedSearch === '' || (() => {
+      try {
+        return (
+          (perf.title || '').toLowerCase().includes(q) ||
+          (perf.contestantName || '').toLowerCase().includes(q) ||
+          (Array.isArray(perf.participantNames) && perf.participantNames.some(name => (name || '').toLowerCase().includes(q))) ||
+          (perf.itemNumber && perf.itemNumber.toString().includes(debouncedSearch)) ||
+          (perf.eodsaId && perf.eodsaId.toLowerCase().includes(q))
+        );
+      } catch (error) {
+        console.error('Search matching error:', error);
+        return true; // Show item if search fails
+      }
+    })();
     
-    return matchesPresence && matchesSearch;
+    // Debug: All live entries should be included regardless of participant count
+    return isLive && matchesPresence && matchesSearch;
   });
 
   const presentCount = performances.filter(p => p.presence?.present).length;
@@ -242,6 +291,7 @@ export default function RegistrationDashboard() {
   return (
     <RealtimeUpdates
       eventId={selectedEvent}
+      strictEvent
       onPerformanceReorder={handlePerformanceReorder}
       onPerformanceStatus={handlePerformanceStatus}
     >
@@ -269,6 +319,30 @@ export default function RegistrationDashboard() {
                     <option key={event.id} value={event.id}>{event.name}</option>
                   ))}
                 </select>
+                <button
+                  onClick={() => {
+                    const rows = [['Item #','Title','Contestant','Participants','Present','CheckedInBy','CheckedInAt']];
+                    for (const p of performances) {
+                      rows.push([
+                        String(p.itemNumber || ''),
+                        p.title || '',
+                        p.contestantName || '',
+                        Array.isArray(p.participantNames) ? p.participantNames.join('; ') : '',
+                        p.presence?.present ? 'Yes' : 'No',
+                        p.presence?.checkedInBy || '',
+                        p.presence?.checkedInAt ? new Date(p.presence.checkedInAt).toLocaleString() : ''
+                      ]);
+                    }
+                    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'presence.csv'; a.click(); URL.revokeObjectURL(url);
+                  }}
+                  className="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-black transition-colors"
+                >
+                  Export Presence CSV
+                </button>
                 <button
                   onClick={() => {
                     localStorage.removeItem('registrationSession');
@@ -400,22 +474,39 @@ export default function RegistrationDashboard() {
                           <h3 className="text-lg font-semibold text-black">
                             {performance.title}
                           </h3>
-                          <p className="text-sm text-black">
-                            by {performance.choreographer} • {performance.mastery} • {performance.itemStyle}
-                          </p>
-                          <p className="text-sm text-black">
-                            <strong>Studio/Contestant:</strong> {performance.contestantName}
-                          </p>
-                          <p className="text-sm text-black">
-                            <strong>Performers:</strong> {performance.participantNames.join(', ')}
-                          </p>
-                          {performance.eodsaId && (
-                            <p className="text-xs text-gray-600">
-                              EODSA ID: {performance.eodsaId}
-                            </p>
-                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                            <div>
+                              <p className="text-sm text-black">
+                                <strong>Entry Name:</strong> {performance.title}
+                              </p>
+                              <p className="text-sm text-black">
+                                <strong>Choreographer:</strong> {performance.choreographer}
+                              </p>
+                              <p className="text-sm text-black">
+                                <strong>Style:</strong> {performance.itemStyle} • <strong>Level:</strong> {performance.mastery}
+                              </p>
+                              {performance.ageCategory && (
+                                <p className="text-sm text-black">
+                                  <strong>Age Category:</strong> {performance.ageCategory}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-black">
+                                <strong>Studio Name:</strong> {performance.contestantName}
+                              </p>
+                              <p className="text-sm text-black">
+                                <strong>Contestant(s):</strong> {performance.participantNames.join(', ')}
+                              </p>
+                              {performance.eodsaId && (
+                                <p className="text-xs text-gray-600">
+                                  <strong>EODSA ID:</strong> {performance.eodsaId}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                           {performance.presence?.checkedInAt && (
-                            <p className="text-xs text-green-600">
+                            <p className="text-xs text-green-600 mt-2">
                               Last updated: {new Date(performance.presence.checkedInAt).toLocaleString()}
                             </p>
                           )}

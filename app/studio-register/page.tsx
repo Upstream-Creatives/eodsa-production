@@ -29,6 +29,8 @@ export default function StudioRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string>('');
   const [nameValidationTimeout, setNameValidationTimeout] = useState<NodeJS.Timeout | null>(null);
   const router = useRouter();
@@ -456,32 +458,52 @@ export default function StudioRegisterPage() {
                       <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
                         Password *
                       </label>
-                      <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white placeholder-gray-400"
-                        placeholder="Enter password"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          id="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 pr-12 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white placeholder-gray-400"
+                          placeholder="Enter password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          className="absolute inset-y-0 right-2 my-1 px-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/10"
+                          aria-label="Toggle password visibility"
+                        >
+                          {showPassword ? '🙈' : '👁️'}
+                        </button>
+                      </div>
                     </div>
                     
                     <div>
                       <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-2">
                         Confirm Password *
                       </label>
-                      <input
-                        type="password"
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white placeholder-gray-400"
-                        placeholder="Confirm password"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          type={showConfirm ? 'text' : 'password'}
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 pr-12 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white placeholder-gray-400"
+                          placeholder="Confirm password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirm(v => !v)}
+                          className="absolute inset-y-0 right-2 my-1 px-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/10"
+                          aria-label="Toggle confirm password visibility"
+                        >
+                          {showConfirm ? '🙈' : '👁️'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

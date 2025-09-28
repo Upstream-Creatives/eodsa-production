@@ -95,6 +95,7 @@ export interface EventEntry {
   approved: boolean;
   qualifiedForNationals: boolean;
   itemNumber?: number; // NEW: Item Number for program order
+  virtualItemNumber?: number; // NEW: Independent Virtual program number
   // EODSA Nationals Entry Form fields
   itemName: string;
   choreographer: string;
@@ -122,6 +123,7 @@ export interface Performance {
   participantNames: string[];
   duration: number; // in minutes (maps to estimatedDuration)
   itemNumber?: number; // NEW: Item Number for program order
+  performanceOrder?: number; // NEW: Performance order (different from item number)
   scheduledTime?: string;
   status: 'scheduled' | 'ready' | 'hold' | 'in_progress' | 'completed' | 'cancelled';
   withdrawnFromJudging?: boolean; // NEW: Admin can withdraw items from judging
@@ -129,6 +131,20 @@ export interface Performance {
   choreographer: string;
   mastery: string; // UPDATED: New mastery levels
   itemStyle: string;
+  ageCategory?: string; // NEW: Age category from event
+  // NEW: Music cue preference to guide sound start timing
+  musicCue?: 'onstage' | 'offstage';
+  // NEW: Entry type to distinguish live vs virtual performances
+  entryType?: 'live' | 'virtual';
+  // NEW: Media files
+  musicFileUrl?: string;
+  musicFileName?: string;
+  videoExternalUrl?: string;
+  videoExternalType?: 'youtube' | 'vimeo' | 'other';
+  // NEW: Announcer features
+  announced?: boolean;
+  announcedAt?: string;
+  announcerNotes?: string;
 }
 
 export interface Judge {

@@ -10,6 +10,7 @@ export default function AnnouncerPortalPage() {
     email: '',
     password: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -104,18 +105,26 @@ export default function AnnouncerPortalPage() {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
-                <div className="mt-1">
+                <div className="mt-1 relative">
                   <input
                     id="password"
                     name="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     required
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm text-gray-900 bg-white"
+                    className="appearance-none block w-full px-3 py-2 pr-12 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm text-gray-900 bg-white"
                     placeholder="Enter your password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute inset-y-0 right-2 my-1 px-3 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    aria-label="Toggle password visibility"
+                  >
+                    {showPassword ? '🙈' : '👁️'}
+                  </button>
                 </div>
               </div>
 

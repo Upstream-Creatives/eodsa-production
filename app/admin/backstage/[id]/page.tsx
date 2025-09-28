@@ -7,6 +7,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -22,7 +23,6 @@ import {
 import {CSS} from '@dnd-kit/utilities';
 import { useBackstageSocket } from '@/hooks/useSocket';
 import { useToast } from '@/components/ui/simple-toast';
-import BackstageMusicPlayer from '@/components/BackstageMusicPlayer';
 
 interface Performance {
   id: string;
@@ -30,11 +30,13 @@ interface Performance {
   contestantName: string;
   participantNames: string[];
   duration: number;
-  itemNumber?: number;
+  itemNumber?: number; // Permanent item number (locked after assignment)
+  performanceOrder?: number; // Current position in backstage sequence
   status: 'scheduled' | 'ready' | 'hold' | 'in_progress' | 'completed' | 'cancelled';
   entryType?: 'live' | 'virtual';
   musicFileUrl?: string;
   videoExternalUrl?: string;
+  musicCue?: 'onstage' | 'offstage';
 }
 
 interface Event {
@@ -49,11 +51,21 @@ interface Event {
 function SortablePerformanceItem({ 
   performance, 
   updatePerformanceStatus, 
-  onPlayMusic 
+  onUpdateMusicCue,
+  selectedForMove,
+  movePerformanceUp,
+  movePerformanceDown,
+  setSelectedForMove,
+  performances
 }: { 
   performance: Performance; 
   updatePerformanceStatus: (id: string, status: Performance['status']) => void;
-  onPlayMusic: (performance: Performance) => void;
+  onUpdateMusicCue: (id: string, cue: 'onstage' | 'offstage') => void;
+  selectedForMove: string | null;
+  movePerformanceUp: (id: string) => void;
+  movePerformanceDown: (id: string) => void;
+  setSelectedForMove: (id: string | null) => void;
+  performances: Performance[];
 }) {
   const {
     attributes,
@@ -75,196 +87,299 @@ function SortablePerformanceItem({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-        isDragging
-          ? 'bg-purple-600 border-purple-400 shadow-2xl scale-105 rotate-2'
-          : performance.status === 'completed'
-          ? 'bg-green-700 border-green-500'
-          : performance.status === 'in_progress'
-          ? 'bg-blue-700 border-blue-500'
-          : 'bg-gray-700 border-gray-600'
-      }`}
+      {...listeners}
+      className={`relative rounded-xl border-2 transition-all duration-150 select-none cursor-grab active:cursor-grabbing
+        ${isDragging ? 'z-50 shadow-2xl scale-105' : ''}
+        ${performance.status === 'completed' ? 'bg-green-700 border-green-500' 
+        : performance.status === 'in_progress' ? 'bg-blue-700 border-blue-500'
+        : 'bg-gray-700 border-gray-600'}
+        ${selectedForMove === performance.id ? 'ring-4 ring-yellow-400' : ''}
+      `}
     >
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          {/* Enhanced Item Number Display */}
-          <div className={`relative ${isDragging ? 'animate-pulse' : ''}`}>
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl border-4 transition-all duration-200 ${
-              isDragging 
-                ? 'bg-yellow-400 border-yellow-300 text-black scale-110' 
-                : performance.status === 'completed'
-                ? 'bg-green-500 border-green-400 text-white'
-                : performance.status === 'in_progress'
-                ? 'bg-blue-500 border-blue-400 text-white'
+      
+      {/* Mobile/Desktop responsive content */}
+      <div className="p-3 md:p-4">
+        {/* Mobile Layout */}
+        <div className="md:hidden">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-3">
+              {/* Compact item number */}
+              <div className={`w-16 h-16 rounded-lg flex flex-col items-center justify-center font-bold border-2 ${
+                performance.status === 'completed' ? 'bg-green-500 border-green-400 text-white'
+                : performance.status === 'in_progress' ? 'bg-blue-500 border-blue-400 text-white'
                 : 'bg-purple-500 border-purple-400 text-white'
-            }`}>
-              {performance.itemNumber || '?'}
+              }`}>
+                <div className="text-sm leading-none">#{performance.itemNumber || '?'}</div>
+                <div className="text-xs opacity-75 leading-none">P{performance.performanceOrder || '?'}</div>
+              </div>
+              
+              {/* Mobile select button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedForMove(selectedForMove === performance.id ? null : performance.id);
+                }}
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                  selectedForMove === performance.id 
+                    ? 'bg-yellow-400 text-black' 
+                    : 'bg-gray-600 text-white hover:bg-gray-500'
+                }`}
+              >
+                {selectedForMove === performance.id ? 'Selected' : 'Select'}
+              </button>
             </div>
-            {isDragging && (
-              <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-300 rounded-full flex items-center justify-center">
-                <span className="text-xs font-bold text-black">📌</span>
+
+            {/* Mobile reorder buttons */}
+            {selectedForMove === performance.id && (
+              <div className="flex space-x-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    movePerformanceUp(performance.id);
+                  }}
+                  disabled={performances.findIndex(p => p.id === performance.id) === 0}
+                  className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    movePerformanceDown(performance.id);
+                  }}
+                  disabled={performances.findIndex(p => p.id === performance.id) === performances.length - 1}
+                  className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  ↓
+                </button>
               </div>
             )}
           </div>
-          
-          <div className={isDragging ? 'opacity-75' : ''}>
-            <h3 className="font-semibold text-lg text-white">{performance.title}</h3>
-            <p className={`text-sm ${isDragging ? 'text-gray-200' : 'text-gray-300'}`}>
-              by {performance.contestantName} | {performance.duration}min | {performance.entryType?.toUpperCase()}
-            </p>
-            <p className={`text-xs ${isDragging ? 'text-gray-300' : 'text-gray-400'}`}>
-              {performance.participantNames.join(', ')}
-            </p>
+
+          {/* Mobile title and info */}
+          <div className="mb-3">
+            <h3 className="font-semibold text-lg text-white leading-tight truncate">{performance.title}</h3>
+            <p className="text-sm text-gray-300 truncate">by {performance.contestantName}</p>
+            <p className="text-xs text-gray-400 truncate">{performance.participantNames.join(', ')}</p>
+          </div>
+
+          {/* Mobile action buttons */}
+          <div className="flex flex-wrap gap-2">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateMusicCue(performance.id, performance.musicCue === 'onstage' ? 'offstage' : 'onstage');
+              }}
+              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                performance.musicCue === 'onstage' ? 'bg-green-600 text-white' : 'bg-gray-600 text-white'
+              }`}
+            >
+              {performance.musicCue === 'onstage' ? 'Onstage' : 'Offstage'}
+            </button>
+
+            {/* Mobile Status Controls */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                updatePerformanceStatus(performance.id, 'in_progress');
+              }}
+              disabled={performance.status === 'in_progress'}
+              className={`px-2 py-1 rounded text-sm font-bold ${
+                performance.status === 'in_progress' 
+                  ? 'bg-blue-600 text-white cursor-not-allowed' 
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+              title="Start"
+            >
+              ▶️
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                updatePerformanceStatus(performance.id, 'hold');
+              }}
+              disabled={performance.status !== 'in_progress'}
+              className={`px-2 py-1 rounded text-sm font-bold ${
+                performance.status !== 'in_progress'
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                  : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+              }`}
+              title="Pause"
+            >
+              ⏸️
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                updatePerformanceStatus(performance.id, 'completed');
+              }}
+              disabled={performance.status === 'completed'}
+              className={`px-2 py-1 rounded text-sm font-bold ${
+                performance.status === 'completed'
+                  ? 'bg-green-600 text-white cursor-not-allowed'
+                  : 'bg-green-500 hover:bg-green-600 text-white'
+              }`}
+              title="Complete"
+            >
+              ✅
+            </button>
+
+            <span className={`px-3 py-1 rounded-lg text-sm ${
+              performance.status === 'completed' ? 'bg-green-600 text-white'
+              : performance.status === 'in_progress' ? 'bg-blue-600 text-white'
+              : performance.status === 'hold' ? 'bg-yellow-600 text-white'
+              : 'bg-gray-600 text-white'
+            }`}>
+              {performance.status.toUpperCase()}
+            </span>
           </div>
         </div>
 
-        <div className={`flex items-center space-x-2 ${isDragging ? 'opacity-50' : ''}`}>
-          {/* Music/Video Play Button */}
-          {!isDragging && (
+        {/* Desktop Layout */}
+        <div className="hidden md:flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            {/* Desktop drag handle */}
             <button
-              onClick={() => onPlayMusic(performance)}
-              className={`p-3 rounded-lg transition-all duration-200 border-2 ${
-                performance.entryType === 'live' && performance.musicFileUrl
-                  ? 'bg-green-600 hover:bg-green-700 border-green-400 text-white'
-                  : performance.entryType === 'virtual' && performance.videoExternalUrl
-                  ? 'bg-blue-600 hover:bg-blue-700 border-blue-400 text-white'
-                  : 'bg-gray-600 border-gray-500 text-gray-300 opacity-50 cursor-not-allowed'
-              }`}
-              disabled={!performance.musicFileUrl && !performance.videoExternalUrl}
-              title={
-                performance.entryType === 'live' && performance.musicFileUrl
-                  ? 'Play music'
-                  : performance.entryType === 'virtual' && performance.videoExternalUrl
-                  ? 'Open video'
-                  : 'No media available'
-              }
+              aria-label="Drag to reorder"
+              {...listeners}
+              className="hidden md:flex w-10 h-20 rounded-lg bg-gray-600 text-white flex-col items-center justify-center active:cursor-grabbing cursor-grab select-none"
             >
-              <span className="text-lg">
-                {performance.entryType === 'live' ? '🎵' : performance.entryType === 'virtual' ? '📹' : '🚫'}
-              </span>
+              <span className="text-lg leading-none">⋮</span>
+              <span className="text-lg leading-none -mt-1">⋮</span>
             </button>
-          )}
-
-          {/* Status buttons with full lifecycle control */}
-          {performance.status === 'scheduled' && !isDragging && (
-            <>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'ready')}
-                className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded font-semibold transition-colors text-sm"
-              >
-                ✅ Ready
-              </button>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'hold')}
-                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded font-semibold transition-colors text-sm"
-              >
-                ⏸️ Hold
-              </button>
-            </>
-          )}
-          
-          {performance.status === 'ready' && !isDragging && (
-            <>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'in_progress')}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition-colors"
-              >
-                ▶️ Start
-              </button>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'hold')}
-                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded font-semibold transition-colors text-sm"
-              >
-                ⏸️ Hold
-              </button>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'scheduled')}
-                className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
-                title="Reset to scheduled"
-              >
-                ↩️ Reset
-              </button>
-            </>
-          )}
-          
-          {performance.status === 'hold' && !isDragging && (
-            <>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'ready')}
-                className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded font-semibold transition-colors"
-              >
-                ✅ Ready
-              </button>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'scheduled')}
-                className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
-                title="Reset to scheduled"
-              >
-                ↩️ Reset
-              </button>
-            </>
-          )}
-          
-          {performance.status === 'in_progress' && !isDragging && (
-            <>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'completed')}
-                className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded font-semibold transition-colors"
-              >
-                ✅ Complete
-              </button>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'scheduled')}
-                className="px-2 py-1 bg-orange-600 hover:bg-orange-700 rounded text-xs font-semibold transition-colors"
-                title="Reset to scheduled"
-              >
-                ↩️ Reset
-              </button>
-            </>
-          )}
-
-          {performance.status === 'completed' && !isDragging && (
-            <>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'in_progress')}
-                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-semibold transition-colors"
-                title="Mark as in progress"
-              >
-                ◀️ In Progress
-              </button>
-              <button
-                onClick={() => updatePerformanceStatus(performance.id, 'scheduled')}
-                className="px-2 py-1 bg-orange-600 hover:bg-orange-700 rounded text-xs font-semibold transition-colors"
-                title="Reset to scheduled"
-              >
-                ↩️ Reset
-              </button>
-            </>
-          )}
-
-          {/* Enhanced Status indicator */}
-          <div className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${
-            performance.status === 'completed' ? 'bg-green-600 border-green-400 text-white' :
-            performance.status === 'in_progress' ? 'bg-blue-600 border-blue-400 text-white animate-pulse' :
-            performance.status === 'ready' ? 'bg-green-500 border-green-300 text-white' :
-            performance.status === 'hold' ? 'bg-yellow-600 border-yellow-400 text-black' :
-            performance.status === 'cancelled' ? 'bg-red-600 border-red-400 text-white' :
-            'bg-gray-600 border-gray-400 text-white'
-          }`}>
-            {performance.status.toUpperCase()}
+            {/* Item Number + Performance Order Display */}
+            <div className={`relative ${isDragging ? 'animate-pulse' : ''}`}>
+              <div className={`w-20 h-20 rounded-xl flex flex-col items-center justify-center font-bold border-4 transition-all duration-150 ${
+                isDragging 
+                  ? 'bg-yellow-400 border-yellow-300 text-black scale-110' 
+                  : performance.status === 'completed'
+                  ? 'bg-green-500 border-green-400 text-white'
+                  : performance.status === 'in_progress'
+                  ? 'bg-blue-500 border-blue-400 text-white'
+                  : 'bg-purple-500 border-purple-400 text-white'
+              }`}>
+                <div className="text-lg leading-none">#{performance.itemNumber || '?'}</div>
+                <div className="text-xs opacity-75 leading-none mt-1">
+                  Pos: {performance.performanceOrder || '?'}
+                </div>
+              </div>
+              {isDragging && (
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-300 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-black">📌</span>
+                </div>
+              )}
+            </div>
+            
+            <div className={isDragging ? 'opacity-75' : ''}>
+              <h3 className="font-semibold text-lg text-white leading-tight">{performance.title}</h3>
+              <p className={`text-sm ${isDragging ? 'text-gray-200' : 'text-gray-300'} mt-1`}>
+                by {performance.contestantName} | {performance.entryType?.toUpperCase()}
+              </p>
+              <p className={`text-xs ${isDragging ? 'text-gray-300' : 'text-gray-400'}`}>
+                {performance.participantNames.join(', ')}
+              </p>
+            </div>
           </div>
 
-          {/* Enhanced Drag handle */}
-          <div 
-            {...listeners} 
-            className={`text-gray-300 cursor-grab active:cursor-grabbing p-3 rounded-lg transition-all duration-200 ${
-              isDragging 
-                ? 'bg-yellow-400 text-black scale-110' 
-                : 'hover:bg-gray-600 hover:text-white'
-            }`}
-            title="Drag to reorder"
-          >
-            <div className="text-lg">⋮⋮</div>
+          {/* Desktop controls */}
+          <div className="flex items-center space-x-2">
+            {/* Desktop select + arrow controls (unified with mobile) */}
+            <button
+              onClick={() => setSelectedForMove(selectedForMove === performance.id ? null : performance.id)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                selectedForMove === performance.id 
+                  ? 'bg-yellow-400 text-black' 
+                  : 'bg-gray-600 text-white hover:bg-gray-500'
+              }`}
+            >
+              {selectedForMove === performance.id ? 'Selected' : 'Select'}
+            </button>
+            {selectedForMove === performance.id && (
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => movePerformanceUp(performance.id)}
+                  disabled={performances.findIndex(p => p.id === performance.id) === 0}
+                  className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={() => movePerformanceDown(performance.id)}
+                  disabled={performances.findIndex(p => p.id === performance.id) === performances.length - 1}
+                  className="w-10 h-10 rounded-lg bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  ↓
+                </button>
+              </div>
+            )}
+
+            {/* On-stage/Off-stage Toggle - Desktop */}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateMusicCue(performance.id, performance.musicCue === 'onstage' ? 'offstage' : 'onstage');
+              }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                performance.musicCue === 'onstage' 
+                  ? 'bg-green-600 text-white border-2 border-green-400' 
+                  : 'bg-gray-600 text-white border-2 border-gray-500 hover:bg-gray-500'
+              }`}
+              title={`Currently ${performance.musicCue || 'offstage'} - Click to toggle`}
+            >
+              {performance.musicCue === 'onstage' ? '🎭 Onstage' : '📴 Offstage'}
+            </button>
+
+            {/* Performance Status Controls */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'in_progress')}
+                disabled={performance.status === 'in_progress'}
+                className={`px-2 py-1 rounded text-xs font-bold ${
+                  performance.status === 'in_progress' 
+                    ? 'bg-blue-600 text-white cursor-not-allowed' 
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+                title="Start Performance"
+              >
+                ▶️
+              </button>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'hold')}
+                disabled={performance.status !== 'in_progress'}
+                className={`px-2 py-1 rounded text-xs font-bold ${
+                  performance.status !== 'in_progress'
+                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                    : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                }`}
+                title="Pause Performance"
+              >
+                ⏸️
+              </button>
+              <button
+                onClick={() => updatePerformanceStatus(performance.id, 'completed')}
+                disabled={performance.status === 'completed'}
+                className={`px-2 py-1 rounded text-xs font-bold ${
+                  performance.status === 'completed'
+                    ? 'bg-green-600 text-white cursor-not-allowed'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+                }`}
+                title="Complete Performance"
+              >
+                ✅
+              </button>
+            </div>
+
+            {/* Status indicator */}
+            <div className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${
+              performance.status === 'completed' ? 'bg-green-600 border-green-400 text-white' :
+              performance.status === 'in_progress' ? 'bg-blue-600 border-blue-400 text-white animate-pulse' :
+              performance.status === 'hold' ? 'bg-yellow-600 border-yellow-400 text-white' :
+              'bg-gray-600 border-gray-400 text-white'
+            }`}>
+              {performance.status.toUpperCase()}
+            </div>
+
+            {/* No drag indicator; selection + arrows used on all devices */}
           </div>
         </div>
       </div>
@@ -293,16 +408,29 @@ export default function BackstageDashboard() {
   const [currentPerformance, setCurrentPerformance] = useState<Performance | null>(null);
   const [eventStatus, setEventStatus] = useState<'waiting' | 'active' | 'paused' | 'completed'>('waiting');
   
-  // Music Player State
-  const [musicPlayerOpen, setMusicPlayerOpen] = useState(false);
-  const [selectedPerformance, setSelectedPerformance] = useState<Performance | null>(null);
+  // No music player needed on Backstage - that's for Sound Tech dashboard
+  // Mobile Reordering State
+  const [selectedForMove, setSelectedForMove] = useState<string | null>(null);
 
   // Socket connection for real-time updates
   const socket = useBackstageSocket(eventId);
 
-  // @dnd-kit sensors for drag interactions
+  // @dnd-kit sensors for drag interactions - iPad-optimized touch handling
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    // Mouse/Desktop sensor with minimal activation distance
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Slightly higher to prevent accidental drags on iPad
+      },
+    }),
+    // Touch sensor specifically tuned for iPad drag & drop
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 100, // iPad needs slightly more delay to distinguish tap vs drag
+        tolerance: 15, // Higher tolerance for finger size on iPad
+      },
+    }),
+    // Keyboard accessibility
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -355,6 +483,8 @@ export default function BackstageDashboard() {
     };
   }, [socket.connected, eventId]);
 
+  const [searchTerm, setSearchTerm] = useState('');
+
   const loadEventData = async () => {
     setIsLoading(true);
     try {
@@ -371,8 +501,15 @@ export default function BackstageDashboard() {
       const performancesData = await performancesRes.json();
       
       if (performancesData.success) {
-        // Sort by item number, then by creation time
-        const sortedPerformances = performancesData.performances.sort((a: Performance, b: Performance) => {
+        // Filter live only for backstage
+        const liveOnly = performancesData.performances.filter((p: Performance) => (p.entryType || 'live') === 'live');
+        // Sort by performanceOrder first, then by item number for initial display
+        const sortedPerformances = liveOnly.sort((a: Performance, b: Performance) => {
+          // If both have performanceOrder, use that
+          if (a.performanceOrder && b.performanceOrder) {
+            return a.performanceOrder - b.performanceOrder;
+          }
+          // Fall back to item number ordering
           if (a.itemNumber && b.itemNumber) {
             return a.itemNumber - b.itemNumber;
           } else if (a.itemNumber && !b.itemNumber) {
@@ -383,12 +520,44 @@ export default function BackstageDashboard() {
           return a.title.localeCompare(b.title);
         });
         
-        setPerformances(sortedPerformances);
+        // Set initial performanceOrder if not already set
+        const performancesWithOrder = sortedPerformances.map((performance: Performance, index: number) => ({
+          ...performance,
+          performanceOrder: performance.performanceOrder || (index + 1)
+        }));
+        
+        setPerformances(performancesWithOrder);
       }
     } catch (error) {
       console.error('Error loading event data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const updateMusicCue = async (performanceId: string, cue: 'onstage' | 'offstage') => {
+    try {
+      const res = await fetch(`/api/performances/${performanceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ musicCue: cue })
+      });
+      if (res.ok) {
+        setPerformances(prev => prev.map(p => p.id === performanceId ? { ...p, musicCue: cue } : p));
+        // Broadcast to other dashboards
+        socket.emit('performance:music_cue', {
+          eventId,
+          performanceId,
+          musicCue: cue,
+          timestamp: new Date().toISOString()
+        });
+        success(`Music cue set to ${cue}`);
+      } else {
+        error('Failed to update music cue');
+      }
+    } catch (e) {
+      console.error('Error updating music cue:', e);
+      error('Failed to update music cue');
     }
   };
 
@@ -410,20 +579,21 @@ export default function BackstageDashboard() {
     // Reorder performances array
     const reorderedPerformances = arrayMove(performances, oldIndex, newIndex);
     
-    // Update item numbers based on new order (THIS HAPPENS IMMEDIATELY)
+    // GABRIEL'S REQUIREMENT: Lock item numbers, only update performance order
     const updatedPerformances = reorderedPerformances.map((performance, index) => ({
       ...performance,
-      itemNumber: index + 1  // Item numbers are 1-based
+      // itemNumber stays UNCHANGED - locked for judges
+      performanceOrder: index + 1  // Only update the performance sequence
     }));
 
     // Update local state immediately for instant visual feedback
     setPerformances(updatedPerformances);
 
-    // Show immediate feedback
-    const oldItemNumber = draggedPerformance.itemNumber || oldIndex + 1;
-    const newItemNumber = newIndex + 1;
+    // Show immediate feedback - Gabriel's requirement
+    const oldOrder = oldIndex + 1;
+    const newOrder = newIndex + 1;
     
-    success(`🎯 Moved "${draggedPerformance.title}" from #${oldItemNumber} → #${newItemNumber}`);
+    success(`🎯 Moved Item #${draggedPerformance.itemNumber} from position ${oldOrder} → position ${newOrder}`);
 
     try {
       // Send reorder to server
@@ -434,8 +604,8 @@ export default function BackstageDashboard() {
           eventId,
           performances: updatedPerformances.map(p => ({
             id: p.id,
-            itemNumber: p.itemNumber,
-            displayOrder: p.itemNumber
+            itemNumber: p.itemNumber, // Keep original item number (locked)
+            performanceOrder: p.performanceOrder // Send new performance order
           }))
         })
       });
@@ -446,8 +616,9 @@ export default function BackstageDashboard() {
           eventId,
           performances: updatedPerformances.map(p => ({
             id: p.id,
-            itemNumber: p.itemNumber!,
-            displayOrder: p.itemNumber!
+            itemNumber: p.itemNumber!, // Keep permanent item number (locked)
+            performanceOrder: p.performanceOrder!, // Send new performance order
+            displayOrder: p.performanceOrder! // For backward compatibility with existing handlers
           }))
         });
 
@@ -468,6 +639,17 @@ export default function BackstageDashboard() {
       error('❌ Network error - reverted to original order');
     }
   };
+
+  const visiblePerformances = performances.filter(p => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      p.title.toLowerCase().includes(q) ||
+      p.contestantName.toLowerCase().includes(q) ||
+      p.participantNames.some(name => name.toLowerCase().includes(q)) ||
+      (p.itemNumber && p.itemNumber.toString().includes(searchTerm))
+    );
+  });
 
   const updatePerformanceStatus = async (performanceId: string, status: Performance['status']) => {
     try {
@@ -534,22 +716,70 @@ export default function BackstageDashboard() {
     success(`Event ${action}ed`);
   };
 
-  const handlePlayMusic = (performance: Performance) => {
-    setSelectedPerformance(performance);
-    setMusicPlayerOpen(true);
+  // Music player functions removed - Backstage doesn't need to play music/videos
+
+  // Mobile reordering functions
+  const movePerformanceUp = async (performanceId: string) => {
+    const currentIndex = performances.findIndex(p => p.id === performanceId);
+    if (currentIndex <= 0) return;
     
-    // Log the media access for debugging
-    console.log('🎵 Opening music player for:', {
-      title: performance.title,
-      entryType: performance.entryType,
-      hasMusic: !!performance.musicFileUrl,
-      hasVideo: !!performance.videoExternalUrl
-    });
+    const newPerformances = [...performances];
+    [newPerformances[currentIndex - 1], newPerformances[currentIndex]] = 
+    [newPerformances[currentIndex], newPerformances[currentIndex - 1]];
+    
+    await updatePerformanceOrder(newPerformances);
   };
 
-  const closeMusicPlayer = () => {
-    setMusicPlayerOpen(false);
-    setSelectedPerformance(null);
+  const movePerformanceDown = async (performanceId: string) => {
+    const currentIndex = performances.findIndex(p => p.id === performanceId);
+    if (currentIndex >= performances.length - 1) return;
+    
+    const newPerformances = [...performances];
+    [newPerformances[currentIndex], newPerformances[currentIndex + 1]] = 
+    [newPerformances[currentIndex + 1], newPerformances[currentIndex]];
+    
+    await updatePerformanceOrder(newPerformances);
+  };
+
+  const updatePerformanceOrder = async (reorderedPerformances: Performance[]) => {
+    // Update performance order only (Gabriel's requirement)
+    const updatedPerformances = reorderedPerformances.map((performance, index) => ({
+      ...performance,
+      performanceOrder: index + 1
+    }));
+
+    setPerformances(updatedPerformances);
+
+    try {
+      const response = await fetch('/api/admin/reorder-performances', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          performances: updatedPerformances.map(p => ({
+            id: p.id,
+            itemNumber: p.itemNumber,
+            performanceOrder: p.performanceOrder
+          }))
+        })
+      });
+
+      if (response.ok) {
+        socket.emit('performance:reorder', {
+          eventId,
+          performances: updatedPerformances.map(p => ({
+            id: p.id,
+            itemNumber: p.itemNumber!,
+            performanceOrder: p.performanceOrder!,
+            displayOrder: p.performanceOrder!
+          }))
+        });
+        success('Order updated');
+      }
+    } catch (err) {
+      console.error('Error updating order:', err);
+      error('Failed to update order');
+    }
   };
 
   if (isLoading) {
@@ -674,7 +904,7 @@ export default function BackstageDashboard() {
           <div>
             <h2 className="text-2xl font-bold">Performance Order</h2>
             <p className="text-sm text-gray-400 mt-1">
-              Drag the <span className="text-yellow-400">⋮⋮ handle</span> to reorder performances. Item numbers update instantly!
+              <span className="md:hidden">Drag anywhere on a card to reorder, or use Select + ↑↓ buttons</span><span className="hidden md:inline">Drag anywhere on a card to reorder</span>. Item numbers stay locked, only performance order changes!
             </p>
           </div>
           <div className="text-right">
@@ -683,6 +913,14 @@ export default function BackstageDashboard() {
             </div>
             <div className="text-xs text-gray-500 mt-1">
               Last updated: {new Date().toLocaleTimeString()}
+            </div>
+            <div className="mt-3">
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by title, studio, dancer, or item #"
+                className="px-3 py-2 rounded bg-gray-700 border border-gray-600 placeholder-gray-400 text-white w-72"
+              />
             </div>
           </div>
         </div>
@@ -697,8 +935,8 @@ export default function BackstageDashboard() {
             <ol className="text-gray-300 text-sm mt-2 space-y-1">
               <li>1. Go to the admin dashboard and create some event entries</li>
               <li>2. Return here to see them listed with item numbers</li>
-              <li>3. Drag the ⋮⋮ handle to reorder them</li>
-              <li>4. Watch item numbers update in real-time!</li>
+              <li>3. Drag anywhere on a card to reorder them</li>
+              <li>4. Watch performance order update in real-time (item numbers stay locked)!</li>
             </ol>
           </div>
         )}
@@ -706,12 +944,11 @@ export default function BackstageDashboard() {
         {performances.length > 0 && (
           <div className="bg-purple-600/10 border border-purple-600/50 rounded-lg p-4 mb-6">
             <p className="text-purple-300 text-sm">
-              <span className="font-semibold">💡 How to test:</span> Grab any ⋮⋮ handle and drag up/down to reorder. 
-              Item numbers will update instantly and sync across all connected dashboards!
+              <span className="font-semibold">💡 How to use:</span> Drag anywhere on a performance card to reorder (works on iPad, mouse, touch). Select + ↑↓ buttons also available. 
+              Item numbers stay locked (for judges), only the performance order changes and syncs across dashboards!
             </p>
             <p className="text-purple-300 text-sm mt-2">
-              <span className="font-semibold">🎵 Music Player:</span> Click the 🎵 button on live entries to play music, 
-              or 📹 button on virtual entries to open video links. Full controls with play/pause/seek/volume!
+              <span className="font-semibold">🎭 Backstage Control:</span> Use On-stage/Off-stage toggles and status buttons (▶️ Start, ⏸️ Pause, ✅ Complete) to manage performances.
             </p>
           </div>
         )}
@@ -726,12 +963,17 @@ export default function BackstageDashboard() {
             strategy={verticalListSortingStrategy}
           >
             <div className="space-y-3">
-              {performances.map((performance) => (
+              {visiblePerformances.map((performance) => (
                 <SortablePerformanceItem
                   key={performance.id}
                   performance={performance}
                   updatePerformanceStatus={updatePerformanceStatus}
-                  onPlayMusic={handlePlayMusic}
+                  onUpdateMusicCue={updateMusicCue}
+                  selectedForMove={selectedForMove}
+                  movePerformanceUp={movePerformanceUp}
+                  movePerformanceDown={movePerformanceDown}
+                  setSelectedForMove={setSelectedForMove}
+                  performances={performances}
                 />
               ))}
             </div>
@@ -739,12 +981,7 @@ export default function BackstageDashboard() {
         </DndContext>
       </div>
 
-      {/* Music Player Modal */}
-      <BackstageMusicPlayer
-        isOpen={musicPlayerOpen}
-        onClose={closeMusicPlayer}
-        performance={selectedPerformance}
-      />
+      {/* Music player removed - not needed on Backstage dashboard */}
     </div>
   );
 }

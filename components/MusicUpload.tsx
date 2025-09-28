@@ -17,13 +17,17 @@ interface MusicUploadProps {
     url: string;
     filename: string;
   } | null;
+  variant?: 'light' | 'dark';
+  compact?: boolean;
 }
 
 export default function MusicUpload({ 
   onUploadSuccess, 
   onUploadError, 
   disabled = false,
-  currentFile = null 
+  currentFile = null,
+  variant = 'dark',
+  compact = false
 }: MusicUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -215,21 +219,22 @@ export default function MusicUpload({
     <div className="space-y-4">
       {/* Current File Display */}
       {currentFile && (
-        <div className="bg-green-900/30 border border-green-500/40 rounded-xl p-4 sm:p-6 backdrop-blur-sm">
+        <div className={`${variant === 'light' ? 'bg-green-50 border-green-200' : 'bg-green-900/30 border-green-500/40'} border rounded-xl p-4 sm:p-6 ${variant === 'light' ? '' : 'backdrop-blur-sm'}`}
+        >
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center border border-green-500/30">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${variant === 'light' ? 'bg-green-100 border-green-200' : 'bg-green-500/20 border-green-500/30'}`}>
                 <span className="text-2xl">🎵</span>
               </div>
               <div>
-                <p className="font-semibold text-green-300 text-base">✅ Music File Uploaded</p>
-                <p className="text-sm text-green-200 break-all">{currentFile.filename}</p>
+                <p className={`font-semibold text-base ${variant === 'light' ? 'text-green-700' : 'text-green-300'}`}>✅ Music File Uploaded</p>
+                <p className={`text-sm break-all ${variant === 'light' ? 'text-green-700/80' : 'text-green-200'}`}>{currentFile.filename}</p>
               </div>
             </div>
             <div className="flex justify-center sm:justify-end">
               <audio 
                 controls 
-                className="h-10 sm:h-8 rounded-lg bg-slate-800/60"
+                className={`h-10 sm:h-8 rounded-lg ${variant === 'light' ? 'bg-white border border-gray-200' : 'bg-slate-800/60'}`}
                 style={{ 
                   width: '100%', 
                   maxWidth: '280px',
@@ -249,14 +254,14 @@ export default function MusicUpload({
 
       {/* Upload Area */}
       <div
-        className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 transition-all duration-300 transform hover:scale-[1.01] ${
+        className={`relative ${compact ? 'p-4 rounded-xl' : 'p-6 sm:p-8 rounded-2xl'} border ${compact ? 'border' : 'border-2'} border-dashed transition-all duration-300 shadow-sm ${
           dragActive
-            ? 'border-purple-400 bg-purple-500/10 scale-[1.02]'
+            ? variant === 'light' ? 'border-purple-400 bg-purple-50' : 'border-purple-400 bg-purple-500/10'
             : disabled
-            ? 'border-slate-600 bg-slate-700/20 opacity-60 cursor-not-allowed'
+            ? variant === 'light' ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed' : 'border-slate-600 bg-slate-700/20 opacity-60 cursor-not-allowed'
             : isUploading
-            ? 'border-blue-400 bg-blue-500/10'
-            : 'border-slate-500 bg-slate-700/30 hover:border-purple-400 hover:bg-purple-500/10'
+            ? variant === 'light' ? 'border-blue-300 bg-blue-50' : 'border-blue-400 bg-blue-500/10'
+            : variant === 'light' ? 'border-gray-200 bg-white hover:border-purple-300' : 'border-slate-500 bg-slate-700/30 hover:border-purple-400 hover:bg-purple-500/10'
         }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -264,38 +269,38 @@ export default function MusicUpload({
       >
         {isUploading ? (
           <div className="text-center py-4">
-            <div className="w-16 h-16 mx-auto mb-6 bg-blue-500/20 rounded-full flex items-center justify-center border border-blue-500/30">
+            <div className={`w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center border ${variant === 'light' ? 'bg-blue-50 border-blue-200' : 'bg-blue-500/20 border-blue-500/30'}`}>
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-transparent"></div>
             </div>
-            <h4 className="text-lg font-semibold text-blue-300 mb-2">Uploading Music...</h4>
-            <div className="mt-4 w-full bg-slate-600/50 rounded-full h-3 border border-slate-500/50">
+            <h4 className={`text-lg font-semibold mb-2 ${variant === 'light' ? 'text-blue-700' : 'text-blue-300'}`}>Uploading Music...</h4>
+            <div className={`mt-4 w-full rounded-full h-3 border ${variant === 'light' ? 'bg-gray-100 border-gray-200' : 'bg-slate-600/50 border-slate-500/50'}`}>
               <div 
                 className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
-            <p className="text-sm text-blue-200 mt-3 font-medium">{uploadProgress}% complete</p>
+            <p className={`text-sm mt-3 font-medium ${variant === 'light' ? 'text-blue-700' : 'text-blue-200'}`}>{uploadProgress}% complete</p>
           </div>
         ) : (
           <div className="text-center py-4">
-            <div className={`w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-              dragActive 
-                ? 'bg-purple-500/20 border-purple-400 scale-110' 
+            <div className={`mx-auto mb-4 ${compact ? 'w-12 h-12' : 'w-16 h-16'} rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+              dragActive
+                ? variant === 'light' ? 'bg-purple-50 border-purple-300 scale-110' : 'bg-purple-500/20 border-purple-400 scale-110'
                 : disabled
-                ? 'bg-slate-600/20 border-slate-500'
-                : 'bg-slate-600/30 border-slate-500 hover:border-purple-400 hover:bg-purple-500/20'
+                ? variant === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-slate-600/20 border-slate-500'
+                : variant === 'light' ? 'bg-gray-50 border-gray-200 hover:border-purple-300' : 'bg-slate-600/30 border-slate-500 hover:border-purple-400 hover:bg-purple-500/20'
             }`}>
-              <span className="text-3xl">{dragActive ? '🎯' : '🎵'}</span>
+              <span className={`${compact ? 'text-2xl' : 'text-3xl'}`}>{dragActive ? '🎯' : '🎵'}</span>
             </div>
             
-            <h4 className={`text-lg font-semibold mb-2 ${
-              disabled ? 'text-slate-400' : 'text-slate-200'
+            <h4 className={`${compact ? 'text-base' : 'text-lg'} font-semibold mb-1 ${
+              disabled ? (variant === 'light' ? 'text-gray-400' : 'text-slate-400') : (variant === 'light' ? 'text-gray-800' : 'text-slate-200')
             }`}>
               {currentFile ? '🔄 Replace Music File' : '📤 Upload Music File'}
             </h4>
             
-            <p className={`text-sm mb-2 ${
-              disabled ? 'text-slate-500' : 'text-slate-300'
+            <p className={`${compact ? 'text-xs' : 'text-sm'} mb-2 ${
+              disabled ? (variant === 'light' ? 'text-gray-400' : 'text-slate-500') : (variant === 'light' ? 'text-gray-600' : 'text-slate-300')
             }`}>
               {dragActive 
                 ? '🎯 Drop your music file here!' 
@@ -303,8 +308,8 @@ export default function MusicUpload({
               }
             </p>
             
-            <div className={`text-xs mb-4 space-y-1 ${
-              disabled ? 'text-slate-500' : 'text-slate-400'
+            <div className={`text-xs ${compact ? 'mb-2' : 'mb-4'} space-y-1 ${
+              disabled ? (variant === 'light' ? 'text-gray-400' : 'text-slate-500') : (variant === 'light' ? 'text-gray-500' : 'text-slate-400')
             }`}>
               <p>📀 <strong>Supports:</strong> MP3, WAV, AAC, M4A</p>
               <p>📏 <strong>Max size:</strong> 50MB</p>
@@ -315,9 +320,9 @@ export default function MusicUpload({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className={`px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 transform ${
+              className={`${compact ? 'px-4 py-2' : 'px-6 py-3'} text-sm font-semibold rounded-xl transition-all duration-300 transform ${
                 disabled
-                  ? 'bg-slate-600/50 text-slate-400 cursor-not-allowed border border-slate-500/50'
+                  ? (variant === 'light' ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' : 'bg-slate-600/50 text-slate-400 cursor-not-allowed border border-slate-500/50')
                   : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-500 hover:to-pink-500 hover:scale-105 shadow-lg hover:shadow-purple-500/25 border border-purple-500/30'
               }`}
             >
@@ -337,12 +342,13 @@ export default function MusicUpload({
       </div>
 
       {/* Enhanced Help Text */}
-      <div className="bg-slate-800/40 border border-slate-600/50 rounded-lg p-4 space-y-2">
-        <h5 className="text-sm font-semibold text-slate-300 mb-3 flex items-center">
+      {!compact && (
+      <div className={`${variant === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-slate-800/40 border-slate-600/50'} border rounded-lg p-4 space-y-2`}>
+        <h5 className={`text-sm font-semibold mb-3 flex items-center ${variant === 'light' ? 'text-gray-700' : 'text-slate-300'}`}>
           <span className="mr-2">💡</span>
           Music Upload Guidelines
         </h5>
-        <div className="text-xs text-slate-400 space-y-1.5">
+        <div className={`text-xs space-y-1.5 ${variant === 'light' ? 'text-gray-600' : 'text-slate-400'}`}>
           <p className="flex items-start">
             <span className="mr-2 text-green-400">✓</span>
             <span>Music file will be played during your live performance</span>
@@ -361,6 +367,7 @@ export default function MusicUpload({
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import MusicPlayer from '@/components/MusicPlayer';
+import MusicUpload from '@/components/MusicUpload';
 import { useToast } from '@/components/ui/simple-toast';
 import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import RealtimeUpdates from '@/components/RealtimeUpdates';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface EventEntry {
@@ -35,6 +37,9 @@ interface EventEntry {
   videoExternalUrl?: string;
   videoExternalType?: string;
   eventName?: string;
+  // From performances mapping when single event selected
+  musicCue?: 'onstage' | 'offstage';
+  performanceOrder?: number;
 }
 
 interface Event {
@@ -69,6 +74,16 @@ function SoundTechPage() {
     fetchData();
   }, [router]);
 
+  // Join sound room for real-time updates
+  useEffect(() => {
+    if (selectedEvent && selectedEvent !== 'all') {
+      import('@/lib/socket-client').then(({ socketClient }) => {
+        socketClient.joinAsSound(selectedEvent);
+        console.log(`🎵 Joined sound room for event: ${selectedEvent}`);
+      });
+    }
+  }, [selectedEvent]);
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -83,10 +98,38 @@ function SoundTechPage() {
       if (entriesData.success) {
         console.log('📊 Sound Tech: Fetched entries:', entriesData.entries);
         console.log('📊 Live entries with music:', entriesData.entries?.filter((e: any) => e.entryType === 'live' && e.musicFileUrl));
-        setEntries(entriesData.entries || []);
+        let baseEntries = entriesData.entries || [];
+        // If a specific event is selected, map in the latest item numbers from performances
+        if (selectedEvent && selectedEvent !== 'all') {
+          try {
+            const perfRes = await fetch(`/api/events/${selectedEvent}/performances`);
+            const perfData = await perfRes.json();
+            if (perfData.success) {
+              const numMap = new Map<string, number>();
+              const cueMap = new Map<string, 'onstage' | 'offstage'>();
+              for (const p of perfData.performances) {
+                if (p.eventEntryId && p.itemNumber) {
+                  numMap.set(p.eventEntryId, p.itemNumber);
+                }
+                if (p.eventEntryId && p.musicCue) cueMap.set(p.eventEntryId, p.musicCue);
+              }
+              baseEntries = baseEntries.map((e: any) => (
+                e.eventId === selectedEvent
+                  ? { ...e, itemNumber: numMap.get(e.id) ?? e.itemNumber, musicCue: cueMap.get(e.id) }
+                  : e
+              ));
+            }
+          } catch {}
+        }
+        setEntries(baseEntries);
       }
       if (eventsData.success) {
-        setEvents(eventsData.events || []);
+        const ev = eventsData.events || [];
+        setEvents(ev);
+        // Default to first event for realtime join if currently "all"
+        if ((selectedEvent === 'all' || !selectedEvent) && ev.length > 0) {
+          setSelectedEvent(ev[0].id);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -120,9 +163,19 @@ function SoundTechPage() {
     
     return matchesEvent && matchesEntryType && matchesSearch;
   });
-
-  const liveEntries = filteredEntries.filter(entry => entry.entryType === 'live' && entry.musicFileUrl);
-  const virtualEntries = filteredEntries.filter(entry => entry.entryType === 'virtual' && entry.videoExternalUrl);
+  // Sort consistently by performance order (from backstage), fallback to item number then name
+  const sortedFilteredEntries = [...filteredEntries].sort((a, b) => {
+    // Primary: Use performance order from backstage if available
+    if (a.performanceOrder && b.performanceOrder) return a.performanceOrder - b.performanceOrder;
+    // Fallback: Use item number if performance order not available  
+    if (a.itemNumber && b.itemNumber) return a.itemNumber - b.itemNumber;
+    if (a.itemNumber && !b.itemNumber) return -1;
+    if (!a.itemNumber && b.itemNumber) return 1;
+    return a.itemName.localeCompare(b.itemName);
+  });
+  // Sound desk must see ALL live entries, even without music
+  const liveEntries = sortedFilteredEntries.filter(entry => entry.entryType === 'live');
+  const virtualEntries = sortedFilteredEntries.filter(entry => entry.entryType === 'virtual' && entry.videoExternalUrl);
 
   const downloadAllMusic = () => {
     liveEntries.forEach(entry => {
@@ -188,19 +241,90 @@ function SoundTechPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-white">Loading sound tech dashboard...</p>
+          <p className="mt-4 text-black">Loading sound tech dashboard...</p>
         </div>
       </div>
     );
   }
 
+  const handleRealtimeReorder = async () => {
+    // Update item numbers and performance order from the latest performances without disrupting filters
+    if (!selectedEvent || selectedEvent === 'all') {
+      await fetchData();
+      return;
+    }
+    try {
+      const perfRes = await fetch(`/api/events/${selectedEvent}/performances`);
+      const perfData = await perfRes.json();
+      if (perfData.success) {
+        const numMap = new Map<string, number>();
+        const cueMap = new Map<string, 'onstage' | 'offstage'>();
+        const orderMap = new Map<string, number>();
+        for (const p of perfData.performances) {
+          if (p.eventEntryId && p.itemNumber) numMap.set(p.eventEntryId, p.itemNumber);
+          if (p.eventEntryId && p.musicCue) cueMap.set(p.eventEntryId, p.musicCue);
+          if (p.eventEntryId && p.performanceOrder) orderMap.set(p.eventEntryId, p.performanceOrder);
+        }
+        setEntries(prev => {
+          const updated = prev.map((e: any) => (
+            e.eventId === selectedEvent 
+              ? { 
+                  ...e, 
+                  itemNumber: numMap.get(e.id) ?? e.itemNumber, 
+                  musicCue: cueMap.get(e.id) ?? e.musicCue,
+                  performanceOrder: orderMap.get(e.id) ?? e.performanceOrder
+                } 
+              : e
+          ));
+          // Re-sort by performance order if available, fallback to item number
+          return updated.sort((a, b) => {
+            if (a.performanceOrder && b.performanceOrder) {
+              return a.performanceOrder - b.performanceOrder;
+            }
+            if (a.itemNumber && b.itemNumber) {
+              return a.itemNumber - b.itemNumber;
+            }
+            return a.itemName.localeCompare(b.itemName);
+          });
+        });
+      }
+    } catch {
+      await fetchData();
+    }
+  };
+
   return (
-    <div className={`min-h-screen ${themeClasses.mainBg}`}>
+    <RealtimeUpdates
+      eventId={selectedEvent !== 'all' ? selectedEvent : ''}
+      strictEvent
+      onPerformanceReorder={handleRealtimeReorder}
+      onPerformanceMusicCue={async (data) => {
+        // Update in place for specific event; if in All, fetch the single performance to map
+        if (selectedEvent && selectedEvent !== 'all') {
+          setEntries(prev => prev.map((e: any) => (
+            e.eventId === selectedEvent && e.id === data.performanceId ? e : e
+          )));
+          // We map by eventEntry; refresh mapping quickly
+          await handleRealtimeReorder();
+        } else {
+          try {
+            const perfRes = await fetch(`/api/performances/${data.performanceId}`);
+            const perfData = await perfRes.json();
+            if (perfData.success) {
+              setEntries(prev => prev.map((e: any) => (
+                e.id === perfData.performance.eventEntryId ? { ...e, musicCue: perfData.performance.musicCue } : e
+              )));
+            }
+          } catch {}
+        }
+      }}
+    >
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className={`${themeClasses.headerBg} shadow border-b ${themeClasses.headerBorder}`}>
+      <div className="bg-white shadow border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
@@ -208,14 +332,14 @@ function SoundTechPage() {
                 <span className="text-white text-xl">🎵</span>
               </div>
               <div>
-                <h1 className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Sound Tech Dashboard</h1>
-                <p className={`${themeClasses.textSecondary}`}>Manage music files for live performances</p>
+                <h1 className="text-2xl font-bold text-black">Sound Tech Dashboard</h1>
+                <p className="text-gray-600">Manage music files for live performances</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => router.push('/admin')}
-                className="px-4 py-2 bg-gray-100 text-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 ← Back to Admin
               </button>
@@ -236,96 +360,93 @@ function SoundTechPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gray-800 rounded-lg shadow p-6">
+          <div className="bg-white border border-gray-200 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
                 <span className="text-green-600">🎵</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Live Entries</p>
-                <p className="text-2xl font-semibold text-white">{liveEntries.length}</p>
+                <p className="text-sm font-medium text-black">Live Entries</p>
+                <p className="text-2xl font-semibold text-black">{liveEntries.length}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-gray-800 rounded-lg shadow p-6">
+          <div className="bg-white border border-gray-200 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                 <span className="text-blue-600">📹</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Virtual Entries</p>
-                <p className="text-2xl font-semibold text-white">{virtualEntries.length}</p>
+                <p className="text-sm font-medium text-black">Virtual Entries</p>
+                <p className="text-2xl font-semibold text-black">{virtualEntries.length}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-gray-800 rounded-lg shadow p-6">
+          <div className="bg-white border border-gray-200 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
                 <span className="text-purple-600">🎭</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Total Entries</p>
-                <p className="text-2xl font-semibold text-white">{filteredEntries.length}</p>
+                <p className="text-sm font-medium text-black">Total Entries</p>
+                <p className="text-2xl font-semibold text-black">{filteredEntries.length}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-gray-800 rounded-lg shadow p-6">
+          <div className="bg-white border border-gray-200 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
                 <span className="text-orange-600">🏆</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Events</p>
-                <p className="text-2xl font-semibold text-white">{events.length}</p>
+                <p className="text-sm font-medium text-black">Events</p>
+                <p className="text-2xl font-semibold text-black">{events.length}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-gray-800 rounded-lg shadow p-6 mb-8">
+        <div className="bg-white border border-gray-200 rounded-lg shadow p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-white mb-2">Search</label>
+              <label className="block text-sm font-medium text-black mb-2">Search</label>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by item name, choreographer, or participant..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
-                style={{ color: 'black' }}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-white mb-2">Event</label>
+              <label className="block text-sm font-medium text-black mb-2">Event</label>
               <select
                 value={selectedEvent}
                 onChange={(e) => setSelectedEvent(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
-                style={{ color: 'black' }}
+                className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-black focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               >
-                <option value="all" style={{ color: 'black' }}>All Events</option>
+                <option value="all">All Events</option>
                 {events.map(event => (
-                  <option key={event.id} value={event.id} style={{ color: 'black' }}>{event.name}</option>
+                  <option key={event.id} value={event.id}>{event.name}</option>
                 ))}
               </select>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-white mb-2">Entry Type</label>
+              <label className="block text-sm font-medium text-black mb-2">Entry Type</label>
               <select
                 value={entryTypeFilter}
                 onChange={(e) => setEntryTypeFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
-                style={{ color: 'black' }}
+                className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-black focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               >
-                <option value="all" style={{ color: 'black' }}>All Types</option>
-                <option value="live" style={{ color: 'black' }}>Live Performances</option>
-                <option value="virtual" style={{ color: 'black' }}>Virtual Performances</option>
+                <option value="all">All Types</option>
+                <option value="live">Live Performances</option>
+                <option value="virtual">Virtual Performances</option>
               </select>
             </div>
           </div>
@@ -333,9 +454,9 @@ function SoundTechPage() {
 
         {/* Music Files List */}
         {entryTypeFilter === 'live' || entryTypeFilter === 'all' ? (
-          <div className="bg-gray-800 rounded-lg shadow mb-8">
+          <div className="bg-white border border-gray-200 rounded-lg shadow mb-8">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-white flex items-center">
+              <h2 className="text-lg font-semibold text-black flex items-center">
                 <span className="mr-2">🎵</span>
                 Live Performances - Music Files ({liveEntries.length})
               </h2>
@@ -354,15 +475,32 @@ function SoundTechPage() {
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-white truncate">
+                            <h3 className="text-lg font-semibold text-black truncate">
                               {entry.itemName}
                             </h3>
-                            <p className="text-sm text-white">
-                              by {entry.choreographer} • {getPerformanceType(entry.participantIds)}
+                            <p className="text-sm text-black">
+                              {getPerformanceType(entry.participantIds)} • Style: {entry.itemStyle}
+                              {entry.musicCue && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800">
+                                  {entry.musicCue === 'onstage' ? 'Music: Onstage' : 'Music: Offstage'}
+                                </span>
+                              )}
                             </p>
-                            <p className="text-xs text-white">
-                              {getEventName(entry.eventId)} • {entry.participantNames?.join(', ')}
-                            </p>
+                            {/* Prominent contestant name display */}
+                            <div className="mb-2">
+                              <p className="text-lg font-bold text-black">
+                                {entry.contestantName || 'Unknown Contestant'}
+                              </p>
+                              <p className="text-base text-gray-700">
+                                {entry.participantNames?.join(', ')}
+                                {Array.isArray(entry.participantIds) && entry.participantIds.length > 1 ? ` (${entry.participantIds.length} contestants)` : ''}
+                              </p>
+                            </div>
+                            {selectedEvent === 'all' && (
+                              <p className="text-xs text-gray-600">
+                                Event: {getEventName(entry.eventId)}
+                              </p>
+                            )}
                           </div>
                         </div>
                         
@@ -370,9 +508,39 @@ function SoundTechPage() {
                           <div className="mt-4">
                             <MusicPlayer
                               musicUrl={entry.musicFileUrl}
-                              filename={entry.musicFileName || `${entry.itemName}.mp3`}
+                              filename="" 
                               className="max-w-2xl"
                               showDownload={true}
+                            />
+                          </div>
+                        )}
+                        {!entry.musicFileUrl && (
+                          <div className="mt-4">
+                            <div className="mb-2 p-3 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-md text-sm">
+                              Upload outstanding — no track uploaded yet.
+                            </div>
+                            <MusicUpload
+                              currentFile={null}
+                              variant="light"
+                              compact
+                              onUploadSuccess={async (file) => {
+                                // Persist music info to entry and refetch
+                                try {
+                                  await fetch(`/api/admin/entries/${entry.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      musicFileUrl: file.url,
+                                      musicFileName: file.originalFilename
+                                    })
+                                  });
+                                  success('Music uploaded and saved');
+                                  await fetchData();
+                                } catch (e) {
+                                  error('Failed to save uploaded music');
+                                }
+                              }}
+                              onUploadError={(err) => error(err)}
                             />
                           </div>
                         )}
@@ -404,11 +572,7 @@ function SoundTechPage() {
                           )}
                         </button>
                         
-                        <div className="text-right text-xs text-white">
-                          <div>Mastery: {entry.mastery}</div>
-                          <div>Style: {entry.itemStyle}</div>
-                          <div>Duration: {entry.estimatedDuration}min</div>
-                        </div>
+                        {/* Hide filename to avoid confusion */}
                       </div>
                     </div>
                   </div>
@@ -417,7 +581,7 @@ function SoundTechPage() {
             ) : (
               <div className="p-8 text-center">
                 <span className="text-4xl mb-4 block">🎵</span>
-                <p className="text-white">No live performances with music files found</p>
+                <p className="text-gray-700">No live performances with music files found</p>
               </div>
             )}
           </div>
@@ -425,9 +589,9 @@ function SoundTechPage() {
 
         {/* Virtual Entries List */}
         {entryTypeFilter === 'virtual' || entryTypeFilter === 'all' ? (
-          <div className="bg-gray-800 rounded-lg shadow">
+          <div className="bg-white border border-gray-200 rounded-lg shadow">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-white flex items-center">
+              <h2 className="text-lg font-semibold text-black flex items-center">
                 <span className="mr-2">📹</span>
                 Virtual Performances - Video Links ({virtualEntries.length})
               </h2>
@@ -446,13 +610,13 @@ function SoundTechPage() {
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-white truncate">
+                            <h3 className="text-lg font-semibold text-black truncate">
                               {entry.itemName}
                             </h3>
-                            <p className="text-sm text-white">
+                            <p className="text-sm text-black">
                               by {entry.choreographer} • {getPerformanceType(entry.participantIds)}
                             </p>
-                            <p className="text-xs text-white">
+                            <p className="text-xs text-gray-600">
                               {getEventName(entry.eventId)} • {entry.participantNames?.join(', ')}
                             </p>
                           </div>
@@ -491,10 +655,10 @@ function SoundTechPage() {
                           {entry.approved ? 'Approved' : 'Pending'}
                         </span>
                         
-                        <div className="text-right text-xs text-white">
+                        <div className="text-right text-xs text-gray-600">
                           <div>Mastery: {entry.mastery}</div>
                           <div>Style: {entry.itemStyle}</div>
-                          <div>Duration: {entry.estimatedDuration}min</div>
+                          {/* Duration hidden by request */}
                         </div>
                       </div>
                     </div>
@@ -504,13 +668,14 @@ function SoundTechPage() {
             ) : (
               <div className="p-8 text-center">
                 <span className="text-4xl mb-4 block">📹</span>
-                <p className="text-white">No virtual performances found</p>
+                <p className="text-gray-700">No virtual performances found</p>
               </div>
             )}
           </div>
         ) : null}
       </div>
     </div>
+    </RealtimeUpdates>
   );
 }
 

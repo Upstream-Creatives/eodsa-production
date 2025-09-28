@@ -16,6 +16,8 @@ function ResetPasswordContent() {
   const [success, setSuccess] = useState(false);
   const [token, setToken] = useState('');
   const [userType, setUserType] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     const tokenParam = searchParams.get('token');
@@ -254,34 +256,54 @@ function ResetPasswordContent() {
                 <label htmlFor="newPassword" className="block text-sm font-semibold text-gray-700 mb-3">
                   New Password
                 </label>
-                <input
-                  type="password"
-                  id="newPassword"
-                  name="newPassword"
-                  value={formData.newPassword}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
-                  placeholder="Enter new password"
-                  required
-                  minLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    id="newPassword"
+                    name="newPassword"
+                    value={formData.newPassword}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-4 pr-12 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    placeholder="Enter new password"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNew(v => !v)}
+                    className="absolute inset-y-0 right-2 my-1 px-3 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    aria-label="Toggle new password visibility"
+                  >
+                    {showNew ? '🙈' : '👁️'}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700 mb-3">
                   Confirm New Password
                 </label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
-                  placeholder="Confirm new password"
-                  required
-                  minLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-4 pr-12 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium text-gray-900 placeholder-gray-400"
+                    placeholder="Confirm new password"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(v => !v)}
+                    className="absolute inset-y-0 right-2 my-1 px-3 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    aria-label="Toggle confirm password visibility"
+                  >
+                    {showConfirm ? '🙈' : '👁️'}
+                  </button>
+                </div>
               </div>
 
               {error && (

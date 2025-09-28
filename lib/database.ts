@@ -50,9 +50,15 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS item_number INTEGER`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_reference TEXT`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_date TEXT`;
+    await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS virtual_item_number INTEGER`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_end_date TEXT`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS item_number INTEGER`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS performance_order INTEGER`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS withdrawn_from_judging BOOLEAN DEFAULT FALSE`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced BOOLEAN DEFAULT FALSE`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_by TEXT`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_at TEXT`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announcer_notes TEXT`;
     
     // Create EFT payment logs table for tracking manual payments
     await sqlClient`
@@ -142,6 +148,24 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced BOOLEAN DEFAULT FALSE`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_by TEXT`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_at TEXT`;
+
+    // GABRIEL'S SCORE APPROVAL TABLE
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS score_approvals (
+        id TEXT PRIMARY KEY,
+        performance_id TEXT NOT NULL,
+        judge_id TEXT NOT NULL,
+        judge_name TEXT NOT NULL,
+        performance_title TEXT NOT NULL,
+        score_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        approved_by TEXT,
+        approved_at TEXT,
+        rejected BOOLEAN DEFAULT FALSE,
+        rejection_reason TEXT,
+        created_at TEXT NOT NULL
+      )
+    `;
 
     console.log('✅ Database schema is up to date.');
     
@@ -488,6 +512,7 @@ export const db = {
       approved: row.approved,
       qualifiedForNationals: row.qualified_for_nationals,
       itemNumber: row.item_number,
+      virtualItemNumber: row.virtual_item_number,
       itemName: row.item_name,
       choreographer: row.choreographer,
       mastery: row.mastery,
@@ -647,9 +672,22 @@ export const db = {
     const sqlClient = getSql();
     const id = Date.now().toString();
     
+    // Ensure optional music cue column exists
+    try {
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS music_cue TEXT`;
+    } catch {}
+
     await sqlClient`
-      INSERT INTO performances (id, event_id, event_entry_id, contestant_id, title, participant_names, duration, choreographer, mastery, item_style, scheduled_time, status)
-      VALUES (${id}, ${performance.eventId}, ${performance.eventEntryId}, ${performance.contestantId}, ${performance.title}, ${JSON.stringify(performance.participantNames)}, ${performance.duration}, ${performance.choreographer}, ${performance.mastery}, ${performance.itemStyle}, ${performance.scheduledTime || null}, ${performance.status})
+      INSERT INTO performances (
+        id, event_id, event_entry_id, contestant_id, title, participant_names, duration,
+        choreographer, mastery, item_style, scheduled_time, status, item_number, music_cue
+      )
+      VALUES (
+        ${id}, ${performance.eventId}, ${performance.eventEntryId}, ${performance.contestantId}, ${performance.title},
+        ${JSON.stringify(performance.participantNames)}, ${performance.duration}, ${performance.choreographer},
+        ${performance.mastery}, ${performance.itemStyle}, ${performance.scheduledTime || null}, ${performance.status},
+        ${performance.itemNumber || null}, ${((performance as any).musicCue) || null}
+      )
     `;
     
     return { ...performance, id };
@@ -673,13 +711,15 @@ export const db = {
       participantNames: JSON.parse(row.participant_names),
       duration: row.duration,
       itemNumber: row.item_number,
+      performanceOrder: row.performance_order,
       withdrawnFromJudging: row.withdrawn_from_judging || false,
       choreographer: row.choreographer,
       mastery: row.mastery,
       itemStyle: row.item_style,
       scheduledTime: row.scheduled_time,
       status: row.status,
-      contestantName: row.contestant_name
+      contestantName: row.contestant_name,
+      musicCue: row.music_cue || null
     })) as (Performance & { contestantName: string })[];
   },
 
@@ -710,7 +750,8 @@ export const db = {
       itemStyle: row.item_style,
       scheduledTime: row.scheduled_time,
       status: row.status,
-      contestantName: row.contestant_name
+      contestantName: row.contestant_name,
+      musicCue: row.music_cue || null
     } as Performance & { contestantName: string };
   },
 
@@ -740,6 +781,20 @@ export const db = {
     await sqlClient`
       UPDATE performances 
       SET status = ${status}
+      WHERE id = ${performanceId}
+    `;
+    return true;
+  },
+
+  async updatePerformanceMusicCue(performanceId: string, musicCue: 'onstage' | 'offstage') {
+    const sqlClient = getSql();
+    // Ensure column exists
+    try {
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS music_cue TEXT`;
+    } catch {}
+    await sqlClient`
+      UPDATE performances
+      SET music_cue = ${musicCue}
       WHERE id = ${performanceId}
     `;
     return true;
@@ -968,9 +1023,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.id = ${eventId}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.id = ${eventId} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else {
@@ -998,6 +1054,7 @@ export const db = {
               JOIN events e ON p.event_id = e.id
               JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN scores s ON p.id = s.performance_id
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
               WHERE e.id = ${eventId}
               GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
               HAVING COUNT(s.id) > 0
@@ -1031,9 +1088,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else if (region && ageCategory) {
@@ -1058,9 +1116,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region} AND e.age_category = ${ageCategory}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else if (region) {
@@ -1085,9 +1144,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region}
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE e.region = ${region} AND sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         } else {
@@ -1112,8 +1172,10 @@ export const db = {
             JOIN events e ON p.event_id = e.id
             JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN scores s ON p.id = s.performance_id
+            LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+            WHERE sa.id IS NOT NULL
             GROUP BY p.id, e.id, e.name, e.region, e.age_category, e.performance_type, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name
-            HAVING COUNT(s.id) > 0
+            HAVING COUNT(sa.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
           ` as any[];
         }
@@ -1216,8 +1278,10 @@ export const db = {
         FROM events e
         JOIN performances p ON e.id = p.event_id
         LEFT JOIN scores s ON p.id = s.performance_id
+        LEFT JOIN score_approvals sa ON s.id = sa.score_id AND sa.status = 'approved'
+        WHERE sa.id IS NOT NULL
         GROUP BY e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, e.venue
-        HAVING COUNT(DISTINCT s.id) > 0
+        HAVING COUNT(DISTINCT sa.id) > 0
         ORDER BY e.event_date DESC, e.name
       ` as any[];
       
@@ -1665,12 +1729,14 @@ export const db = {
         ee.music_file_name,
         ee.video_external_url,
         ee.video_external_type,
-        ee.participant_ids
+        ee.participant_ids,
+        e.age_category
       FROM performances p 
-      JOIN contestants c ON p.contestant_id = c.id 
+      LEFT JOIN contestants c ON p.contestant_id = c.id 
       LEFT JOIN event_entries ee ON p.event_entry_id = ee.id
+      LEFT JOIN events e ON p.event_id = e.id
       WHERE p.event_id = ${eventId}
-      ORDER BY p.scheduled_time ASC
+      ORDER BY COALESCE(p.performance_order, p.item_number, 999) ASC
     ` as any[];
 
     // Resolve participant names if stored values are missing/unknown
@@ -1714,6 +1780,7 @@ export const db = {
         participantNames,
         duration: row.duration,
         itemNumber: row.item_number,
+        performanceOrder: row.performance_order,
         withdrawnFromJudging: row.withdrawn_from_judging || false,
         choreographer: row.choreographer,
         mastery: row.mastery,
@@ -1726,7 +1793,10 @@ export const db = {
         musicFileUrl: row.music_file_url,
         musicFileName: row.music_file_name,
         videoExternalUrl: row.video_external_url,
-        videoExternalType: row.video_external_type
+        videoExternalType: row.video_external_type,
+        announcerNotes: row.announcer_notes || null,
+        musicCue: row.music_cue || null,
+        ageCategory: row.age_category || null
       } as Performance & { contestantName: string };
     }));
 
@@ -3013,13 +3083,21 @@ export const db = {
   },
 
   // NEW: Announcer functionality
-  async markPerformanceAnnounced(performanceId: string, announcedBy: string) {
+  async markPerformanceAnnounced(performanceId: string, announcedBy: string, note?: string) {
     const sqlClient = getSql();
     const timestamp = new Date().toISOString();
     
+    // Ensure columns exist for announcer tracking (idempotent)
+    try {
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced BOOLEAN DEFAULT FALSE`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_by TEXT`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_at TEXT`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announcer_notes TEXT`;
+    } catch {}
+
     await sqlClient`
       UPDATE performances 
-      SET announced = true, announced_by = ${announcedBy}, announced_at = ${timestamp}
+      SET announced = true, announced_by = ${announcedBy}, announced_at = ${timestamp}, announcer_notes = COALESCE(${note || null}, announcer_notes)
       WHERE id = ${performanceId}
     `;
     
@@ -3102,6 +3180,16 @@ export const db = {
     await sqlClient`
       UPDATE performances 
       SET item_number = ${itemNumber}
+      WHERE id = ${performanceId}
+    `;
+    return { success: true };
+  },
+
+  async updatePerformanceOrder(performanceId: string, performanceOrder: number) {
+    const sqlClient = getSql();
+    await sqlClient`
+      UPDATE performances 
+      SET performance_order = ${performanceOrder}
       WHERE id = ${performanceId}
     `;
     return { success: true };

@@ -609,6 +609,7 @@ function EventParticipantsPage() {
         const entryTypeLabel = entry.entryType === 'virtual' ? 'VIRTUAL' : 'LIVE';
         return [
           entry.itemNumber || 'Not Assigned',
+          entry.itemName || 'Untitled',
           entry.eodsaId,
           entry.contestantName || 'Unknown',
           performanceType,
@@ -634,6 +635,7 @@ function EventParticipantsPage() {
       // Create headers for participant data
       const participantHeaders = [
         'Item Number',
+        'Item Name',
         'EODSA ID',
         'Contestant Name',
         'Performance Type', 
@@ -668,6 +670,7 @@ function EventParticipantsPage() {
       // Set column widths
       const colWidths = [
         { wch: 12 }, // Item Number
+        { wch: 25 }, // Item Name
         { wch: 12 }, // EODSA ID
         { wch: 20 }, // Contestant Name
         { wch: 15 }, // Performance Type
@@ -871,13 +874,16 @@ function EventParticipantsPage() {
           performanceTitle,
           ...data.scoringStatus
         });
+      } else if (response.status === 404) {
+        showAlert('Performance not found or no scoring data available', 'warning');
+        setShowScoresModal(false);
       } else {
         showAlert('Failed to load performance scores', 'error');
         setShowScoresModal(false);
       }
     } catch (error) {
       console.error('Error loading scores:', error);
-      showAlert('Failed to load performance scores', 'error');
+      showAlert('Network error loading performance scores', 'error');
       setShowScoresModal(false);
     } finally {
       setLoadingScores(false);

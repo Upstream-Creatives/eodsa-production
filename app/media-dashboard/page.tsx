@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/simple-toast';
 import RealtimeUpdates from '@/components/RealtimeUpdates';
-import MusicPlayer from '@/components/MusicPlayer';
-import VideoPlayer from '@/components/VideoPlayer';
 
 interface Performance {
   id: string;
@@ -14,10 +12,14 @@ interface Performance {
   participantNames: string[];
   duration: number;
   itemNumber?: number;
+  performanceOrder?: number;
   status: 'scheduled' | 'ready' | 'hold' | 'in_progress' | 'completed' | 'cancelled';
   entryType?: 'live' | 'virtual';
+  announced?: boolean;
+  announcedAt?: string;
   mastery?: string;
   itemStyle?: string;
+  ageCategory?: string;
   choreographer?: string;
   contestantId?: string;
   eodsaId?: string;
@@ -78,6 +80,7 @@ export default function MediaDashboard() {
   const [selectedStudio, setSelectedStudio] = useState<any>(null);
   const [showDancerModal, setShowDancerModal] = useState(false);
   const [showStudioModal, setShowStudioModal] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string>('');
 
   useEffect(() => {
     // Check authentication
@@ -99,6 +102,16 @@ export default function MediaDashboard() {
   useEffect(() => {
     if (selectedEvent) {
       fetchEventData();
+    }
+  }, [selectedEvent]);
+
+  // Join media room for real-time updates
+  useEffect(() => {
+    if (selectedEvent) {
+      import('@/lib/socket-client').then(({ socketClient }) => {
+        socketClient.joinAsMedia(selectedEvent);
+        console.log(`📸 Joined media room for event: ${selectedEvent}`);
+      });
     }
   }, [selectedEvent]);
 
@@ -151,15 +164,15 @@ export default function MediaDashboard() {
       const performancesData = await performancesRes.json();
       
       if (performancesData.success) {
-        // Sort by item number, then by creation time
-        const sortedPerformances = performancesData.performances.sort((a: Performance, b: Performance) => {
-          if (a.itemNumber && b.itemNumber) {
-            return a.itemNumber - b.itemNumber;
-          } else if (a.itemNumber && !b.itemNumber) {
-            return -1;
-          } else if (!a.itemNumber && b.itemNumber) {
-            return 1;
-          }
+        // Virtual program: sort by virtualItemNumber if entryType is virtual and virtualItemNumber exists
+        const sortedPerformances = performancesData.performances.sort((a: any, b: any) => {
+          const aIsVirtual = a.entryType === 'virtual';
+          const bIsVirtual = b.entryType === 'virtual';
+          const aNum = aIsVirtual && a.virtualItemNumber ? a.virtualItemNumber : a.itemNumber;
+          const bNum = bIsVirtual && b.virtualItemNumber ? b.virtualItemNumber : b.itemNumber;
+          if (aNum && bNum) return aNum - bNum;
+          if (aNum && !bNum) return -1;
+          if (!aNum && bNum) return 1;
           return a.title.localeCompare(b.title);
         });
         
@@ -180,8 +193,34 @@ export default function MediaDashboard() {
     }
   };
 
-  const handlePerformanceReorder = (reorderedPerformances: any) => {
-    setPerformances(reorderedPerformances);
+  const handlePerformanceReorder = (reorderedPerformances: any[]) => {
+    // Merge both itemNumber (permanent) and performanceOrder (dynamic) from backstage
+    setPerformances(prev => {
+      const updateMap = new Map(reorderedPerformances.map((r: any) => [r.id, r]));
+      const merged = prev.map(p => {
+        if (updateMap.has(p.id)) {
+          const update = updateMap.get(p.id)!;
+          return { 
+            ...p, 
+            itemNumber: update.itemNumber || p.itemNumber, // Keep permanent item number
+            performanceOrder: update.performanceOrder // Update performance order from backstage
+          };
+        }
+        return p;
+      });
+      // Sort by performance order (backstage sequence) for live sync
+      merged.sort((a, b) => {
+        // Primary sort: performanceOrder (backstage sequence)
+        if (a.performanceOrder && b.performanceOrder) return a.performanceOrder - b.performanceOrder;
+        // Fallback to item number if performanceOrder missing
+        if (a.itemNumber && b.itemNumber) return a.itemNumber - b.itemNumber;
+        if (a.itemNumber && !b.itemNumber) return -1;
+        if (!a.itemNumber && b.itemNumber) return 1;
+        return a.title.localeCompare(b.title);
+      });
+      return merged;
+    });
+    setLastSyncAt(new Date().toLocaleTimeString());
     success('Performance order updated by backstage');
   };
 
@@ -193,7 +232,22 @@ export default function MediaDashboard() {
           : p
       )
     );
+    setLastSyncAt(new Date().toLocaleTimeString());
   };
+
+  const handlePerformanceAnnounced = (data: any) => {
+    setPerformances(prev => 
+      prev.map(p => 
+        p.id === data.performanceId 
+          ? { ...p, announced: true, announcedAt: data.announcedAt }
+          : p
+      )
+    );
+    setLastSyncAt(new Date().toLocaleTimeString());
+  };
+
+  // Ensure realtime reorder and status updates are wired via RealtimeUpdates wrapper
+  // (already present above in JSX)
 
   const getContestantDetails = (contestantId: string) => {
     return contestants.find(c => c.id === contestantId);
@@ -263,8 +317,21 @@ export default function MediaDashboard() {
   return (
     <RealtimeUpdates
       eventId={selectedEvent}
+      role="media"
+      strictEvent
       onPerformanceReorder={handlePerformanceReorder}
       onPerformanceStatus={handlePerformanceStatus}
+      onPerformanceAnnounced={handlePerformanceAnnounced}
+      onMusicUpdated={(data) => {
+        setPerformances(prev => prev.map(p => (
+          (p as any).eventEntryId === data.entryId ? { ...p, musicFileUrl: data.musicFileUrl, musicFileName: data.musicFileName } : p
+        )));
+      }}
+      onVideoUpdated={(data) => {
+        setPerformances(prev => prev.map(p => (
+          (p as any).eventEntryId === data.entryId ? { ...p, videoExternalUrl: data.videoExternalUrl } : p
+        )));
+      }}
     >
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
@@ -278,6 +345,11 @@ export default function MediaDashboard() {
                 <div>
                   <h1 className="text-2xl font-bold text-black">Media Dashboard</h1>
                   <p className="text-black">Welcome, {user?.name}</p>
+                  {lastSyncAt && (
+                    <p className="text-xs text-green-600">
+                      🔄 Last sync: {lastSyncAt}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center space-x-4">
@@ -290,6 +362,12 @@ export default function MediaDashboard() {
                     <option key={event.id} value={event.id}>{event.name}</option>
                   ))}
                 </select>
+                <button
+                  onClick={() => window.open('https://eodsa.vercel.app/admin/rankings', '_blank')}
+                  className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors font-medium"
+                >
+                  🏆 View Rankings
+                </button>
                 <button
                   onClick={() => {
                     localStorage.removeItem('mediaSession');
@@ -491,6 +569,12 @@ export default function MediaDashboard() {
                             }`}>
                               {performance.status.toUpperCase()}
                             </span>
+                            
+                            {performance.announced && (
+                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                📢 ANNOUNCED
+                              </span>
+                            )}
                           </div>
                         </div>
                         
@@ -502,38 +586,36 @@ export default function MediaDashboard() {
                             📋 View Details
                           </button>
                           
-                          {performance.entryType === 'live' && performance.musicFileUrl && (
-                            <a
-                              href={performance.musicFileUrl}
-                              download={performance.musicFileName || `${performance.title}.mp3`}
-                              className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors text-center"
-                            >
-                              🎵 Download Music
-                            </a>
-                          )}
-                          
-                          {performance.entryType === 'virtual' && performance.videoExternalUrl && (
-                            <a
-                              href={performance.videoExternalUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors text-center"
-                            >
-                              📹 Watch Video
-                            </a>
-                          )}
+                          {/* Media Dashboard is view-only - no download/play buttons */}
                         </div>
                       </div>
                       
-                      {/* Inline media preview */}
-                      {performance.entryType === 'live' && performance.musicFileUrl && (
+                      {/* Media view-only section */}
+                      {performance.entryType === 'live' && (
                         <div className="mt-4">
-                          <MusicPlayer
-                            musicUrl={performance.musicFileUrl}
-                            filename={performance.musicFileName || `${performance.title}.mp3`}
-                            className="max-w-2xl"
-                            showDownload={false}
-                          />
+                          {performance.musicFileUrl ? (
+                            <div className="p-3 border border-green-200 bg-green-50 text-green-800 rounded-md text-sm">
+                              🎵 Music file available: {performance.musicFileName || `${performance.title}.mp3`}
+                            </div>
+                          ) : (
+                            <div className="p-3 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-md text-sm">
+                              🎵 Music file not uploaded yet
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {performance.entryType === 'virtual' && (
+                        <div className="mt-4">
+                          {performance.videoExternalUrl ? (
+                            <div className="p-3 border border-purple-200 bg-purple-50 text-purple-800 rounded-md text-sm">
+                              📹 Video link provided: {performance.videoExternalType?.toUpperCase()} format
+                            </div>
+                          ) : (
+                            <div className="p-3 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-md text-sm">
+                              📹 Video link not provided yet
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -588,7 +670,7 @@ export default function MediaDashboard() {
                       <p><strong>Choreographer:</strong> {selectedPerformance.choreographer || 'N/A'}</p>
                       <p><strong>Style:</strong> {selectedPerformance.itemStyle || 'N/A'}</p>
                       <p><strong>Mastery Level:</strong> {selectedPerformance.mastery || 'N/A'}</p>
-                      <p><strong>Duration:</strong> {selectedPerformance.duration || 'N/A'} minutes</p>
+                      {/* Duration hidden by request */}
                       <p><strong>Entry Type:</strong> {selectedPerformance.entryType?.toUpperCase() || 'N/A'}</p>
                       <p><strong>Status:</strong> {selectedPerformance.status?.toUpperCase() || 'SCHEDULED'}</p>
                     </div>
@@ -637,12 +719,14 @@ export default function MediaDashboard() {
                     {selectedPerformance.entryType === 'live' && selectedPerformance.musicFileUrl && (
                       <div className="mb-4">
                         <h5 className="font-medium text-black mb-2">Music File</h5>
-                        <MusicPlayer
-                          musicUrl={selectedPerformance.musicFileUrl}
-                          filename={selectedPerformance.musicFileName || `${selectedPerformance.title}.mp3`}
-                          className="w-full"
-                          showDownload={true}
-                        />
+                        <div className="p-4 bg-green-50 rounded-lg">
+                          <p className="text-sm text-green-900 mb-2">
+                            <strong>🎵 Music File Available</strong>
+                          </p>
+                          <p className="text-xs text-green-700 break-all">
+                            {selectedPerformance.musicFileName || `${selectedPerformance.title}.mp3`}
+                          </p>
+                        </div>
                       </div>
                     )}
                     
@@ -651,19 +735,11 @@ export default function MediaDashboard() {
                         <h5 className="font-medium text-black mb-2">Video Link</h5>
                         <div className="p-4 bg-purple-50 rounded-lg">
                           <p className="text-sm text-purple-900 mb-2">
-                            <strong>{selectedPerformance.videoExternalType?.toUpperCase()} Video</strong>
+                            <strong>📹 {selectedPerformance.videoExternalType?.toUpperCase()} Video Available</strong>
                           </p>
-                          <p className="text-xs text-purple-700 mb-3 break-all">
-                            {selectedPerformance.videoExternalUrl}
+                          <p className="text-xs text-purple-700 break-all">
+                            Video link has been provided by the contestant
                           </p>
-                          <a
-                            href={selectedPerformance.videoExternalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors"
-                          >
-                            📹 Watch Video
-                          </a>
                         </div>
                       </div>
                     )}

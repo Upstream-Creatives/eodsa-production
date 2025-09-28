@@ -87,6 +87,36 @@ export function useSocket(options: UseSocketOptions = {}) {
     };
   }, [eventId, role, judgeId, autoConnect]);
 
+  // Ensure we (re)join correct rooms when eventId/role changes after initial connection
+  useEffect(() => {
+    if (!connected || !eventId) return;
+
+    // Always join the generic event room
+    socketClient.joinEvent(eventId);
+
+    // Join role-specific room if provided
+    switch (role) {
+      case 'judge':
+        if (judgeId) socketClient.joinAsJudge(eventId, judgeId);
+        break;
+      case 'sound':
+        socketClient.joinAsSound(eventId);
+        break;
+      case 'backstage':
+        socketClient.joinAsBackstage(eventId);
+        break;
+      case 'announcer':
+        socketClient.joinAsAnnouncer(eventId);
+        break;
+      case 'registration':
+        socketClient.joinAsRegistration(eventId);
+        break;
+      case 'media':
+        socketClient.joinAsMedia(eventId);
+        break;
+    }
+  }, [connected, eventId, role, judgeId]);
+
   // Function to listen for events
   const on = <T extends keyof SocketEvents>(
     event: T,
