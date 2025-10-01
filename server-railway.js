@@ -61,7 +61,9 @@ const io = new Server(server, {
 });
 
 // Health check endpoint for Railway
+// IMPORTANT: Only handle specific paths, let Socket.IO handle everything else
 server.on('request', (req, res) => {
+  // Only intercept health check requests
   if (req.url === '/health' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
@@ -72,9 +74,15 @@ server.on('request', (req, res) => {
     return;
   }
   
-  // Default response
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('EODSA WebSocket Server - Running');
+  // Only respond to root path for status
+  if (req.url === '/' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('EODSA WebSocket Server - Running');
+    return;
+  }
+  
+  // Let Socket.IO handle all other requests (polling, websocket upgrade, etc.)
+  // DO NOT send any response here - Socket.IO will handle it
 });
 
 // Socket.io event handling
@@ -218,12 +226,26 @@ server.on('error', (error) => {
   console.error('🚨 Server error:', error);
 });
 
+io.engine.on('connection_error', (err) => {
+  // Suppress headers already sent errors (they're expected during connection issues)
+  if (err.code === 'ERR_HTTP_HEADERS_SENT') {
+    // This happens when clients disconnect during polling - it's normal, don't log it
+    return;
+  }
+  console.error('🚨 Connection error:', err);
+});
+
 process.on('uncaughtException', (error) => {
   console.error('🚨 Uncaught Exception:', error);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
+  // Suppress Socket.IO polling errors (they're expected during normal operation)
+  if (reason && reason.code === 'ERR_HTTP_HEADERS_SENT') {
+    // This is a known Socket.IO polling race condition - safe to ignore
+    return;
+  }
   console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
 });
 

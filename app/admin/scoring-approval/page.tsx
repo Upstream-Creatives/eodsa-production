@@ -201,13 +201,13 @@ export default function ScoringApprovalPage() {
   const rejectedCount = approvals.filter(a => a.status === 'rejected').length;
 
   const calculateTotalScore = (score: ScoreApproval['score']) => {
-    return score.technicalScore + score.musicalScore + score.performanceScore + 
-           score.stylingScore + score.overallImpressionScore;
+    return Number(score.technicalScore) + Number(score.musicalScore) + Number(score.performanceScore) + 
+           Number(score.stylingScore) + Number(score.overallImpressionScore);
   };
 
   const calculatePercentage = (score: ScoreApproval['score']) => {
     const total = calculateTotalScore(score);
-    return Math.round((total / 100) * 100);
+    return total; // Total out of 100 is already the percentage
   };
 
   if (isLoading) {
@@ -226,26 +226,26 @@ export default function ScoringApprovalPage() {
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <span className="text-white text-xl">⚖️</span>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:py-6 gap-4">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-lg sm:text-xl">⚖️</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-black">Score Approval System</h1>
-                <p className="text-black">Review and approve judge scores before release</p>
+                <h1 className="text-lg sm:text-2xl font-bold text-black">Score Approval System</h1>
+                <p className="text-xs sm:text-sm text-gray-700 hidden sm:block">Review and approve judge scores before release</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button
                 onClick={() => router.push('/admin')}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex-1 sm:flex-none px-3 py-2 sm:px-4 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                ← Back to Admin
+                ← Back
               </button>
               <button
                 onClick={fetchApprovals}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="flex-1 sm:flex-none px-3 py-2 sm:px-4 text-xs sm:text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 🔄 Refresh
               </button>
@@ -254,83 +254,83 @@ export default function ScoringApprovalPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-blue-600">📋</span>
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                <span className="text-blue-600 text-sm sm:text-base">📋</span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-black">Total Scores</p>
-                <p className="text-2xl font-semibold text-black">{approvals.length}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-black truncate">Total</p>
+                <p className="text-xl sm:text-2xl font-semibold text-black">{approvals.length}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-yellow-600">⏳</span>
+              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                <span className="text-yellow-600 text-sm sm:text-base">⏳</span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-black">Pending Approval</p>
-                <p className="text-2xl font-semibold text-black">{pendingCount}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-black truncate">Pending</p>
+                <p className="text-xl sm:text-2xl font-semibold text-black">{pendingCount}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-green-600">✅</span>
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                <span className="text-green-600 text-sm sm:text-base">✅</span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-black">Approved</p>
-                <p className="text-2xl font-semibold text-black">{approvedCount}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-black truncate">Approved</p>
+                <p className="text-xl sm:text-2xl font-semibold text-black">{approvedCount}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-red-600">❌</span>
+              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                <span className="text-red-600 text-sm sm:text-base">❌</span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-black">Rejected</p>
-                <p className="text-2xl font-semibold text-black">{rejectedCount}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-black truncate">Rejected</p>
+                <p className="text-xl sm:text-2xl font-semibold text-black">{rejectedCount}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-black mb-2">Search</label>
+              <label className="block text-xs sm:text-sm font-medium text-black mb-2">Search</label>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by performance title or judge name..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                placeholder="Search performance or judge..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base text-black"
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">Status</label>
+            <div className="w-full sm:w-auto">
+              <label className="block text-xs sm:text-sm font-medium text-black mb-2">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base text-black"
               >
-                <option value="pending">Pending Approval</option>
+                <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
-                <option value="all">All Scores</option>
+                <option value="all">All</option>
               </select>
             </div>
           </div>
@@ -348,46 +348,84 @@ export default function ScoringApprovalPage() {
           {filteredApprovals.length > 0 ? (
             <div className="divide-y divide-gray-200">
               {filteredApprovals.map((approval) => (
-                <div key={approval.id} className={`p-6 ${
+                <div key={approval.id} className={`p-4 sm:p-6 ${
                   approval.status === 'approved' ? 'bg-green-50' : 
                   approval.status === 'rejected' ? 'bg-red-50' : ''
                 }`}>
-                  <div className="flex items-start justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-black">
+                      <h3 className="text-lg sm:text-xl font-bold text-black mb-2">
                         {approval.performanceTitle}
                       </h3>
-                      <p className="text-sm text-black">
-                        <strong>Judge:</strong> {approval.judgeName}
-                      </p>
-                      <p className="text-sm text-black">
-                        <strong>Total Score:</strong> {calculateTotalScore(approval.score)}/100 
-                        ({calculatePercentage(approval.score)}%)
-                      </p>
-                      <p className="text-sm text-black">
-                        <strong>Breakdown:</strong> Tech: {approval.score.technicalScore}, 
-                        Music: {approval.score.musicalScore}, 
-                        Performance: {approval.score.performanceScore}, 
-                        Style: {approval.score.stylingScore}, 
-                        Overall: {approval.score.overallImpressionScore}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        Submitted: {new Date(approval.createdAt).toLocaleString()}
-                      </p>
-                      {approval.approvedAt && (
-                        <p className="text-xs text-gray-600">
-                          {approval.status === 'approved' ? 'Approved' : 'Rejected'}: {new Date(approval.approvedAt).toLocaleString()}
-                        </p>
+                      
+                      <div className="grid grid-cols-1 gap-3 mb-3">
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-700">
+                            <span className="font-semibold">Judge:</span> {approval.judgeName}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            <span className="font-semibold">Submitted:</span> {new Date(approval.createdAt).toLocaleString()}
+                          </p>
+                          {approval.approvedAt && (
+                            <p className="text-sm text-gray-600">
+                              <span className="font-semibold">{approval.status === 'approved' ? 'Approved' : 'Rejected'}:</span> {new Date(approval.approvedAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                            <p className="text-xl sm:text-2xl font-bold text-indigo-900">
+                              {calculateTotalScore(approval.score)}<span className="text-base sm:text-lg text-indigo-600">/100</span>
+                            </p>
+                            <p className="text-xs text-indigo-600 font-medium">Total Score</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-lg p-3 mb-2">
+                        <p className="text-xs font-semibold text-gray-700 mb-2">Score Breakdown:</p>
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-xs">
+                          <div className="text-center">
+                            <div className="font-bold text-blue-600">{approval.score.technicalScore}/20</div>
+                            <div className="text-gray-600 text-[10px] sm:text-xs">Tech</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bold text-purple-600">{approval.score.musicalScore}/20</div>
+                            <div className="text-gray-600 text-[10px] sm:text-xs">Music</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bold text-green-600">{approval.score.performanceScore}/20</div>
+                            <div className="text-gray-600 text-[10px] sm:text-xs">Perf</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bold text-orange-600">{approval.score.stylingScore}/20</div>
+                            <div className="text-gray-600 text-[10px] sm:text-xs">Style</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bold text-pink-600">{approval.score.overallImpressionScore}/20</div>
+                            <div className="text-gray-600 text-[10px] sm:text-xs">Overall</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {approval.score.comments && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2">
+                          <p className="text-xs font-semibold text-blue-900 mb-1">Judge Comments:</p>
+                          <p className="text-xs text-blue-800 italic">{approval.score.comments}</p>
+                        </div>
                       )}
+                      
                       {approval.rejectionReason && (
-                        <p className="text-sm text-red-600 mt-2">
-                          <strong>Rejection Reason:</strong> {approval.rejectionReason}
-                        </p>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                          <p className="text-xs font-semibold text-red-900 mb-1">Rejection Reason:</p>
+                          <p className="text-xs text-red-800">{approval.rejectionReason}</p>
+                        </div>
                       )}
                     </div>
 
-                    <div className="ml-4 flex items-center space-x-2">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    <div className="flex flex-row sm:flex-col items-center justify-between sm:justify-start gap-2 sm:ml-4">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
                         approval.status === 'approved' ? 'bg-green-100 text-green-800' :
                         approval.status === 'rejected' ? 'bg-red-100 text-red-800' :
                         'bg-yellow-100 text-yellow-800'
@@ -395,30 +433,32 @@ export default function ScoringApprovalPage() {
                         {approval.status.toUpperCase()}
                       </span>
 
-                      <button
-                        onClick={() => openDetails(approval)}
-                        className="px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium transition-colors"
-                      >
-                        📋 Details
-                      </button>
+                      <div className="flex flex-wrap gap-2 justify-end sm:justify-start">
+                        <button
+                          onClick={() => openDetails(approval)}
+                          className="px-2 sm:px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
+                        >
+                          📋 Details
+                        </button>
 
-                      {approval.status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => approveScore(approval.id, approval.performanceTitle)}
-                            disabled={processingApproval.has(approval.id)}
-                            className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors disabled:opacity-50"
-                          >
-                            {processingApproval.has(approval.id) ? '...' : '✅ Approve'}
-                          </button>
-                          <button
-                            onClick={() => openDetails(approval)}
-                            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
-                          >
-                            ❌ Reject
-                          </button>
-                        </>
-                      )}
+                        {approval.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => approveScore(approval.id, approval.performanceTitle)}
+                              disabled={processingApproval.has(approval.id)}
+                              className="px-2 sm:px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {processingApproval.has(approval.id) ? '...' : '✅ Approve'}
+                            </button>
+                            <button
+                              onClick={() => openDetails(approval)}
+                              className="px-2 sm:px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
+                            >
+                              ❌ Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -435,77 +475,119 @@ export default function ScoringApprovalPage() {
 
       {/* Score Details Modal */}
       {showDetails && selectedApproval && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-xl font-semibold text-black">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="text-base sm:text-xl font-semibold text-black pr-4 line-clamp-2">
                 Score Details - {selectedApproval.performanceTitle}
               </h3>
               <button
                 onClick={() => setShowDetails(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 text-2xl sm:text-xl flex-shrink-0 p-2"
               >
                 ✕
               </button>
             </div>
             
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <h4 className="font-semibold text-black mb-2">Performance Information</h4>
-                  <p className="text-sm"><strong>Title:</strong> {selectedApproval.performanceTitle}</p>
-                  <p className="text-sm"><strong>Judge:</strong> {selectedApproval.judgeName}</p>
-                  <p className="text-sm"><strong>Status:</strong> {selectedApproval.status.toUpperCase()}</p>
-                  <p className="text-sm"><strong>Submitted:</strong> {new Date(selectedApproval.createdAt).toLocaleString()}</p>
+            <div className="p-4 sm:p-6">
+              {/* Total Score Display */}
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 text-center">
+                <p className="text-xs sm:text-sm font-semibold text-indigo-600 mb-2">TOTAL SCORE</p>
+                <p className="text-4xl sm:text-5xl font-bold text-indigo-900">
+                  {calculateTotalScore(selectedApproval.score)}
+                  <span className="text-2xl sm:text-3xl text-indigo-600">/100</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-4 sm:mb-6">
+                <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                  <h4 className="font-bold text-sm sm:text-base text-gray-900 mb-2 sm:mb-3 flex items-center">
+                    <span className="mr-2">📋</span>
+                    Performance Information
+                  </h4>
+                  <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
+                    <p><span className="font-semibold text-gray-700">Title:</span> <span className="text-gray-900">{selectedApproval.performanceTitle}</span></p>
+                    <p><span className="font-semibold text-gray-700">Judge:</span> <span className="text-gray-900">{selectedApproval.judgeName}</span></p>
+                    <p><span className="font-semibold text-gray-700">Status:</span> 
+                      <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        selectedApproval.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        selectedApproval.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {selectedApproval.status.toUpperCase()}
+                      </span>
+                    </p>
+                    <p className="break-all"><span className="font-semibold text-gray-700">Submitted:</span> <span className="text-gray-900">{new Date(selectedApproval.createdAt).toLocaleString()}</span></p>
+                  </div>
                 </div>
                 
-                <div>
-                  <h4 className="font-semibold text-black mb-2">Score Breakdown</h4>
-                  <div className="space-y-1 text-sm">
-                    <p><strong>Technical:</strong> {selectedApproval.score.technicalScore}/20</p>
-                    <p><strong>Musicality:</strong> {selectedApproval.score.musicalScore}/20</p>
-                    <p><strong>Performance:</strong> {selectedApproval.score.performanceScore}/20</p>
-                    <p><strong>Styling:</strong> {selectedApproval.score.stylingScore}/20</p>
-                    <p><strong>Overall Impression:</strong> {selectedApproval.score.overallImpressionScore}/20</p>
-                    <p className="pt-2 border-t"><strong>Total:</strong> {calculateTotalScore(selectedApproval.score)}/100 ({calculatePercentage(selectedApproval.score)}%)</p>
+                <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                  <h4 className="font-bold text-sm sm:text-base text-gray-900 mb-2 sm:mb-3 flex items-center">
+                    <span className="mr-2">📊</span>
+                    Score Breakdown
+                  </h4>
+                  <div className="space-y-1 sm:space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-gray-700">Technical Execution</span>
+                      <span className="font-bold text-sm sm:text-base text-blue-600">{selectedApproval.score.technicalScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-gray-700">Musical Interpretation</span>
+                      <span className="font-bold text-sm sm:text-base text-purple-600">{selectedApproval.score.musicalScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-gray-700">Performance Quality</span>
+                      <span className="font-bold text-sm sm:text-base text-green-600">{selectedApproval.score.performanceScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-gray-700">Styling & Presentation</span>
+                      <span className="font-bold text-sm sm:text-base text-orange-600">{selectedApproval.score.stylingScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-gray-700">Overall Impression</span>
+                      <span className="font-bold text-sm sm:text-base text-pink-600">{selectedApproval.score.overallImpressionScore}/20</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {selectedApproval.score.comments && (
-                <div className="mb-6">
-                  <h4 className="font-semibold text-black mb-2">Judge Comments</h4>
-                  <p className="text-sm bg-gray-50 p-3 rounded-lg">{selectedApproval.score.comments}</p>
+                <div className="mb-4 sm:mb-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                  <h4 className="font-bold text-sm sm:text-base text-blue-900 mb-2 flex items-center">
+                    <span className="mr-2">💬</span>
+                    Judge Comments
+                  </h4>
+                  <p className="text-xs sm:text-sm text-blue-800 italic leading-relaxed">{selectedApproval.score.comments}</p>
                 </div>
               )}
 
               {selectedApproval.status === 'pending' && (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-black mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-black mb-2">
                       Rejection Reason (if rejecting)
                     </label>
                     <textarea
                       value={rejectionReason}
                       onChange={(e) => setRejectionReason(e.target.value)}
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-black"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-xs sm:text-sm text-black"
                       placeholder="Enter reason for rejection..."
                     />
                   </div>
                   
-                  <div className="flex space-x-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <button
                       onClick={() => approveScore(selectedApproval.id, selectedApproval.performanceTitle)}
                       disabled={processingApproval.has(selectedApproval.id)}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors disabled:opacity-50"
+                      className="flex-1 px-4 py-3 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors disabled:opacity-50 text-sm sm:text-base"
                     >
                       {processingApproval.has(selectedApproval.id) ? 'Processing...' : '✅ Approve Score'}
                     </button>
                     <button
                       onClick={() => rejectScore(selectedApproval.id, selectedApproval.performanceTitle, rejectionReason)}
                       disabled={processingApproval.has(selectedApproval.id) || !rejectionReason.trim()}
-                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors disabled:opacity-50"
+                      className="flex-1 px-4 py-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors disabled:opacity-50 text-sm sm:text-base"
                     >
                       {processingApproval.has(selectedApproval.id) ? 'Processing...' : '❌ Reject Score'}
                     </button>
