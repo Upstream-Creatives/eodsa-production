@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, initializeDatabase, unifiedDb } from '@/lib/database';
 import { emailService } from '@/lib/email';
 import { getExistingSoloEntries, validateAndCorrectEntryFee } from '@/lib/pricing-utils';
+import { getAgeCategoryFromAge, calculateAgeOnDate } from '@/lib/types';
 
 // Helper function to check if a dancer's age matches the event's age category
 function checkAgeEligibility(dancerAge: number, ageCategory: string): boolean {
@@ -377,6 +378,58 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Calculate age category from average dancer ages
+    let calculatedAgeCategory = event.ageCategory; // Default to event's age category
+
+    try {
+      const { getSql } = await import('@/lib/database');
+      const sqlClient = getSql();
+
+      // Get ages of all participants
+      const participantAges = await Promise.all(
+        body.participantIds.map(async (participantId: string) => {
+          try {
+            // Try unified system first
+            const dancer = await unifiedDb.getDancerById(participantId);
+            if (dancer) {
+              return dancer.age;
+            }
+
+            // Try old system
+            const result = await sqlClient`
+              SELECT age, date_of_birth FROM dancers WHERE id = ${participantId} OR eodsa_id = ${participantId}
+            ` as any[];
+
+            if (result.length > 0) {
+              if (result[0].age) {
+                return result[0].age;
+              }
+              if (result[0].date_of_birth) {
+                return calculateAgeOnDate(result[0].date_of_birth, new Date(event.eventDate));
+              }
+            }
+            return null;
+          } catch (error) {
+            console.warn(`Could not get age for participant ${participantId}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter out null values and calculate average age
+      const validAges = participantAges.filter(age => age !== null) as number[];
+      if (validAges.length > 0) {
+        const averageAge = Math.round(validAges.reduce((sum, age) => sum + age, 0) / validAges.length);
+        calculatedAgeCategory = getAgeCategoryFromAge(averageAge);
+        console.log(`✅ Calculated age category for entry: ${calculatedAgeCategory} (average age: ${averageAge} from ${validAges.length} dancers)`);
+      } else {
+        console.warn(`⚠️ Could not calculate age category for entry, using event default: ${event.ageCategory}`);
+      }
+    } catch (error) {
+      console.error('Error calculating age category:', error);
+      // Fall back to event age category
+    }
+
     // Create event entry
     const eventEntry = await db.createEventEntry({
       eventId: body.eventId,
@@ -394,6 +447,8 @@ export async function POST(request: NextRequest) {
       mastery: body.mastery,
       itemStyle: body.itemStyle,
       estimatedDuration: body.estimatedDuration,
+      performanceType: performanceType,
+      ageCategory: calculatedAgeCategory, // Add calculated age category
       // PHASE 2: Live vs Virtual Entry Support
       entryType: body.entryType || 'live',
       musicFileUrl: body.musicFileUrl || null,

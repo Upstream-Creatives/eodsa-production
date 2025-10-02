@@ -389,18 +389,19 @@ export const db = {
     try {
       await sqlClient`
         INSERT INTO event_entries (
-          id, event_id, contestant_id, eodsa_id, participant_ids, calculated_fee, payment_status, submitted_at, 
+          id, event_id, contestant_id, eodsa_id, participant_ids, calculated_fee, payment_status, submitted_at,
           approved, qualified_for_nationals, item_number, item_name, choreographer, mastery, item_style, estimated_duration,
-          entry_type, music_file_url, music_file_name, video_file_url, video_file_name, video_external_url, video_external_type
+          entry_type, music_file_url, music_file_name, video_file_url, video_file_name, video_external_url, video_external_type,
+          performance_type, age_category
         )
         VALUES (
-          ${id}, ${eventEntry.eventId}, ${eventEntry.contestantId}, ${eventEntry.eodsaId}, ${JSON.stringify(eventEntry.participantIds)}, 
-          ${eventEntry.calculatedFee}, ${eventEntry.paymentStatus}, ${submittedAt}, ${eventEntry.approved}, 
-          ${eventEntry.qualifiedForNationals || false}, ${eventEntry.itemNumber || null}, ${eventEntry.itemName}, 
+          ${id}, ${eventEntry.eventId}, ${eventEntry.contestantId}, ${eventEntry.eodsaId}, ${JSON.stringify(eventEntry.participantIds)},
+          ${eventEntry.calculatedFee}, ${eventEntry.paymentStatus}, ${submittedAt}, ${eventEntry.approved},
+          ${eventEntry.qualifiedForNationals || false}, ${eventEntry.itemNumber || null}, ${eventEntry.itemName},
           ${eventEntry.choreographer}, ${eventEntry.mastery}, ${eventEntry.itemStyle}, ${eventEntry.estimatedDuration},
           ${eventEntry.entryType || 'live'}, ${eventEntry.musicFileUrl || null}, ${eventEntry.musicFileName || null},
-          ${eventEntry.videoFileUrl || null}, ${eventEntry.videoFileName || null}, ${eventEntry.videoExternalUrl || null}, 
-          ${eventEntry.videoExternalType || null}
+          ${eventEntry.videoFileUrl || null}, ${eventEntry.videoFileName || null}, ${eventEntry.videoExternalUrl || null},
+          ${eventEntry.videoExternalType || null}, ${(eventEntry as any).performanceType || null}, ${(eventEntry as any).ageCategory || null}
         )
       `;
       
@@ -434,10 +435,23 @@ export const db = {
             if (newContestant) {
             // Now try to insert the event entry again
             await sqlClient`
-              INSERT INTO event_entries (id, event_id, contestant_id, eodsa_id, participant_ids, calculated_fee, payment_status, submitted_at, approved, qualified_for_nationals, item_number, item_name, choreographer, mastery, item_style, estimated_duration)
-              VALUES (${id}, ${eventEntry.eventId}, ${eventEntry.contestantId}, ${eventEntry.eodsaId}, ${JSON.stringify(eventEntry.participantIds)}, ${eventEntry.calculatedFee}, ${eventEntry.paymentStatus}, ${submittedAt}, ${eventEntry.approved}, ${eventEntry.qualifiedForNationals || false}, ${eventEntry.itemNumber || null}, ${eventEntry.itemName}, ${eventEntry.choreographer}, ${eventEntry.mastery}, ${eventEntry.itemStyle}, ${eventEntry.estimatedDuration})
+              INSERT INTO event_entries (
+                id, event_id, contestant_id, eodsa_id, participant_ids, calculated_fee, payment_status, submitted_at,
+                approved, qualified_for_nationals, item_number, item_name, choreographer, mastery, item_style, estimated_duration,
+                entry_type, music_file_url, music_file_name, video_file_url, video_file_name, video_external_url, video_external_type,
+                performance_type, age_category
+              )
+              VALUES (
+                ${id}, ${eventEntry.eventId}, ${eventEntry.contestantId}, ${eventEntry.eodsaId}, ${JSON.stringify(eventEntry.participantIds)},
+                ${eventEntry.calculatedFee}, ${eventEntry.paymentStatus}, ${submittedAt}, ${eventEntry.approved},
+                ${eventEntry.qualifiedForNationals || false}, ${eventEntry.itemNumber || null}, ${eventEntry.itemName},
+                ${eventEntry.choreographer}, ${eventEntry.mastery}, ${eventEntry.itemStyle}, ${eventEntry.estimatedDuration},
+                ${eventEntry.entryType || 'live'}, ${eventEntry.musicFileUrl || null}, ${eventEntry.musicFileName || null},
+                ${eventEntry.videoFileUrl || null}, ${eventEntry.videoFileName || null}, ${eventEntry.videoExternalUrl || null},
+                ${eventEntry.videoExternalType || null}, ${(eventEntry as any).performanceType || null}, ${(eventEntry as any).ageCategory || null}
+              )
             `;
-            
+
             console.log(`✅ Event entry ${id} created successfully after creating contestant record`);
             } else {
                 throw new Error(`Failed to create or find contestant record for dancer ID: ${eventEntry.contestantId}`);
@@ -525,7 +539,9 @@ export const db = {
       videoFileUrl: row.video_file_url,
       videoFileName: row.video_file_name,
       videoExternalUrl: row.video_external_url,
-      videoExternalType: row.video_external_type
+      videoExternalType: row.video_external_type,
+      performanceType: row.performance_type,
+      ageCategory: row.age_category
     })) as EventEntry[];
   },
 
@@ -680,13 +696,13 @@ export const db = {
     await sqlClient`
       INSERT INTO performances (
         id, event_id, event_entry_id, contestant_id, title, participant_names, duration,
-        choreographer, mastery, item_style, scheduled_time, status, item_number, music_cue
+        choreographer, mastery, item_style, scheduled_time, status, item_number, music_cue, age_category
       )
       VALUES (
         ${id}, ${performance.eventId}, ${performance.eventEntryId}, ${performance.contestantId}, ${performance.title},
         ${JSON.stringify(performance.participantNames)}, ${performance.duration}, ${performance.choreographer},
         ${performance.mastery}, ${performance.itemStyle}, ${performance.scheduledTime || null}, ${performance.status},
-        ${performance.itemNumber || null}, ${((performance as any).musicCue) || null}
+        ${performance.itemNumber || null}, ${((performance as any).musicCue) || null}, ${performance.ageCategory || null}
       )
     `;
     
@@ -716,6 +732,7 @@ export const db = {
       choreographer: row.choreographer,
       mastery: row.mastery,
       itemStyle: row.item_style,
+      ageCategory: row.age_category || null,
       scheduledTime: row.scheduled_time,
       status: row.status,
       contestantName: row.contestant_name,

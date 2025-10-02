@@ -419,10 +419,10 @@ export default function AnnouncerDashboard() {
 
   if (isLoading && !event) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-black">Loading announcer dashboard...</p>
+          <p className="mt-4 text-white">Loading announcer dashboard...</p>
         </div>
       </div>
     );
@@ -446,9 +446,9 @@ export default function AnnouncerDashboard() {
         )));
       }}
     >
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-900 text-white">
         {/* Header */}
-        <div className="bg-white shadow">
+        <div className="bg-gray-800 border-b border-gray-700 shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
               <div className="flex items-center space-x-4">
@@ -456,15 +456,15 @@ export default function AnnouncerDashboard() {
                   <span className="text-white text-xl">📢</span>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-black">Announcer Dashboard</h1>
-                  <p className="text-black">Welcome, {user?.name}</p>
+                  <h1 className="text-2xl font-bold text-white">Announcer Dashboard</h1>
+                  <p className="text-gray-300">Welcome, {user?.name}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
                 <select
                   value={selectedEvent}
                   onChange={(e) => setSelectedEvent(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-black"
+                  className="px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 >
                   {events.map(event => (
                     <option key={event.id} value={event.id}>{event.name}</option>
@@ -517,9 +517,9 @@ export default function AnnouncerDashboard() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Announcer General Notes */}
-          <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-8">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-4 sm:p-6 mb-8">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl sm:text-2xl font-bold text-black">Announcer Notes</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Announcer Notes</h2>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-500">Autosaves</span>
                 <button
@@ -536,7 +536,7 @@ export default function AnnouncerDashboard() {
               onBlur={() => {
                 try { localStorage.setItem(`announcer:generalNotes:${selectedEvent}`, generalNotes || ''); } catch {}
               }}
-              className="w-full min-h-[120px] sm:min-h-[160px] px-3 py-2 border border-gray-300 rounded-lg text-black"
+              className="w-full min-h-[120px] sm:min-h-[160px] px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg"
               placeholder="Script, announcements, reminders…"
             />
           </div>

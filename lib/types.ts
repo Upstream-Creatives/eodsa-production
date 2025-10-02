@@ -102,6 +102,8 @@ export interface EventEntry {
   mastery: string; // UPDATED: New mastery levels
   itemStyle: string;
   estimatedDuration: number; // in minutes
+  performanceType?: string; // Calculated from participant count: Solo, Duet, Trio, Group
+  ageCategory?: string; // Calculated from average participant ages
   // PHASE 2: Live vs Virtual Entry Support
   entryType: 'live' | 'virtual';
   // For Live entries - music file

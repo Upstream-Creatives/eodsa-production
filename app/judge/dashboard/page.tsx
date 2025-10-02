@@ -36,6 +36,7 @@ interface Performance {
   choreographer?: string;
   itemStyle?: string;
   mastery?: string;
+  ageCategory?: string;
   itemNumber?: number;
   performanceOrder?: number;
   // PHASE 2: Live vs Virtual Entry Support
@@ -339,11 +340,34 @@ export default function JudgeDashboard() {
   }, [performances, filterStatus, entryTypeFilter, searchTerm, itemNumberSearch]);
 
   useEffect(() => {
-    const onFocus = () => setLastSyncAt(new Date().toLocaleTimeString());
-    const hb = setInterval(() => setLastSyncAt(new Date().toLocaleTimeString()), 15000);
+    const onFocus = () => {
+      setLastSyncAt(new Date().toLocaleTimeString());
+      // Reconnect sockets when window regains focus (laptop wake up)
+      if (judgeId && assignments.length > 0) {
+        import('@/lib/socket-client').then(({ socketClient }) => {
+          assignments.forEach((assignment: any) => {
+            socketClient.joinAsJudge(assignment.eventId, judgeId);
+            console.log(`⚖️ Reconnected judge room for event: ${assignment.eventId}`);
+          });
+        });
+      }
+    };
+    
+    const hb = setInterval(() => {
+      setLastSyncAt(new Date().toLocaleTimeString());
+      // Periodic reconnection check
+      if (judgeId && assignments.length > 0) {
+        import('@/lib/socket-client').then(({ socketClient }) => {
+          assignments.forEach((assignment: any) => {
+            socketClient.joinAsJudge(assignment.eventId, judgeId);
+          });
+        });
+      }
+    }, 30000); // Every 30 seconds
+    
     if (typeof window !== 'undefined') window.addEventListener('focus', onFocus);
     return () => { clearInterval(hb); if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus); };
-  }, []);
+  }, [judgeId, assignments]);
 
   const loadJudgeData = async (judgeId: string) => {
     setIsLoading(true);
@@ -831,6 +855,12 @@ export default function JudgeDashboard() {
                         <p className={`font-semibold text-${colorTheme.text}`}>{selectedPerformance.mastery}</p>
                       </div>
                     )}
+                    {selectedPerformance.ageCategory && (
+                      <div>
+                        <p className="text-gray-600">Age Category</p>
+                        <p className="font-semibold text-gray-900">{selectedPerformance.ageCategory}</p>
+                      </div>
+                    )}
                     {/* Duration hidden by request */}
                     <div>
                       <p className="text-gray-600">Entry Type</p>
@@ -1222,9 +1252,22 @@ export default function JudgeDashboard() {
                             </div>
                             <div className="flex flex-col md:flex-row items-end md:items-center space-y-2 md:space-y-0 md:space-x-3 flex-shrink-0">
                               {performance.hasScore ? (
-                                <span className="inline-flex items-center px-3 py-1 md:px-3 md:py-1 mobile-status-badge rounded-full text-xs md:text-sm font-medium bg-green-100 text-green-800">
-                                  ✓ Scored
-                                </span>
+                                <div className="flex flex-col items-end">
+                                  <span className="inline-flex items-center px-3 py-1 md:px-3 md:py-1 mobile-status-badge rounded-full text-xs md:text-sm font-medium bg-green-100 text-green-800">
+                                    ✓ Scored
+                                  </span>
+                                  {performance.judgeScore && (
+                                    <span className="text-xs text-gray-600 mt-1">
+                                      Total: {(
+                                        (performance.judgeScore.technicalScore || 0) +
+                                        (performance.judgeScore.musicalScore || 0) +
+                                        (performance.judgeScore.performanceScore || 0) +
+                                        (performance.judgeScore.stylingScore || 0) +
+                                        (performance.judgeScore.overallImpressionScore || 0)
+                                      ).toFixed(1)}/100
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
                                 <span className="inline-flex items-center px-2 py-1 md:px-3 md:py-1 mobile-status-badge rounded-full text-xs md:text-sm font-medium bg-yellow-100 text-yellow-800">
                                   Pending
@@ -1232,14 +1275,13 @@ export default function JudgeDashboard() {
                               )}
                               <button
                                 onClick={() => handleStartScoring(performance)}
-                                disabled={performance.hasScore} // DISABLE if already scored
                                 className={`px-3 py-2 md:px-4 md:py-2 mobile-score-button text-white font-medium rounded-lg transition-colors ${
                                   performance.hasScore 
-                                    ? 'bg-gray-400 cursor-not-allowed opacity-50' // Disabled styling
+                                    ? 'bg-blue-600 hover:bg-blue-700' // Allow viewing scores
                                     : `bg-${colorTheme.primary} hover:bg-${colorTheme.secondary}`
                                 } whitespace-nowrap`}
                               >
-                                {performance.hasScore ? 'Submitted' : 'Score'}
+                                {performance.hasScore ? 'View Score' : 'Score'}
                               </button>
                             </div>
                           </div>

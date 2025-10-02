@@ -121,8 +121,8 @@ function SortablePerformanceItem({
                 }}
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   selectedForMove === performance.id 
-                    ? 'bg-yellow-400 text-black' 
-                    : 'bg-gray-600 text-white hover:bg-gray-500'
+                    ? 'bg-yellow-400 text-white' 
+                    : 'bg-gray-600 text-white hover:bg-gray-9000'
                 }`}
               >
                 {selectedForMove === performance.id ? 'Selected' : 'Select'}
@@ -201,7 +201,7 @@ function SortablePerformanceItem({
               disabled={performance.status !== 'in_progress'}
               className={`px-2 py-1 rounded text-sm font-bold ${
                 performance.status !== 'in_progress'
-                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                  ? 'bg-gray-600 text-gray-600 cursor-not-allowed'
                   : 'bg-yellow-500 hover:bg-yellow-600 text-white'
               }`}
               title="Pause"
@@ -251,7 +251,7 @@ function SortablePerformanceItem({
             <div className={`relative ${isDragging ? 'animate-pulse' : ''}`}>
               <div className={`w-20 h-20 rounded-xl flex flex-col items-center justify-center font-bold border-4 transition-all duration-150 ${
                 isDragging 
-                  ? 'bg-yellow-400 border-yellow-300 text-black scale-110' 
+                  ? 'bg-yellow-400 border-yellow-300 text-white scale-110' 
                   : performance.status === 'completed'
                   ? 'bg-green-500 border-green-400 text-white'
                   : performance.status === 'in_progress'
@@ -265,7 +265,7 @@ function SortablePerformanceItem({
               </div>
               {isDragging && (
                 <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-300 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-bold text-black">📌</span>
+                  <span className="text-xs font-bold text-white">📌</span>
                 </div>
               )}
             </div>
@@ -288,8 +288,8 @@ function SortablePerformanceItem({
               onClick={() => setSelectedForMove(selectedForMove === performance.id ? null : performance.id)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 selectedForMove === performance.id 
-                  ? 'bg-yellow-400 text-black' 
-                  : 'bg-gray-600 text-white hover:bg-gray-500'
+                  ? 'bg-yellow-400 text-white' 
+                  : 'bg-gray-600 text-white hover:bg-gray-9000'
               }`}
             >
               {selectedForMove === performance.id ? 'Selected' : 'Select'}
@@ -322,7 +322,7 @@ function SortablePerformanceItem({
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 performance.musicCue === 'onstage' 
                   ? 'bg-green-600 text-white border-2 border-green-400' 
-                  : 'bg-gray-600 text-white border-2 border-gray-500 hover:bg-gray-500'
+                  : 'bg-gray-600 text-white border-2 border-gray-500 hover:bg-gray-9000'
               }`}
               title={`Currently ${performance.musicCue || 'offstage'} - Click to toggle`}
             >
@@ -348,7 +348,7 @@ function SortablePerformanceItem({
                 disabled={performance.status !== 'in_progress'}
                 className={`px-2 py-1 rounded text-xs font-bold ${
                   performance.status !== 'in_progress'
-                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                    ? 'bg-gray-600 text-gray-600 cursor-not-allowed'
                     : 'bg-yellow-500 hover:bg-yellow-600 text-white'
                 }`}
                 title="Pause Performance"
@@ -387,7 +387,7 @@ function SortablePerformanceItem({
       {/* Drag instruction overlay */}
       {isDragging && (
         <div className="absolute inset-0 bg-purple-500/20 rounded-lg flex items-center justify-center">
-          <div className="bg-yellow-400 text-black px-4 py-2 rounded-lg font-bold text-sm">
+          <div className="bg-yellow-400 text-white px-4 py-2 rounded-lg font-bold text-sm">
             🎯 REORDERING ITEM #{performance.itemNumber}
           </div>
         </div>
@@ -652,6 +652,18 @@ export default function BackstageDashboard() {
   });
 
   const updatePerformanceStatus = async (performanceId: string, status: Performance['status']) => {
+    // Backstage "Complete" is local only - doesn't update server or broadcast
+    if (status === 'completed') {
+      // Update local state only for backstage view
+      setPerformances(prev => 
+        prev.map(p => 
+          p.id === performanceId ? { ...p, status } : p
+        )
+      );
+      success('Performance marked as complete (backstage view only)');
+      return;
+    }
+
     try {
       const response = await fetch(`/api/performances/${performanceId}/status`, {
         method: 'PUT',

@@ -347,7 +347,7 @@ function AdminDashboard() {
   };
 
   const exportProgramCsv = () => {
-    const rows = [['Item #','Title','Contestant','Participants','Type','Style','Level','Event','Music','Video']];
+    const rows = [['Item #','Item Name','Contestant','Participants','Type','Style','Level','Event','Music','Video']];
     for (const e of musicTrackingData) {
       rows.push([
         e.itemNumber || '',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
+import { calculateAgeCategoryForEntry } from '@/lib/age-category-calculator';
 
 export async function GET(
   request: Request,
@@ -8,7 +9,7 @@ export async function GET(
   try {
     const { id } = await params;
     const eventId = id;
-    
+
     // First check if the event exists
     const event = await db.getEventById(eventId);
     if (!event) {
@@ -28,24 +29,43 @@ export async function GET(
       itemNumber: p.itemNumber
     })));
 
-    // Include virtualItemNumber by joining entries (if present)
+    // Get SQL client for age calculations
+    const { getSql } = await import('@/lib/database');
+    const sqlClient = getSql();
+
+    // Include virtualItemNumber and calculate age categories
     try {
       const entries = await db.getAllEventEntries();
-      const withVirtual = performances.map((p: any) => {
-        const entry = entries.find(e => e.id === p.eventEntryId);
-        return entry && entry.virtualItemNumber ? { ...p, virtualItemNumber: entry.virtualItemNumber } : p;
-      });
-      
+
+      const withVirtualAndAges = await Promise.all(
+        performances.map(async (p: any) => {
+          const entry = entries.find(e => e.id === p.eventEntryId);
+
+          // Calculate age category dynamically using helper function
+          const ageCategory = entry && entry.participantIds
+            ? await calculateAgeCategoryForEntry(entry.participantIds, event.eventDate, sqlClient)
+            : 'N/A';
+
+          return {
+            ...p,
+            virtualItemNumber: entry && entry.virtualItemNumber ? entry.virtualItemNumber : undefined,
+            ageCategory // Add calculated age category
+          };
+        })
+      );
+
       // Debug: Log entry types to help diagnose filtering issues
-      console.log('Performance entry types:', withVirtual.map(p => ({
+      console.log('Performance entry types:', withVirtualAndAges.map(p => ({
         id: p.id,
         title: p.title,
         entryType: p.entryType,
+        ageCategory: p.ageCategory,
         participantCount: p.participantNames?.length || 0
       })));
-      
-      return NextResponse.json({ success: true, performances: withVirtual });
-    } catch {
+
+      return NextResponse.json({ success: true, performances: withVirtualAndAges });
+    } catch (error) {
+      console.error('Error processing performances:', error);
       return NextResponse.json({ success: true, performances });
     }
   } catch (error) {
@@ -55,4 +75,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}
