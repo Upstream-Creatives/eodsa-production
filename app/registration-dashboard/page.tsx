@@ -304,7 +304,7 @@ export default function RegistrationDashboard() {
     >
       <div className="min-h-screen bg-gray-900">
         {/* Header */}
-        <div className="bg-gray-800 shadow">
+        <div className="bg-gray-800 border-b border-gray-700 shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
               <div className="flex items-center space-x-4">
@@ -313,14 +313,14 @@ export default function RegistrationDashboard() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-white">Registration Dashboard</h1>
-                  <p className="text-white">Welcome, {user?.name}</p>
+                  <p className="text-gray-300">Welcome, {user?.name}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
                 <select
                   value={selectedEvent}
                   onChange={(e) => setSelectedEvent(e.target.value)}
-                  className="px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-white"
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-white"
                 >
                   {events.map(event => (
                     <option key={event.id} value={event.id}>{event.name}</option>
@@ -346,7 +346,7 @@ export default function RegistrationDashboard() {
                     const a = document.createElement('a');
                     a.href = url; a.download = 'presence.csv'; a.click(); URL.revokeObjectURL(url);
                   }}
-                  className="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-black transition-colors"
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   Export Presence CSV
                 </button>
@@ -355,7 +355,7 @@ export default function RegistrationDashboard() {
                     localStorage.removeItem('registrationSession');
                     router.push('/portal/registration');
                   }}
-                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Logout
                 </button>
@@ -367,57 +367,57 @@ export default function RegistrationDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Event Info */}
           {event && (
-            <div className="bg-gray-800 rounded-lg shadow p-6 mb-8">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-8">
               <h2 className="text-xl font-semibold text-white mb-2">{event.name}</h2>
-              <p className="text-white">Date: {event.eventDate} | Venue: {event.venue}</p>
+              <p className="text-gray-300">Date: {event.eventDate} | Venue: {event.venue}</p>
             </div>
           )}
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6">
               <div className="flex items-center">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-blue-600">📋</span>
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                  <span className="text-white">📋</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">Total Performers</p>
+                  <p className="text-sm font-medium text-gray-400">Total Performers</p>
                   <p className="text-2xl font-semibold text-white">{performances.length}</p>
                 </div>
               </div>
             </div>
             
-            <div className="bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6">
               <div className="flex items-center">
-                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-green-600">✅</span>
+                <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+                  <span className="text-white">✅</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">Present</p>
+                  <p className="text-sm font-medium text-gray-400">Present</p>
                   <p className="text-2xl font-semibold text-white">{presentCount}</p>
                 </div>
               </div>
             </div>
             
-            <div className="bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6">
               <div className="flex items-center">
-                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-red-600">❌</span>
+                <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center mr-3">
+                  <span className="text-white">❌</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">Absent</p>
+                  <p className="text-sm font-medium text-gray-400">Absent</p>
                   <p className="text-2xl font-semibold text-white">{absentCount}</p>
                 </div>
               </div>
             </div>
             
-            <div className="bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6">
               <div className="flex items-center">
-                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-purple-600">📊</span>
+                <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
+                  <span className="text-white">📊</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">Attendance Rate</p>
+                  <p className="text-sm font-medium text-gray-400">Attendance Rate</p>
                   <p className="text-2xl font-semibold text-white">
                     {performances.length > 0 ? Math.round((presentCount / performances.length) * 100) : 0}%
                   </p>
@@ -427,7 +427,7 @@ export default function RegistrationDashboard() {
           </div>
 
           {/* Filters */}
-          <div className="bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-8">
             <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-white mb-2">Search</label>
@@ -436,7 +436,7 @@ export default function RegistrationDashboard() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search by name, item number, or EODSA ID..."
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-white"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-white placeholder-gray-400"
                 />
               </div>
               
@@ -445,7 +445,7 @@ export default function RegistrationDashboard() {
                 <select
                   value={presenceFilter}
                   onChange={(e) => setPresenceFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-white"
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-white"
                 >
                   <option value="all">All Performers</option>
                   <option value="present">Present Only</option>
@@ -456,7 +456,7 @@ export default function RegistrationDashboard() {
           </div>
 
           {/* Performer List */}
-          <div className="bg-gray-800 rounded-lg shadow">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow">
             <div className="px-6 py-4 border-b border-gray-700">
               <h2 className="text-lg font-semibold text-white flex items-center">
                 <span className="mr-2">👥</span>
@@ -467,7 +467,7 @@ export default function RegistrationDashboard() {
             {filteredPerformances.length > 0 ? (
               <div className="divide-y divide-gray-700">
                 {filteredPerformances.map((performance) => (
-                  <div key={performance.id} className={`p-6 ${performance.presence?.present ? 'bg-green-50' : ''}`}>
+                  <div key={performance.id} className={`p-6 ${performance.presence?.present ? 'bg-green-900/20' : 'bg-gray-800'}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-4 flex-1">
                         <div className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
@@ -483,38 +483,38 @@ export default function RegistrationDashboard() {
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                             <div>
-                              <p className="text-sm text-white">
-                                <strong>Entry Name:</strong> {performance.title}
+                              <p className="text-sm text-gray-300">
+                                <strong className="text-white">Entry Name:</strong> {performance.title}
                               </p>
-                              <p className="text-sm text-white">
-                                <strong>Choreographer:</strong> {performance.choreographer}
+                              <p className="text-sm text-gray-300">
+                                <strong className="text-white">Choreographer:</strong> {performance.choreographer}
                               </p>
-                              <p className="text-sm text-white">
-                                <strong>Style:</strong> {performance.itemStyle} • <strong>Level:</strong> {performance.mastery}
+                              <p className="text-sm text-gray-300">
+                                <strong className="text-white">Style:</strong> {performance.itemStyle} • <strong className="text-white">Level:</strong> {performance.mastery}
                               </p>
                               {performance.ageCategory && (
-                                <p className="text-sm text-white">
-                                  <strong>Age Category:</strong> {performance.ageCategory}
+                                <p className="text-sm text-gray-300">
+                                  <strong className="text-white">Age Category:</strong> {performance.ageCategory}
                                 </p>
                               )}
                             </div>
                             <div>
-                              <p className="text-sm text-white">
-                                <strong>Studio Name:</strong> {performance.contestantName}
+                              <p className="text-sm text-gray-300">
+                                <strong className="text-white">Studio Name:</strong> {performance.contestantName}
                               </p>
-                              <p className="text-sm text-white">
-                                <strong>Contestant(s):</strong> {performance.participantNames.join(', ')}
+                              <p className="text-sm text-gray-300">
+                                <strong className="text-white">Contestant(s):</strong> {performance.participantNames.join(', ')}
                               </p>
                               {performance.eodsaId && (
-                                <p className="text-xs text-gray-600">
-                                  <strong>EODSA ID:</strong> {performance.eodsaId}
+                                <p className="text-xs text-gray-400">
+                                  <strong className="text-gray-300">EODSA ID:</strong> {performance.eodsaId}
                                 </p>
                               )}
                               {/* Music Status for Live Performances */}
                               {performance.entryType === 'live' && (
                                 <p className="text-xs">
                                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                    performance.musicFileUrl ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                    performance.musicFileUrl ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'
                                   }`}>
                                     {performance.musicFileUrl ? 'Music uploaded' : 'Music missing'}
                                   </span>
@@ -523,7 +523,7 @@ export default function RegistrationDashboard() {
                             </div>
                           </div>
                           {performance.presence?.checkedInAt && (
-                            <p className="text-xs text-green-600 mt-2">
+                            <p className="text-xs text-green-400 mt-2">
                               Last updated: {new Date(performance.presence.checkedInAt).toLocaleString()}
                             </p>
                           )}
@@ -531,18 +531,18 @@ export default function RegistrationDashboard() {
 
                         <div className="flex items-center space-x-2">
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            performance.status === 'in_progress' ? 'bg-orange-100 text-orange-800' :
-                            performance.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                            performance.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-700 text-white'
+                            performance.status === 'in_progress' ? 'bg-orange-600 text-white' :
+                            performance.status === 'completed' ? 'bg-blue-600 text-white' :
+                            performance.status === 'cancelled' ? 'bg-red-600 text-white' :
+                            'bg-gray-600 text-white'
                           }`}>
                             {performance.status.toUpperCase()}
                           </span>
                           
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                             performance.presence?.present 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
+                              ? 'bg-green-600 text-white' 
+                              : 'bg-red-600 text-white'
                           }`}>
                             {performance.presence?.present ? 'PRESENT' : 'ABSENT'}
                           </span>
@@ -580,7 +580,7 @@ export default function RegistrationDashboard() {
             ) : (
               <div className="p-8 text-center">
                 <span className="text-4xl mb-4 block">👥</span>
-                <p className="text-white">No performers found for the selected filter</p>
+                <p className="text-gray-400">No performers found for the selected filter</p>
               </div>
             )}
           </div>

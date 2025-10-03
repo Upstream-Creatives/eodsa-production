@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/database';
+import { emailService } from '@/lib/email';
+import { getMedalFromPercentage, formatCertificateDate } from '@/lib/certificate-generator';
 
 export async function PUT(
   request: NextRequest,
@@ -22,7 +24,7 @@ export async function PUT(
     // Check if performance exists
     const allPerformances = await db.getAllPerformances();
     const performance = allPerformances.find(p => p.id === performanceId);
-    
+
     if (!performance) {
       return NextResponse.json(
         { error: 'Performance not found' },
@@ -30,8 +32,88 @@ export async function PUT(
       );
     }
 
+    // Store previous status to check if transitioning to completed
+    const previousStatus = performance.status;
+
     // Update performance status
     await db.updatePerformanceStatus(performanceId, status);
+
+    // If status changed to 'completed', automatically generate and send certificate
+    let certificateResult = null;
+    if (status === 'completed' && previousStatus !== 'completed') {
+      try {
+        console.log(`Performance ${performanceId} completed - generating certificate...`);
+
+        // Get scores for this performance
+        const scores = await db.getScoresByPerformance(performanceId);
+
+        if (scores && scores.length > 0) {
+          // Calculate average percentage from all judge scores
+          const totalPercentage = scores.reduce((sum, score) => {
+            const scoreTotal = score.technicalScore + score.musicalScore + score.performanceScore + score.stylingScore + score.overallImpressionScore;
+            return sum + scoreTotal;
+          }, 0);
+          const averagePercentage = Math.round(totalPercentage / scores.length);
+
+          // Get medallion
+          const medallion = getMedalFromPercentage(averagePercentage);
+
+          // Get dancer information
+          const allDancers = await db.getAllDancers();
+          const dancer = allDancers.find(d => performance.participantNames.includes(d.name));
+
+          if (dancer) {
+            // Get contestant to get email
+            const allContestants = await db.getAllContestants();
+            const contestant = allContestants.find(c => c.dancers.some(d => d.id === dancer.id));
+
+            if (contestant && contestant.email) {
+              // Get event details for date
+              const allEvents = await db.getAllEvents();
+              const event = allEvents.find(e => e.id === performance.eventId);
+
+              if (event) {
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                const certificateUrl = `${appUrl}/certificates/${performanceId}`;
+
+                // Send certificate email
+                const emailResult = await emailService.sendCertificateEmail(
+                  performance.participantNames.join(', '),
+                  contestant.email,
+                  averagePercentage,
+                  medallion,
+                  certificateUrl
+                );
+
+                if (emailResult.success) {
+                  certificateResult = {
+                    sent: true,
+                    email: contestant.email,
+                    percentage: averagePercentage,
+                    medallion
+                  };
+                  console.log(`✅ Certificate sent to ${contestant.email}`);
+                } else {
+                  console.error(`❌ Failed to send certificate: ${emailResult.error}`);
+                  certificateResult = {
+                    sent: false,
+                    error: emailResult.error
+                  };
+                }
+              }
+            }
+          }
+        } else {
+          console.warn(`No scores found for performance ${performanceId} - certificate not sent`);
+        }
+      } catch (certError) {
+        console.error('Error generating/sending certificate:', certError);
+        certificateResult = {
+          sent: false,
+          error: certError instanceof Error ? certError.message : 'Unknown error'
+        };
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -39,7 +121,8 @@ export async function PUT(
       performance: {
         ...performance,
         status
-      }
+      },
+      certificate: certificateResult
     });
 
   } catch (error) {

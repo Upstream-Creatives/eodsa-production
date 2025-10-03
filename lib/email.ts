@@ -7,7 +7,7 @@ const EMAIL_CONFIG = {
   secure: false, // true for 465, false for other ports
   auth: {
     user: 'devops@upstreamcreatives.co.za',
-    pass: 'ceTWgaQXrDTTCYQuRJg4'
+    pass: 'p69t5HKsDSHmqFMPxDsZ'
   },
   tls: {
     rejectUnauthorized: false // Accept self-signed certificates
@@ -280,40 +280,89 @@ export const emailTemplates = {
           <h1 style="color: white; margin: 0; font-size: 28px;">🔐 Password Reset</h1>
           <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">EODSA Account Recovery</p>
         </div>
-        
+
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
           <h2 style="color: #333; margin: 0 0 20px 0;">Hello ${name},</h2>
-          
+
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
             We received a request to reset your password for your EODSA ${userType === 'studio' ? 'Studio' : userType === 'admin' ? 'Admin' : 'Judge'} account.
           </p>
-          
+
           <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; border-left: 4px solid #2196f3; margin: 20px 0;">
             <p style="margin: 0; color: #0d47a1; font-size: 16px; line-height: 1.6;">
               <strong>⚠️ Important:</strong> This password reset link will expire in 1 hour for security reasons.
             </p>
           </div>
-          
+
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}&type=${userType}" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}&type=${userType}"
                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; font-size: 16px;">
               Reset Password
             </a>
           </div>
-          
+
           <p style="color: #555; font-size: 14px; line-height: 1.6;">
             If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.
           </p>
-          
+
           <p style="color: #555; font-size: 14px; line-height: 1.6;">
             If the button above doesn't work, copy and paste this link into your browser:
           </p>
           <p style="color: #667eea; font-size: 12px; word-break: break-all; background: #f5f5f5; padding: 10px; border-radius: 4px;">
             ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}&type=${userType}
           </p>
-          
+
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
             Need help? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+          </p>
+        </div>
+      </div>
+    `
+  }),
+
+  // Certificate of achievement email
+  certificateAchievement: (name: string, percentage: number, medallion: string, certificateUrl: string) => ({
+    subject: 'EODSA Nationals 2025 - Your Certificate of Achievement!',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #e91e63 0%, #9c27b0 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🏆 Certificate of Achievement</h1>
+          <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">EODSA Nationals 2025</p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+          <h2 style="color: #333; margin: 0 0 20px 0;">Congratulations ${name}!</h2>
+
+          <p style="color: #555; font-size: 16px; line-height: 1.6;">
+            Your performance at the EODSA National Championship has been completed and your certificate is ready!
+          </p>
+
+          <div style="background: ${medallion === 'Gold' ? '#ffd700' : medallion === 'Silver' ? '#c0c0c0' : medallion === 'Bronze' ? '#cd7f32' : '#e3f2fd'}; padding: 20px; border-radius: 8px; border-left: 4px solid ${medallion === 'Gold' ? '#ffb700' : medallion === 'Silver' ? '#a8a8a8' : medallion === 'Bronze' ? '#b36200' : '#2196f3'}; margin: 20px 0;">
+            <h3 style="color: ${medallion ? '#000' : '#0d47a1'}; margin: 0 0 15px 0;">Your Achievement</h3>
+            <p style="margin: 5px 0; color: ${medallion ? '#000' : '#0d47a1'};"><strong>Score:</strong> ${percentage}%</p>
+            ${medallion ? `<p style="margin: 5px 0; color: #000;"><strong>Medallion:</strong> ${medallion} 🏅</p>` : ''}
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${certificateUrl}"
+               style="background: linear-gradient(135deg, #e91e63 0%, #9c27b0 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; font-size: 16px;">
+              View Certificate
+            </a>
+          </div>
+
+          <p style="color: #555; font-size: 14px; line-height: 1.6;">
+            You can download and share your certificate. Print it or share it on social media to celebrate your achievement!
+          </p>
+
+          <h3 style="color: #333; margin: 25px 0 15px 0;">Share Your Success:</h3>
+          <ul style="color: #555; line-height: 1.8;">
+            <li>Download your certificate for your records</li>
+            <li>Share on social media with #EODSANationals2025</li>
+            <li>Frame it and display your achievement!</li>
+          </ul>
+
+          <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
+            Questions? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #e91e63;">devops@upstreamcreatives.co.za</a>
           </p>
         </div>
       </div>
@@ -440,6 +489,26 @@ export const emailService = {
       return { success: true, messageId: result.messageId };
     } catch (error) {
       console.error(`❌ Failed to send password reset email to ${email}:`, error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+
+  // Send certificate email
+  async sendCertificateEmail(name: string, email: string, percentage: number, medallion: string, certificateUrl: string) {
+    try {
+      const template = emailTemplates.certificateAchievement(name, percentage, medallion, certificateUrl);
+
+      await transporter.sendMail({
+        from: '"EODSA Nationals 2025" <devops@upstreamcreatives.co.za>',
+        to: email,
+        subject: template.subject,
+        html: template.html
+      });
+
+      console.log('Certificate email sent successfully to:', email);
+      return { success: true };
+    } catch (error) {
+      console.error('Error sending certificate email:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   },
