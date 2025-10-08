@@ -397,6 +397,264 @@ function VideoUploadSection({ dancerSession }: { dancerSession: DancerSession })
   );
 }
 
+// Scores & Feedback Section Component
+function ScoresFeedbackSection({ dancerSession }: { dancerSession: DancerSession }) {
+  const [scores, setScores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedScore, setSelectedScore] = useState<any | null>(null);
+  const [showScoreDetails, setShowScoreDetails] = useState(false);
+
+  useEffect(() => {
+    loadScores();
+  }, [dancerSession.eodsaId]);
+
+  const loadScores = async () => {
+    try {
+      const response = await fetch(`/api/dancers/scores?eodsaId=${dancerSession.eodsaId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setScores(data.scores);
+      } else {
+        setError(data.error || 'Failed to load scores');
+      }
+    } catch (error) {
+      console.error('Error loading scores:', error);
+      setError('Failed to load scores');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateTotalScore = (score: any) => {
+    return Number(score.technicalScore) + Number(score.musicalScore) +
+           Number(score.performanceScore) + Number(score.stylingScore) +
+           Number(score.overallImpressionScore);
+  };
+
+  const getMedalColor = (total: number) => {
+    if (total >= 90) return 'text-yellow-400'; // Gold
+    if (total >= 80) return 'text-gray-300'; // Silver
+    if (total >= 70) return 'text-orange-400'; // Bronze
+    return 'text-blue-400'; // Participation
+  };
+
+  const getMedalName = (total: number) => {
+    if (total >= 90) return 'Gold';
+    if (total >= 80) return 'Silver';
+    if (total >= 70) return 'Bronze';
+    return 'Participation';
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 p-6">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          <span className="ml-3 text-gray-300">Loading scores...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
+        <div className="p-6 border-b border-gray-700">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold text-white">
+                🏅 My Scores & Feedback
+                {!loading && (
+                  <span className="text-sm font-normal text-gray-400 ml-2">
+                    ({scores.length})
+                  </span>
+                )}
+              </h3>
+              <p className="text-gray-400 text-sm mt-1">View your performance scores and judge feedback</p>
+            </div>
+            <button
+              onClick={loadScores}
+              disabled={loading}
+              className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+            >
+              {loading ? '🔄' : '↻'} Refresh
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="p-4 bg-red-500/20 border-b border-red-500/30 text-red-200">
+            {error}
+          </div>
+        )}
+
+        {scores.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🏅</span>
+            </div>
+            <p className="text-gray-400 mb-2">No scores available yet</p>
+            <p className="text-gray-500 text-sm">
+              Scores will appear here after judges have scored your performances and they've been approved.
+            </p>
+          </div>
+        ) : (
+          <div className="p-6">
+            <div className="space-y-4">
+              {scores.map((score) => {
+                const totalScore = calculateTotalScore(score);
+                return (
+                  <div
+                    key={score.id}
+                    className="bg-gray-700/50 rounded-xl p-4 border border-gray-600 hover:border-purple-500 transition-all duration-300 cursor-pointer"
+                    onClick={() => {
+                      setSelectedScore(score);
+                      setShowScoreDetails(true);
+                    }}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-white mb-1">{score.performanceTitle}</h4>
+                        <p className="text-sm text-gray-400">Judge: {score.judgeName}</p>
+                        <p className="text-xs text-gray-500">{new Date(score.scoredAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-3xl font-bold ${getMedalColor(totalScore)}`}>
+                          {totalScore}<span className="text-lg text-gray-400">/100</span>
+                        </div>
+                        <div className={`text-xs font-semibold ${getMedalColor(totalScore)}`}>
+                          {getMedalName(totalScore)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-2">
+                      <div className="text-center">
+                        <div className="text-sm font-bold text-blue-400">{score.technicalScore}</div>
+                        <div className="text-[10px] text-gray-500">Technical</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm font-bold text-purple-400">{score.musicalScore}</div>
+                        <div className="text-[10px] text-gray-500">Musical</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm font-bold text-green-400">{score.performanceScore}</div>
+                        <div className="text-[10px] text-gray-500">Performance</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm font-bold text-orange-400">{score.stylingScore}</div>
+                        <div className="text-[10px] text-gray-500">Styling</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm font-bold text-pink-400">{score.overallImpressionScore}</div>
+                        <div className="text-[10px] text-gray-500">Overall</div>
+                      </div>
+                    </div>
+
+                    {score.comments && (
+                      <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                        <p className="text-xs text-blue-300 italic line-clamp-2">{score.comments}</p>
+                      </div>
+                    )}
+
+                    <div className="mt-2 text-xs text-purple-400 text-right">
+                      Click to view full details →
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Score Details Modal */}
+      {showScoreDetails && selectedScore && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={() => setShowScoreDetails(false)}>
+          <div className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-700 flex justify-between items-center sticky top-0 bg-gray-800 z-10">
+              <h3 className="text-xl font-semibold text-white">{selectedScore.performanceTitle}</h3>
+              <button
+                onClick={() => setShowScoreDetails(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30 rounded-xl p-6 mb-6 text-center">
+                <p className="text-sm font-semibold text-purple-300 mb-2">TOTAL SCORE</p>
+                <p className={`text-5xl font-bold ${getMedalColor(calculateTotalScore(selectedScore))}`}>
+                  {calculateTotalScore(selectedScore)}
+                  <span className="text-3xl text-gray-400">/100</span>
+                </p>
+                <p className={`text-sm font-semibold mt-2 ${getMedalColor(calculateTotalScore(selectedScore))}`}>
+                  🏅 {getMedalName(calculateTotalScore(selectedScore))}
+                </p>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="font-bold text-white mb-3 flex items-center">
+                    <span className="mr-2">📊</span>
+                    Score Breakdown
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300">Technical Execution</span>
+                      <span className="font-bold text-blue-400">{selectedScore.technicalScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300">Musical Interpretation</span>
+                      <span className="font-bold text-purple-400">{selectedScore.musicalScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300">Performance Quality</span>
+                      <span className="font-bold text-green-400">{selectedScore.performanceScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300">Styling & Presentation</span>
+                      <span className="font-bold text-orange-400">{selectedScore.stylingScore}/20</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300">Overall Impression</span>
+                      <span className="font-bold text-pink-400">{selectedScore.overallImpressionScore}/20</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="font-bold text-white mb-2 flex items-center">
+                    <span className="mr-2">ℹ️</span>
+                    Performance Info
+                  </h4>
+                  <div className="space-y-1 text-sm">
+                    <p className="text-gray-300">Judge: <span className="text-white">{selectedScore.judgeName}</span></p>
+                    <p className="text-gray-300">Scored: <span className="text-white">{new Date(selectedScore.scoredAt).toLocaleString()}</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedScore.comments && (
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                  <h4 className="font-bold text-blue-300 mb-2 flex items-center">
+                    <span className="mr-2">💬</span>
+                    Judge Comments
+                  </h4>
+                  <p className="text-sm text-blue-200 italic leading-relaxed">{selectedScore.comments}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // Competition Entries Section Component
 function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSession }) {
   const [competitionEntries, setCompetitionEntries] = useState<any[]>([]);
@@ -770,6 +1028,9 @@ export default function DancerDashboardPage() {
       </div>
 
       <div className="container mx-auto p-4 space-y-6">
+        {/* Scores & Feedback Section */}
+        <ScoresFeedbackSection dancerSession={dancerSession} />
+
         {/* Competition Entries Section */}
         <CompetitionEntriesSection dancerSession={dancerSession} />
 

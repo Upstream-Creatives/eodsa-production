@@ -48,20 +48,11 @@ export async function POST(request: Request) {
         overallImpressionScore: Number(overallImpression),
         comments: comments || ''
       });
-
-      // GABRIEL'S REQUIREMENT: Create approval record for admin review
-      try {
-        await db.createScoreApproval(performanceId, judgeId, score.id);
-        console.log('✅ Score approval record created for admin review');
-      } catch (approvalError) {
-        console.error('⚠️ Failed to create approval record:', approvalError);
-        // Don't fail the score submission if approval creation fails
-      }
       
       return NextResponse.json({ 
         success: true, 
         score,
-        message: 'Score submitted successfully and sent for admin approval'
+        message: 'Score submitted successfully'
       });
     }
   } catch (error: any) {

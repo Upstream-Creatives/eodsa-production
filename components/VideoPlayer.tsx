@@ -36,9 +36,20 @@ export default function VideoPlayer({
   };
 
   const extractYouTubeId = (url: string) => {
-    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[7].length === 11) ? match[7] : null;
+    // Handle multiple YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/watch\?.*?v=([a-zA-Z0-9_-]{11})/,
+      /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
   };
 
   const extractVimeoId = (url: string) => {
@@ -75,35 +86,48 @@ export default function VideoPlayer({
       </div>
 
       {embedUrl ? (
-        <div className="relative w-full" style={{ paddingBottom: '56.25%' /* 16:9 aspect ratio */ }}>
+        <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' /* 16:9 aspect ratio */ }}>
           <iframe
             src={embedUrl}
             title={title}
-            className="absolute top-0 left-0 w-full h-full rounded-lg"
+            className="absolute top-0 left-0 w-full h-full"
             frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
+            loading="eager"
           />
         </div>
       ) : (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-900">
-                {videoType?.toUpperCase()} Video Link
-              </p>
-              <p className="text-xs text-blue-700 truncate max-w-md">
-                {videoUrl}
-              </p>
+        <div className="space-y-3">
+          {/* Fallback when video can't be embedded */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 text-2xl">⚠️</div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-900 mb-2">
+                  Video cannot be embedded directly
+                </p>
+                <p className="text-xs text-yellow-700 mb-3">
+                  {videoType === 'youtube' 
+                    ? 'YouTube video ID could not be extracted. Please check the URL format.' 
+                    : 'This video type requires opening in a new tab.'}
+                </p>
+                <div className="bg-white rounded border border-yellow-300 p-2 mb-3">
+                  <p className="text-xs font-mono text-gray-700 break-all">
+                    {videoUrl}
+                  </p>
+                </div>
+                <a
+                  href={videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <span className="mr-2">🎬</span>
+                  Watch Video in New Tab
+                </a>
+              </div>
             </div>
-            <a
-              href={videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Watch Video
-            </a>
           </div>
         </div>
       )}

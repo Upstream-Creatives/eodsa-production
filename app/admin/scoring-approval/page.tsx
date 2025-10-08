@@ -4,41 +4,48 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/simple-toast';
 
-interface ScoreApproval {
-  id: string;
-  performanceId: string;
+interface JudgeScore {
   judgeId: string;
   judgeName: string;
-  performanceTitle: string;
   scoreId: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  rejected?: boolean;
-  rejectionReason?: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-  score: {
-    technicalScore: number;
-    musicalScore: number;
-    performanceScore: number;
-    stylingScore: number;
-    overallImpressionScore: number;
-    comments: string;
-  };
+  technicalScore: number;
+  musicalScore: number;
+  performanceScore: number;
+  stylingScore: number;
+  overallImpressionScore: number;
+  total: number;
+  comments: string;
+  submittedAt: string;
+}
+
+interface PerformanceApproval {
+  performanceId: string;
+  performanceTitle: string;
+  eventId: string;
+  totalJudges: number;
+  scoredJudges: number;
+  judgeScores: JudgeScore[];
+  averageScore: number;
+  percentage: number;
+  medal: string;
+  status: 'pending' | 'published';
+  scoresPublished: boolean;
 }
 
 export default function ScoringApprovalPage() {
   const router = useRouter();
   const { success, error } = useToast();
   const [user, setUser] = useState<any>(null);
-  const [approvals, setApprovals] = useState<ScoreApproval[]>([]);
+  const [approvals, setApprovals] = useState<PerformanceApproval[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [searchTerm, setSearchTerm] = useState('');
-  const [processingApproval, setProcessingApproval] = useState<Set<string>>(new Set());
-  const [selectedApproval, setSelectedApproval] = useState<ScoreApproval | null>(null);
+  const [processingPublish, setProcessingPublish] = useState<Set<string>>(new Set());
+  const [selectedApproval, setSelectedApproval] = useState<PerformanceApproval | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
+  const [editingJudgeScore, setEditingJudgeScore] = useState<JudgeScore | null>(null);
+  const [editedScoreValues, setEditedScoreValues] = useState<any>(null);
+  const [editingTotal, setEditingTotal] = useState<number | null>(null);
 
   useEffect(() => {
     // Check admin authentication
@@ -76,138 +83,119 @@ export default function ScoringApprovalPage() {
     }
   };
 
-  const approveScore = async (approvalId: string, performanceTitle: string) => {
-    if (processingApproval.has(approvalId)) return;
-    
-    setProcessingApproval(prev => new Set(prev).add(approvalId));
-    
+  const publishScores = async (performanceId: string, performanceTitle: string) => {
+    if (processingPublish.has(performanceId)) return;
+
+    setProcessingPublish(prev => new Set(prev).add(performanceId));
+
     try {
       const response = await fetch('/api/scores/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          approvalId,
+          performanceId,
           approvedBy: user.id,
-          action: 'approve'
+          action: 'publish'
         })
       });
 
       if (response.ok) {
-        // Update local state
-        setApprovals(prev => 
-          prev.map(approval => 
-            approval.id === approvalId 
-              ? { 
-                  ...approval, 
-                  status: 'approved', 
-                  approvedBy: user.id, 
-                  approvedAt: new Date().toISOString() 
-                }
-              : approval
-          )
-        );
-
-        success(`Score for "${performanceTitle}" approved successfully`);
+        success(`Scores for "${performanceTitle}" published successfully`);
+        await fetchApprovals(); // Refresh the list
+        setShowDetails(false);
       } else {
-        error('Failed to approve score');
+        error('Failed to publish scores');
       }
     } catch (err) {
-      console.error('Error approving score:', err);
-      error('Failed to approve score');
+      console.error('Error publishing scores:', err);
+      error('Failed to publish scores');
     } finally {
-      setProcessingApproval(prev => {
+      setProcessingPublish(prev => {
         const newSet = new Set(prev);
-        newSet.delete(approvalId);
+        newSet.delete(performanceId);
         return newSet;
       });
     }
   };
 
-  const rejectScore = async (approvalId: string, performanceTitle: string, reason: string) => {
-    if (!reason.trim()) {
-      error('Please provide a reason for rejection');
+  const openDetails = (approval: PerformanceApproval) => {
+    setSelectedApproval(approval);
+    setShowDetails(true);
+    setEditingJudgeScore(null);
+    setEditingTotal(null);
+  };
+
+  const startEditingJudgeScore = (judgeScore: JudgeScore) => {
+    setEditingJudgeScore(judgeScore);
+    setEditingTotal(judgeScore.total);
+  };
+
+  const cancelEditing = () => {
+    setEditingJudgeScore(null);
+    setEditingTotal(null);
+  };
+
+  const saveEditedJudgeScore = async () => {
+    if (!editingJudgeScore || editingTotal === null || !selectedApproval) return;
+
+    // Validate total
+    if (editingTotal < 0 || editingTotal > 100) {
+      error('Total score must be between 0 and 100');
       return;
     }
 
-    if (processingApproval.has(approvalId)) return;
-    
-    setProcessingApproval(prev => new Set(prev).add(approvalId));
-    
     try {
-      const response = await fetch('/api/scores/approve', {
-        method: 'POST',
+      const response = await fetch('/api/scores/edit-total', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          approvalId,
-          approvedBy: user.id,
-          action: 'reject',
-          rejectionReason: reason
+          scoreId: editingJudgeScore.scoreId,
+          performanceId: selectedApproval.performanceId,
+          judgeId: editingJudgeScore.judgeId,
+          newTotal: editingTotal,
+          editedBy: user.id,
+          editedByName: user.name
         })
       });
 
       if (response.ok) {
-        // Update local state
-        setApprovals(prev => 
-          prev.map(approval => 
-            approval.id === approvalId 
-              ? { 
-                  ...approval, 
-                  status: 'rejected', 
-                  approvedBy: user.id, 
-                  approvedAt: new Date().toISOString(),
-                  rejected: true,
-                  rejectionReason: reason
-                }
-              : approval
-          )
-        );
-
-        success(`Score for "${performanceTitle}" rejected`);
-        setRejectionReason('');
+        success('Score total updated successfully');
+        setEditingJudgeScore(null);
+        setEditingTotal(null);
+        await fetchApprovals(); // Refresh the list
         setShowDetails(false);
       } else {
-        error('Failed to reject score');
+        const result = await response.json();
+        error(result.error || 'Failed to update score');
       }
     } catch (err) {
-      console.error('Error rejecting score:', err);
-      error('Failed to reject score');
-    } finally {
-      setProcessingApproval(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(approvalId);
-        return newSet;
-      });
+      console.error('Error updating score:', err);
+      error('Failed to update score');
     }
   };
 
-  const openDetails = (approval: ScoreApproval) => {
-    setSelectedApproval(approval);
-    setShowDetails(true);
-    setRejectionReason('');
-  };
-
   const filteredApprovals = approvals.filter(approval => {
-    const matchesStatus = statusFilter === 'all' || approval.status === statusFilter;
-    
-    const matchesSearch = searchTerm === '' || 
-      approval.performanceTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      approval.judgeName.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'pending' && !approval.scoresPublished) ||
+      (statusFilter === 'published' && approval.scoresPublished);
+
+    const matchesSearch = searchTerm === '' ||
+      approval.performanceTitle.toLowerCase().includes(searchTerm.toLowerCase());
+
     return matchesStatus && matchesSearch;
   });
 
-  const pendingCount = approvals.filter(a => a.status === 'pending').length;
-  const approvedCount = approvals.filter(a => a.status === 'approved').length;
-  const rejectedCount = approvals.filter(a => a.status === 'rejected').length;
+  const pendingCount = approvals.filter(a => !a.scoresPublished).length;
+  const publishedCount = approvals.filter(a => a.scoresPublished).length;
 
-  const calculateTotalScore = (score: ScoreApproval['score']) => {
-    return Number(score.technicalScore) + Number(score.musicalScore) + Number(score.performanceScore) + 
-           Number(score.stylingScore) + Number(score.overallImpressionScore);
-  };
-
-  const calculatePercentage = (score: ScoreApproval['score']) => {
-    const total = calculateTotalScore(score);
-    return total; // Total out of 100 is already the percentage
+  const getMedalColor = (medal: string) => {
+    const colors: Record<string, string> = {
+      'Legend': 'from-purple-500 to-pink-500',
+      'Gold': 'from-yellow-400 to-yellow-600',
+      'Silver': 'from-gray-300 to-gray-500',
+      'Bronze': 'from-orange-400 to-orange-600',
+    };
+    return colors[medal] || 'from-gray-400 to-gray-600';
   };
 
   if (isLoading) {
@@ -232,8 +220,8 @@ export default function ScoringApprovalPage() {
                 <span className="text-white text-lg sm:text-xl">⚖️</span>
               </div>
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-black">Score Approval System</h1>
-                <p className="text-xs sm:text-sm text-gray-700 hidden sm:block">Review and approve judge scores before release</p>
+                <h1 className="text-lg sm:text-2xl font-bold text-black">Score Approval Dashboard</h1>
+                <p className="text-xs sm:text-sm text-gray-700 hidden sm:block">Review & publish aggregated performance scores</p>
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -256,7 +244,7 @@ export default function ScoringApprovalPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <div className="bg-white rounded-lg shadow p-3 sm:p-6">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
@@ -268,7 +256,7 @@ export default function ScoringApprovalPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow p-3 sm:p-6">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
@@ -280,27 +268,15 @@ export default function ScoringApprovalPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow p-3 sm:p-6">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                 <span className="text-green-600 text-sm sm:text-base">✅</span>
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-black truncate">Approved</p>
-                <p className="text-xl sm:text-2xl font-semibold text-black">{approvedCount}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
-                <span className="text-red-600 text-sm sm:text-base">❌</span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-black truncate">Rejected</p>
-                <p className="text-xl sm:text-2xl font-semibold text-black">{rejectedCount}</p>
+                <p className="text-xs sm:text-sm font-medium text-black truncate">Published</p>
+                <p className="text-xl sm:text-2xl font-semibold text-black">{publishedCount}</p>
               </div>
             </div>
           </div>
@@ -315,11 +291,11 @@ export default function ScoringApprovalPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search performance or judge..."
+                placeholder="Search performance..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base text-black"
               />
             </div>
-            
+
             <div className="w-full sm:w-auto">
               <label className="block text-xs sm:text-sm font-medium text-black mb-2">Status</label>
               <select
@@ -328,137 +304,90 @@ export default function ScoringApprovalPage() {
                 className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base text-black"
               >
                 <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
+                <option value="published">Published</option>
                 <option value="all">All</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Score Approvals List */}
+        {/* Performance Approvals List */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-black flex items-center">
-              <span className="mr-2">⚖️</span>
-              Score Approvals ({filteredApprovals.length} scores)
+              <span className="mr-2">🎭</span>
+              Performance Scores ({filteredApprovals.length} performances)
             </h2>
           </div>
-          
+
           {filteredApprovals.length > 0 ? (
             <div className="divide-y divide-gray-200">
               {filteredApprovals.map((approval) => (
-                <div key={approval.id} className={`p-4 sm:p-6 ${
-                  approval.status === 'approved' ? 'bg-green-50' : 
-                  approval.status === 'rejected' ? 'bg-red-50' : ''
+                <div key={approval.performanceId} className={`p-4 sm:p-6 ${
+                  approval.scoresPublished ? 'bg-green-50' : ''
                 }`}>
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg sm:text-xl font-bold text-black mb-2">
-                        {approval.performanceTitle}
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 gap-3 mb-3">
-                        <div className="space-y-1">
-                          <p className="text-sm text-gray-700">
-                            <span className="font-semibold">Judge:</span> {approval.judgeName}
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg sm:text-xl font-bold text-black">
+                          {approval.performanceTitle}
+                        </h3>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          approval.scoresPublished ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {approval.scoresPublished ? 'PUBLISHED' : 'PENDING'}
+                        </span>
+                      </div>
+
+                      {/* Average Score & Medal */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                        <div className={`bg-gradient-to-r ${getMedalColor(approval.medal)} rounded-lg p-4 text-center`}>
+                          <p className="text-xs font-semibold text-white mb-1">FINAL SCORE</p>
+                          <p className="text-3xl sm:text-4xl font-bold text-white">
+                            {approval.averageScore.toFixed(2)}
+                            <span className="text-lg sm:text-xl">/100</span>
                           </p>
-                          <p className="text-sm text-gray-600">
-                            <span className="font-semibold">Submitted:</span> {new Date(approval.createdAt).toLocaleString()}
-                          </p>
-                          {approval.approvedAt && (
-                            <p className="text-sm text-gray-600">
-                              <span className="font-semibold">{approval.status === 'approved' ? 'Approved' : 'Rejected'}:</span> {new Date(approval.approvedAt).toLocaleString()}
-                            </p>
-                          )}
+                          <p className="text-xs text-white mt-1">{approval.percentage.toFixed(1)}%</p>
                         </div>
-                        
-                        <div className="space-y-1">
-                          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-                            <p className="text-xl sm:text-2xl font-bold text-indigo-900">
-                              {calculateTotalScore(approval.score)}<span className="text-base sm:text-lg text-indigo-600">/100</span>
-                            </p>
-                            <p className="text-xs text-indigo-600 font-medium">Total Score</p>
-                          </div>
+
+                        <div className={`bg-gradient-to-r ${getMedalColor(approval.medal)} rounded-lg p-4 text-center`}>
+                          <p className="text-xs font-semibold text-white mb-1">MEDAL</p>
+                          <p className="text-3xl sm:text-4xl font-bold text-white">{approval.medal}</p>
+                          <p className="text-xs text-white mt-1">{approval.totalJudges} judges scored</p>
                         </div>
                       </div>
-                      
+
+                      {/* Judge Scores Summary */}
                       <div className="bg-gray-50 rounded-lg p-3 mb-2">
-                        <p className="text-xs font-semibold text-gray-700 mb-2">Score Breakdown:</p>
-                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-xs">
-                          <div className="text-center">
-                            <div className="font-bold text-blue-600">{approval.score.technicalScore}/20</div>
-                            <div className="text-gray-600 text-[10px] sm:text-xs">Tech</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-bold text-purple-600">{approval.score.musicalScore}/20</div>
-                            <div className="text-gray-600 text-[10px] sm:text-xs">Music</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-bold text-green-600">{approval.score.performanceScore}/20</div>
-                            <div className="text-gray-600 text-[10px] sm:text-xs">Perf</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-bold text-orange-600">{approval.score.stylingScore}/20</div>
-                            <div className="text-gray-600 text-[10px] sm:text-xs">Style</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-bold text-pink-600">{approval.score.overallImpressionScore}/20</div>
-                            <div className="text-gray-600 text-[10px] sm:text-xs">Overall</div>
-                          </div>
+                        <p className="text-xs font-semibold text-gray-700 mb-2">Judge Scores:</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {approval.judgeScores.map((js) => (
+                            <div key={js.judgeId} className="bg-white rounded p-2 text-center">
+                              <div className="font-bold text-indigo-600 text-lg">{js.total}/100</div>
+                              <div className="text-gray-600 text-xs truncate">{js.judgeName}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      
-                      {approval.score.comments && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2">
-                          <p className="text-xs font-semibold text-blue-900 mb-1">Judge Comments:</p>
-                          <p className="text-xs text-blue-800 italic">{approval.score.comments}</p>
-                        </div>
-                      )}
-                      
-                      {approval.rejectionReason && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-2">
-                          <p className="text-xs font-semibold text-red-900 mb-1">Rejection Reason:</p>
-                          <p className="text-xs text-red-800">{approval.rejectionReason}</p>
-                        </div>
-                      )}
                     </div>
 
                     <div className="flex flex-row sm:flex-col items-center justify-between sm:justify-start gap-2 sm:ml-4">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
-                        approval.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        approval.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {approval.status.toUpperCase()}
-                      </span>
+                      <button
+                        onClick={() => openDetails(approval)}
+                        className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
+                      >
+                        📋 View Details
+                      </button>
 
-                      <div className="flex flex-wrap gap-2 justify-end sm:justify-start">
+                      {!approval.scoresPublished && (
                         <button
-                          onClick={() => openDetails(approval)}
-                          className="px-2 sm:px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
+                          onClick={() => publishScores(approval.performanceId, approval.performanceTitle)}
+                          disabled={processingPublish.has(approval.performanceId)}
+                          className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
-                          📋 Details
+                          {processingPublish.has(approval.performanceId) ? 'Publishing...' : '✅ Publish Scores'}
                         </button>
-
-                        {approval.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => approveScore(approval.id, approval.performanceTitle)}
-                              disabled={processingApproval.has(approval.id)}
-                              className="px-2 sm:px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
-                            >
-                              {processingApproval.has(approval.id) ? '...' : '✅ Approve'}
-                            </button>
-                            <button
-                              onClick={() => openDetails(approval)}
-                              className="px-2 sm:px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
-                            >
-                              ❌ Reject
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -466,20 +395,21 @@ export default function ScoringApprovalPage() {
             </div>
           ) : (
             <div className="p-8 text-center">
-              <span className="text-4xl mb-4 block">⚖️</span>
-              <p className="text-black">No scores found for the selected filter</p>
+              <span className="text-4xl mb-4 block">🎭</span>
+              <p className="text-black">No performances found for the selected filter</p>
+              <p className="text-sm text-gray-600 mt-2">Performances appear here when all assigned judges have submitted their scores</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Score Details Modal */}
+      {/* Performance Details Modal */}
       {showDetails && selectedApproval && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-              <h3 className="text-base sm:text-xl font-semibold text-black pr-4 line-clamp-2">
-                Score Details - {selectedApproval.performanceTitle}
+              <h3 className="text-base sm:text-xl font-semibold text-black pr-4">
+                {selectedApproval.performanceTitle}
               </h3>
               <button
                 onClick={() => setShowDetails(false)}
@@ -488,110 +418,127 @@ export default function ScoringApprovalPage() {
                 ✕
               </button>
             </div>
-            
+
             <div className="p-4 sm:p-6">
-              {/* Total Score Display */}
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 text-center">
-                <p className="text-xs sm:text-sm font-semibold text-indigo-600 mb-2">TOTAL SCORE</p>
-                <p className="text-4xl sm:text-5xl font-bold text-indigo-900">
-                  {calculateTotalScore(selectedApproval.score)}
-                  <span className="text-2xl sm:text-3xl text-indigo-600">/100</span>
+              {/* Final Score Display */}
+              <div className={`bg-gradient-to-r ${getMedalColor(selectedApproval.medal)} rounded-xl p-6 mb-6 text-center text-white`}>
+                <p className="text-sm font-semibold mb-2">FINAL AVERAGE SCORE</p>
+                <p className="text-5xl font-bold">
+                  {selectedApproval.averageScore.toFixed(2)}
+                  <span className="text-2xl">/100</span>
                 </p>
+                <p className="text-lg mt-2">{selectedApproval.percentage.toFixed(1)}% • {selectedApproval.medal}</p>
+                <p className="text-sm mt-1 opacity-90">Averaged from {selectedApproval.totalJudges} judges</p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                  <h4 className="font-bold text-sm sm:text-base text-gray-900 mb-2 sm:mb-3 flex items-center">
-                    <span className="mr-2">📋</span>
-                    Performance Information
-                  </h4>
-                  <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
-                    <p><span className="font-semibold text-gray-700">Title:</span> <span className="text-gray-900">{selectedApproval.performanceTitle}</span></p>
-                    <p><span className="font-semibold text-gray-700">Judge:</span> <span className="text-gray-900">{selectedApproval.judgeName}</span></p>
-                    <p><span className="font-semibold text-gray-700">Status:</span> 
-                      <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        selectedApproval.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        selectedApproval.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {selectedApproval.status.toUpperCase()}
-                      </span>
-                    </p>
-                    <p className="break-all"><span className="font-semibold text-gray-700">Submitted:</span> <span className="text-gray-900">{new Date(selectedApproval.createdAt).toLocaleString()}</span></p>
+              {/* Individual Judge Scores */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-gray-900">Individual Judge Scores</h4>
+
+                {selectedApproval.judgeScores.map((judgeScore) => (
+                  <div key={judgeScore.judgeId} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <div>
+                        <h5 className="font-bold text-base text-gray-900">{judgeScore.judgeName}</h5>
+                        <p className="text-sm text-gray-600">Submitted: {new Date(judgeScore.submittedAt).toLocaleString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-indigo-900">{judgeScore.total}/100</p>
+                        </div>
+                        {!selectedApproval.scoresPublished && editingJudgeScore?.judgeId !== judgeScore.judgeId && (
+                          <button
+                            onClick={() => startEditingJudgeScore(judgeScore)}
+                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {editingJudgeScore?.judgeId === judgeScore.judgeId && editingTotal !== null ? (
+                      <div className="space-y-3 bg-white p-4 rounded border border-blue-300">
+                        <p className="text-sm font-semibold text-blue-900">Editing {judgeScore.judgeName}'s Total Score</p>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Total Score (0-100)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={editingTotal}
+                            onChange={(e) => setEditingTotal(Number(e.target.value))}
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg font-bold text-black text-center focus:border-blue-500 focus:outline-none"
+                            autoFocus
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Original score: {judgeScore.total}/100 • Category scores will be adjusted proportionally
+                          </p>
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={saveEditedJudgeScore}
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
+                          >
+                            💾 Save Total
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium transition-colors"
+                          >
+                            ✕ Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-5 gap-2 text-xs">
+                        <div className="text-center bg-white rounded p-2">
+                          <div className="font-bold text-blue-600">{judgeScore.technicalScore}/20</div>
+                          <div className="text-gray-600">Tech</div>
+                        </div>
+                        <div className="text-center bg-white rounded p-2">
+                          <div className="font-bold text-purple-600">{judgeScore.musicalScore}/20</div>
+                          <div className="text-gray-600">Music</div>
+                        </div>
+                        <div className="text-center bg-white rounded p-2">
+                          <div className="font-bold text-green-600">{judgeScore.performanceScore}/20</div>
+                          <div className="text-gray-600">Perf</div>
+                        </div>
+                        <div className="text-center bg-white rounded p-2">
+                          <div className="font-bold text-orange-600">{judgeScore.stylingScore}/20</div>
+                          <div className="text-gray-600">Style</div>
+                        </div>
+                        <div className="text-center bg-white rounded p-2">
+                          <div className="font-bold text-pink-600">{judgeScore.overallImpressionScore}/20</div>
+                          <div className="text-gray-600">Overall</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {judgeScore.comments && (
+                      <div className="mt-2 bg-blue-50 border border-blue-200 rounded p-2">
+                        <p className="text-xs font-semibold text-blue-900">Comments:</p>
+                        <p className="text-xs text-blue-800 italic">{judgeScore.comments}</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-                
-                <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                  <h4 className="font-bold text-sm sm:text-base text-gray-900 mb-2 sm:mb-3 flex items-center">
-                    <span className="mr-2">📊</span>
-                    Score Breakdown
-                  </h4>
-                  <div className="space-y-1 sm:space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs sm:text-sm text-gray-700">Technical Execution</span>
-                      <span className="font-bold text-sm sm:text-base text-blue-600">{selectedApproval.score.technicalScore}/20</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs sm:text-sm text-gray-700">Musical Interpretation</span>
-                      <span className="font-bold text-sm sm:text-base text-purple-600">{selectedApproval.score.musicalScore}/20</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs sm:text-sm text-gray-700">Performance Quality</span>
-                      <span className="font-bold text-sm sm:text-base text-green-600">{selectedApproval.score.performanceScore}/20</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs sm:text-sm text-gray-700">Styling & Presentation</span>
-                      <span className="font-bold text-sm sm:text-base text-orange-600">{selectedApproval.score.stylingScore}/20</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs sm:text-sm text-gray-700">Overall Impression</span>
-                      <span className="font-bold text-sm sm:text-base text-pink-600">{selectedApproval.score.overallImpressionScore}/20</span>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              {selectedApproval.score.comments && (
-                <div className="mb-4 sm:mb-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-                  <h4 className="font-bold text-sm sm:text-base text-blue-900 mb-2 flex items-center">
-                    <span className="mr-2">💬</span>
-                    Judge Comments
-                  </h4>
-                  <p className="text-xs sm:text-sm text-blue-800 italic leading-relaxed">{selectedApproval.score.comments}</p>
-                </div>
-              )}
-
-              {selectedApproval.status === 'pending' && (
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-black mb-2">
-                      Rejection Reason (if rejecting)
-                    </label>
-                    <textarea
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-xs sm:text-sm text-black"
-                      placeholder="Enter reason for rejection..."
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                    <button
-                      onClick={() => approveScore(selectedApproval.id, selectedApproval.performanceTitle)}
-                      disabled={processingApproval.has(selectedApproval.id)}
-                      className="flex-1 px-4 py-3 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors disabled:opacity-50 text-sm sm:text-base"
-                    >
-                      {processingApproval.has(selectedApproval.id) ? 'Processing...' : '✅ Approve Score'}
-                    </button>
-                    <button
-                      onClick={() => rejectScore(selectedApproval.id, selectedApproval.performanceTitle, rejectionReason)}
-                      disabled={processingApproval.has(selectedApproval.id) || !rejectionReason.trim()}
-                      className="flex-1 px-4 py-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors disabled:opacity-50 text-sm sm:text-base"
-                    >
-                      {processingApproval.has(selectedApproval.id) ? 'Processing...' : '❌ Reject Score'}
-                    </button>
-                  </div>
+              {/* Publish Button */}
+              {!selectedApproval.scoresPublished && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => publishScores(selectedApproval.performanceId, selectedApproval.performanceTitle)}
+                    disabled={processingPublish.has(selectedApproval.performanceId)}
+                    className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {processingPublish.has(selectedApproval.performanceId) ? 'Publishing...' : '✅ Publish Scores to Contestants & Teachers'}
+                  </button>
+                  <p className="text-xs text-gray-600 text-center mt-2">
+                    Once published, scores will be visible to contestants and teachers. You can still edit individual judge scores after publishing.
+                  </p>
                 </div>
               )}
             </div>
@@ -601,4 +548,3 @@ export default function ScoringApprovalPage() {
     </div>
   );
 }
-

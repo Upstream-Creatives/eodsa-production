@@ -156,6 +156,11 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_by TEXT`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS announced_at TEXT`;
 
+    // Add published flag to performances for score publishing
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS scores_published BOOLEAN DEFAULT FALSE`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS scores_published_at TEXT`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS scores_published_by TEXT`;
+
     // GABRIEL'S SCORE APPROVAL TABLE
     await sqlClient`
       CREATE TABLE IF NOT EXISTS score_approvals (
@@ -171,6 +176,22 @@ export const initializeDatabase = async () => {
         rejected BOOLEAN DEFAULT FALSE,
         rejection_reason TEXT,
         created_at TEXT NOT NULL
+      )
+    `;
+
+    // Score edit audit logs table
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS score_edit_logs (
+        id TEXT PRIMARY KEY,
+        score_id TEXT NOT NULL,
+        performance_id TEXT NOT NULL,
+        judge_id TEXT NOT NULL,
+        judge_name TEXT,
+        old_values JSONB,
+        new_values JSONB,
+        edited_by TEXT NOT NULL,
+        edited_by_name TEXT,
+        edited_at TEXT NOT NULL
       )
     `;
 
@@ -1461,12 +1482,206 @@ export const db = {
   async updateScore(id: string, updates: Partial<Score>) {
     const sqlClient = getSql();
     await sqlClient`
-      UPDATE scores 
-      SET technical_score = ${updates.technicalScore}, musical_score = ${updates.musicalScore}, 
+      UPDATE scores
+      SET technical_score = ${updates.technicalScore}, musical_score = ${updates.musicalScore},
           performance_score = ${updates.performanceScore}, styling_score = ${updates.stylingScore},
           overall_impression_score = ${updates.overallImpressionScore}, comments = ${updates.comments}
       WHERE id = ${id}
     `;
+  },
+
+  // NEW: Update only the total score (admin simplified edit)
+  async updateScoreTotalWithAudit(scoreId: string, performanceId: string, judgeId: string, newTotal: number, editedBy: string, editedByName?: string) {
+    const sqlClient = getSql();
+
+    // Validate total
+    if (newTotal < 0 || newTotal > 100) {
+      throw new Error('Total score must be between 0 and 100');
+    }
+
+    // Get old score values first
+    const oldScoreResult = await sqlClient`
+      SELECT s.*, j.name as judge_name
+      FROM scores s
+      JOIN judges j ON j.id = s.judge_id
+      WHERE s.id = ${scoreId}
+    ` as any[];
+
+    if (oldScoreResult.length === 0) {
+      throw new Error('Score not found');
+    }
+
+    const oldScore = oldScoreResult[0];
+    const oldTotal = parseFloat(oldScore.technical_score) + parseFloat(oldScore.musical_score) +
+                     parseFloat(oldScore.performance_score) + parseFloat(oldScore.styling_score) +
+                     parseFloat(oldScore.overall_impression_score);
+
+    // Calculate proportional distribution if total changed
+    let technical = parseFloat(oldScore.technical_score);
+    let musical = parseFloat(oldScore.musical_score);
+    let performance = parseFloat(oldScore.performance_score);
+    let styling = parseFloat(oldScore.styling_score);
+    let overall = parseFloat(oldScore.overall_impression_score);
+
+    if (oldTotal !== newTotal && oldTotal > 0) {
+      // Distribute proportionally
+      const ratio = newTotal / oldTotal;
+      technical = Math.round(technical * ratio * 10) / 10;
+      musical = Math.round(musical * ratio * 10) / 10;
+      performance = Math.round(performance * ratio * 10) / 10;
+      styling = Math.round(styling * ratio * 10) / 10;
+      overall = Math.round(overall * ratio * 10) / 10;
+
+      // Adjust for rounding errors
+      const calculatedTotal = technical + musical + performance + styling + overall;
+      const diff = newTotal - calculatedTotal;
+      if (Math.abs(diff) > 0.01) {
+        overall += diff;
+        overall = Math.round(overall * 10) / 10;
+      }
+    }
+
+    // Update the score
+    await sqlClient`
+      UPDATE scores
+      SET technical_score = ${technical},
+          musical_score = ${musical},
+          performance_score = ${performance},
+          styling_score = ${styling},
+          overall_impression_score = ${overall}
+      WHERE id = ${scoreId}
+    `;
+
+    // Create audit log
+    const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = new Date().toISOString();
+
+    const oldValues = {
+      total: oldTotal
+    };
+
+    const newValues = {
+      total: newTotal
+    };
+
+    await sqlClient`
+      INSERT INTO score_edit_logs (id, score_id, performance_id, judge_id, judge_name, old_values, new_values, edited_by, edited_by_name, edited_at)
+      VALUES (${auditId}, ${scoreId}, ${performanceId}, ${judgeId}, ${oldScore.judge_name}, ${JSON.stringify(oldValues)}, ${JSON.stringify(newValues)}, ${editedBy}, ${editedByName || 'Admin'}, ${timestamp})
+    `;
+
+    return { success: true };
+  },
+
+  async updateScoreWithAudit(scoreId: string, performanceId: string, judgeId: string, newScore: any, editedBy: string, editedByName?: string) {
+    const sqlClient = getSql();
+
+    // Get old score values first
+    const oldScoreResult = await sqlClient`
+      SELECT s.*, j.name as judge_name
+      FROM scores s
+      JOIN judges j ON j.id = s.judge_id
+      WHERE s.id = ${scoreId}
+    ` as any[];
+
+    if (oldScoreResult.length === 0) {
+      throw new Error('Score not found');
+    }
+
+    const oldScore = oldScoreResult[0];
+
+    // Update the score
+    await sqlClient`
+      UPDATE scores
+      SET technical_score = ${newScore.technicalScore},
+          musical_score = ${newScore.musicalScore},
+          performance_score = ${newScore.performanceScore},
+          styling_score = ${newScore.stylingScore},
+          overall_impression_score = ${newScore.overallImpressionScore},
+          comments = ${newScore.comments || ''}
+      WHERE id = ${scoreId}
+    `;
+
+    // Create audit log
+    const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = new Date().toISOString();
+
+    const oldValues = {
+      technicalScore: parseFloat(oldScore.technical_score),
+      musicalScore: parseFloat(oldScore.musical_score),
+      performanceScore: parseFloat(oldScore.performance_score),
+      stylingScore: parseFloat(oldScore.styling_score),
+      overallImpressionScore: parseFloat(oldScore.overall_impression_score),
+      comments: oldScore.comments,
+      total: parseFloat(oldScore.technical_score) + parseFloat(oldScore.musical_score) +
+             parseFloat(oldScore.performance_score) + parseFloat(oldScore.styling_score) +
+             parseFloat(oldScore.overall_impression_score)
+    };
+
+    const newValues = {
+      technicalScore: newScore.technicalScore,
+      musicalScore: newScore.musicalScore,
+      performanceScore: newScore.performanceScore,
+      stylingScore: newScore.stylingScore,
+      overallImpressionScore: newScore.overallImpressionScore,
+      comments: newScore.comments || '',
+      total: newScore.technicalScore + newScore.musicalScore + newScore.performanceScore +
+             newScore.stylingScore + newScore.overallImpressionScore
+    };
+
+    await sqlClient`
+      INSERT INTO score_edit_logs (id, score_id, performance_id, judge_id, judge_name, old_values, new_values, edited_by, edited_by_name, edited_at)
+      VALUES (${auditId}, ${scoreId}, ${performanceId}, ${judgeId}, ${oldScore.judge_name}, ${JSON.stringify(oldValues)}, ${JSON.stringify(newValues)}, ${editedBy}, ${editedByName || 'Admin'}, ${timestamp})
+    `;
+
+    return { success: true };
+  },
+
+  async getScoreEditLogs(performanceId?: string) {
+    const sqlClient = getSql();
+
+    const query = performanceId
+      ? sqlClient`
+          SELECT sel.*, p.title as performance_title
+          FROM score_edit_logs sel
+          JOIN performances p ON p.id = sel.performance_id
+          WHERE sel.performance_id = ${performanceId}
+          ORDER BY sel.edited_at DESC
+        `
+      : sqlClient`
+          SELECT sel.*, p.title as performance_title
+          FROM score_edit_logs sel
+          JOIN performances p ON p.id = sel.performance_id
+          ORDER BY sel.edited_at DESC
+        `;
+
+    const logs = await query as any[];
+
+    return logs.map((log: any) => ({
+      id: log.id,
+      scoreId: log.score_id,
+      performanceId: log.performance_id,
+      performanceTitle: log.performance_title,
+      judgeId: log.judge_id,
+      judgeName: log.judge_name,
+      oldValues: typeof log.old_values === 'string' ? JSON.parse(log.old_values) : log.old_values,
+      newValues: typeof log.new_values === 'string' ? JSON.parse(log.new_values) : log.new_values,
+      editedBy: log.edited_by,
+      editedByName: log.edited_by_name,
+      editedAt: log.edited_at
+    }));
+  },
+
+  async publishPerformanceScores(performanceId: string, publishedBy: string) {
+    const sqlClient = getSql();
+    const timestamp = new Date().toISOString();
+
+    await sqlClient`
+      UPDATE performances
+      SET scores_published = true, scores_published_at = ${timestamp}, scores_published_by = ${publishedBy}
+      WHERE id = ${performanceId}
+    `;
+
+    return { success: true };
   },
 
   async deleteScore(id: string) {
@@ -1502,13 +1717,13 @@ export const db = {
   async getScoresByPerformance(performanceId: string) {
     const sqlClient = getSql();
     const result = await sqlClient`
-      SELECT s.*, j.name as judge_name 
-      FROM scores s 
-      JOIN judges j ON s.judge_id = j.id 
+      SELECT s.*, j.name as judge_name
+      FROM scores s
+      JOIN judges j ON s.judge_id = j.id
       WHERE s.performance_id = ${performanceId}
       ORDER BY s.submitted_at
     ` as any[];
-    
+
     return result.map((row: any) => ({
       id: row.id,
       judgeId: row.judge_id,
@@ -1522,6 +1737,48 @@ export const db = {
       submittedAt: row.submitted_at,
       judgeName: row.judge_name
     })) as (Score & { judgeName: string })[];
+  },
+
+  // Get published scores for a dancer by their EODSA ID
+  async getDancerScores(eodsaId: string) {
+    const sqlClient = getSql();
+
+    // Get all published scores for performances where this dancer participated
+    const result = await sqlClient`
+      SELECT
+        s.*,
+        j.name as judge_name,
+        p.id as performance_id,
+        p.title as performance_title,
+        p.scores_published,
+        p.scores_published_at
+      FROM nationals_event_entries nee
+      JOIN scores s ON s.performance_id = nee.id
+      JOIN judges j ON j.id = s.judge_id
+      JOIN performances p ON p.id = nee.id
+      WHERE (
+        nee.eodsa_id = ${eodsaId}
+        OR nee.participant_ids::text LIKE ${`%${eodsaId}%`}
+      )
+      AND p.scores_published = true
+      ORDER BY s.submitted_at DESC
+    ` as any[];
+
+    return result.map((row: any) => ({
+      id: row.id,
+      judgeId: row.judge_id,
+      judgeName: row.judge_name,
+      performanceId: row.performance_id,
+      performanceTitle: row.performance_title,
+      technicalScore: parseFloat(row.technical_score),
+      musicalScore: parseFloat(row.musical_score || 0),
+      performanceScore: parseFloat(row.performance_score || 0),
+      stylingScore: parseFloat(row.styling_score || 0),
+      overallImpressionScore: parseFloat(row.overall_impression_score || 0),
+      comments: row.comments,
+      submittedAt: row.submitted_at,
+      scoredAt: row.submitted_at
+    }));
   },
 
   // NEW: Event management methods
@@ -3053,57 +3310,109 @@ export const db = {
 
   async getScoreApprovals(performanceId?: string) {
     const sqlClient = getSql();
-    let query;
-    
-    if (performanceId) {
-      query = sqlClient`
-        SELECT sa.*, s.technical_score, s.musical_score, s.performance_score, 
-               s.styling_score, s.overall_impression_score, s.comments,
-               j.name as judge_name, p.title as performance_title
-        FROM score_approvals sa
-        JOIN scores s ON sa.score_id = s.id
-        JOIN judges j ON sa.judge_id = j.id
-        JOIN performances p ON sa.performance_id = p.id
-        WHERE sa.performance_id = ${performanceId}
-        ORDER BY sa.created_at DESC
-      `;
-    } else {
-      query = sqlClient`
-        SELECT sa.*, s.technical_score, s.musical_score, s.performance_score, 
-               s.styling_score, s.overall_impression_score, s.comments,
-               j.name as judge_name, p.title as performance_title
-        FROM score_approvals sa
-        JOIN scores s ON sa.score_id = s.id
-        JOIN judges j ON sa.judge_id = j.id
-        JOIN performances p ON sa.performance_id = p.id
-        ORDER BY sa.created_at DESC
-      `;
-    }
-    
-    const result = await query as any[];
-    
-    return result.map((approval: any) => ({
-      id: approval.id,
-      performanceId: approval.performance_id,
-      judgeId: approval.judge_id,
-      judgeName: approval.judge_name,
-      performanceTitle: approval.performance_title,
-      scoreId: approval.score_id,
-      approvedBy: approval.approved_by,
-      approvedAt: approval.approved_at,
-      rejected: approval.rejected,
-      rejectionReason: approval.rejection_reason,
-      status: approval.status,
-      createdAt: approval.created_at,
-      score: {
-        technicalScore: approval.technical_score,
-        musicalScore: approval.musical_score,
-        performanceScore: approval.performance_score,
-        stylingScore: approval.styling_score,
-        overallImpressionScore: approval.overall_impression_score,
-        comments: approval.comments
-      }
+
+    // Get performances with ALL judges scored - aggregated view
+    const performancesQuery = performanceId
+      ? sqlClient`
+          WITH performance_judge_counts AS (
+            SELECT
+              p.id as performance_id,
+              p.title as performance_title,
+              p.event_id,
+              p.scores_published,
+              COUNT(DISTINCT jea.judge_id) as total_judges,
+              COUNT(DISTINCT s.judge_id) as scored_judges
+            FROM performances p
+            JOIN judge_event_assignments jea ON jea.event_id = p.event_id
+            LEFT JOIN scores s ON s.performance_id = p.id
+            WHERE p.id = ${performanceId}
+            GROUP BY p.id, p.title, p.event_id, p.scores_published
+          )
+          SELECT * FROM performance_judge_counts
+          WHERE scored_judges > 0 AND scored_judges = total_judges
+        `
+      : sqlClient`
+          WITH performance_judge_counts AS (
+            SELECT
+              p.id as performance_id,
+              p.title as performance_title,
+              p.event_id,
+              p.scores_published,
+              COUNT(DISTINCT jea.judge_id) as total_judges,
+              COUNT(DISTINCT s.judge_id) as scored_judges
+            FROM performances p
+            JOIN judge_event_assignments jea ON jea.event_id = p.event_id
+            LEFT JOIN scores s ON s.performance_id = p.id
+            GROUP BY p.id, p.title, p.event_id, p.scores_published
+          )
+          SELECT * FROM performance_judge_counts
+          WHERE scored_judges > 0 AND scored_judges = total_judges
+          ORDER BY performance_id DESC
+        `;
+
+    const performances = await performancesQuery as any[];
+
+    // For each performance, get all judge scores
+    const result = await Promise.all(performances.map(async (perf: any) => {
+      const scoresQuery = await sqlClient`
+        SELECT
+          s.id as score_id,
+          s.judge_id,
+          s.technical_score,
+          s.musical_score,
+          s.performance_score,
+          s.styling_score,
+          s.overall_impression_score,
+          s.comments,
+          s.submitted_at,
+          j.name as judge_name
+        FROM scores s
+        JOIN judges j ON j.id = s.judge_id
+        WHERE s.performance_id = ${perf.performance_id}
+        ORDER BY j.name
+      ` as any[];
+
+      const judgeScores = scoresQuery.map((score: any) => ({
+        judgeId: score.judge_id,
+        judgeName: score.judge_name,
+        scoreId: score.score_id,
+        technicalScore: parseFloat(score.technical_score),
+        musicalScore: parseFloat(score.musical_score),
+        performanceScore: parseFloat(score.performance_score),
+        stylingScore: parseFloat(score.styling_score),
+        overallImpressionScore: parseFloat(score.overall_impression_score),
+        total: parseFloat(score.technical_score) + parseFloat(score.musical_score) +
+               parseFloat(score.performance_score) + parseFloat(score.styling_score) +
+               parseFloat(score.overall_impression_score),
+        comments: score.comments,
+        submittedAt: score.submitted_at
+      }));
+
+      // Calculate average
+      const totalSum = judgeScores.reduce((sum, js) => sum + js.total, 0);
+      const average = totalSum / judgeScores.length;
+      const percentage = average; // Already out of 100
+
+      // Get medal from existing function
+      const { getMedalFromPercentage } = await import('./types');
+      const medal = getMedalFromPercentage(percentage);
+
+      return {
+        performanceId: perf.performance_id,
+        performanceTitle: perf.performance_title,
+        eventId: perf.event_id,
+        totalJudges: perf.total_judges,
+        scoredJudges: perf.scored_judges,
+        judgeScores,
+        averageScore: average,
+        percentage,
+        medal,
+        status: perf.scores_published ? 'published' : 'pending',
+        scoresPublished: perf.scores_published || false
+      };
     }));
+
+    return result;
   },
 
   // NEW: Announcer functionality
@@ -3942,7 +4251,8 @@ export const unifiedDb = {
     const dancerIds = studioDancers.map(d => d.id);
     
     // Get all event entries for these dancers AND entries created directly by the studio
-    const result = await sqlClient`
+    // QUERY BOTH event_entries AND nationals_event_entries tables
+    const regularEntries = await sqlClient`
       SELECT ee.*, e.name as event_name, e.region, e.event_date, e.venue, e.performance_type,
              COALESCE(c.name, d.name, 'Studio Entry') as contestant_name, 
              CASE 
@@ -3959,6 +4269,32 @@ export const unifiedDb = {
          OR (${dancerIds.length > 0} AND ee.participant_ids::text LIKE ANY(${dancerIds.map(id => `%"${id}"%`)}))
       ORDER BY ee.submitted_at DESC
     ` as any[];
+    
+    const nationalsEntries = await sqlClient`
+      SELECT nee.*, 
+             nee.nationals_event_id as event_id,
+             e.name as event_name, 
+             e.region, 
+             e.event_date, 
+             e.venue, 
+             e.performance_type,
+             COALESCE(c.name, d.name, 'Studio Entry') as contestant_name, 
+             CASE 
+               WHEN c.type IS NOT NULL THEN c.type 
+               ELSE 'studio' 
+             END as contestant_type
+      FROM nationals_event_entries nee
+      JOIN events e ON nee.nationals_event_id = e.id
+      LEFT JOIN contestants c ON nee.contestant_id = c.id
+      LEFT JOIN dancers d ON nee.contestant_id = d.id
+      WHERE nee.eodsa_id = ${studioId}
+         OR (${dancerEodsaIds.length > 0} AND nee.eodsa_id = ANY(${dancerEodsaIds}))
+         OR (${dancerIds.length > 0} AND nee.contestant_id = ANY(${dancerIds}))
+         OR (${dancerIds.length > 0} AND nee.participant_ids::text LIKE ANY(${dancerIds.map(id => `%"${id}"%`)}))
+      ORDER BY nee.submitted_at DESC
+    ` as any[];
+    
+    const result = [...regularEntries, ...nationalsEntries];
     
     // Enhance entries with participant names
     const enhancedEntries = await Promise.all(

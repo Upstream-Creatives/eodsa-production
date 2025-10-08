@@ -15,7 +15,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all event entries for this contestant (owned OR participating in)
-    const allEntries = await db.getAllEventEntries();
+    // IMPORTANT: Query BOTH event_entries and nationals_event_entries tables
+    const regularEntries = await db.getAllEventEntries();
+    const nationalsEntries = await db.getAllNationalsEventEntries();
+    const allEntries = [...regularEntries, ...nationalsEntries];
     
     // We need to get the dancer's internal ID to check participantIds properly
     // Based on database.ts, participantIds may contain either EODSA IDs or internal dancer IDs
@@ -31,6 +34,8 @@ export async function GET(request: NextRequest) {
     }
     
     if (debug) {
+      console.log(`Total regular entries: ${regularEntries.length}`);
+      console.log(`Total nationals entries: ${nationalsEntries.length}`);
       console.log(`Total entries in database: ${allEntries.length}`);
       console.log(`Looking for entries for EODSA ID: ${eodsaId}`);
       console.log(`Dancer internal ID: ${dancerInternalId}`);
@@ -71,11 +76,14 @@ export async function GET(request: NextRequest) {
       contestantEntries.map(async (entry) => {
         try {
           // Get event details
+          // Handle both eventId (regular entries) and nationalsEventId (nationals entries)
           const events = await db.getAllEvents();
-          const event = events.find(e => e.id === entry.eventId);
+          const eventId = (entry as any).eventId || (entry as any).nationalsEventId;
+          const event = events.find(e => e.id === eventId);
           
           return {
             ...entry,
+            eventId: eventId, // Normalize the field name
             eventName: event?.name || 'Unknown Event',
             eventDate: event?.eventDate || null,
             venue: event?.venue || 'TBD',
@@ -85,8 +93,10 @@ export async function GET(request: NextRequest) {
           };
         } catch (error) {
           console.error('Error getting event details for entry:', entry.id, error);
+          const eventId = (entry as any).eventId || (entry as any).nationalsEventId;
           return {
             ...entry,
+            eventId: eventId,
             eventName: 'Unknown Event',
             eventDate: null,
             venue: 'TBD',
@@ -102,12 +112,21 @@ export async function GET(request: NextRequest) {
       success: true,
       entries: entriesWithDetails,
       debug: debug ? {
+        totalRegularEntries: regularEntries.length,
+        totalNationalsEntries: nationalsEntries.length,
         totalEntriesInDb: allEntries.length,
         entriesFoundForDancer: contestantEntries.length,
         eodsaIdSearched: eodsaId,
         dancerInternalId: dancerInternalId,
-        sampleParticipantIds: allEntries.slice(0, 3).map(e => ({ 
+        sampleRegularEntries: regularEntries.slice(0, 2).map(e => ({ 
           entryId: e.id, 
+          itemName: e.itemName,
+          participantIds: e.participantIds,
+          eodsaId: e.eodsaId 
+        })),
+        sampleNationalsEntries: nationalsEntries.slice(0, 2).map(e => ({ 
+          entryId: e.id, 
+          itemName: e.itemName,
           participantIds: e.participantIds,
           eodsaId: e.eodsaId 
         }))

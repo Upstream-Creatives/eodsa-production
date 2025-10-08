@@ -4,38 +4,31 @@ import { db } from '@/lib/database';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { approvalId, approvedBy, action, rejectionReason } = body;
+    const { performanceId, approvedBy, action } = body;
 
-    if (!approvalId || !approvedBy || !action) {
+    if (!performanceId || !approvedBy || !action) {
       return NextResponse.json(
-        { success: false, error: 'Approval ID, approver ID, and action are required' },
+        { success: false, error: 'Performance ID, approver ID, and action are required' },
         { status: 400 }
       );
     }
 
     let result;
-    if (action === 'approve') {
-      result = await db.approveScore(approvalId, approvedBy);
-    } else if (action === 'reject') {
-      if (!rejectionReason) {
-        return NextResponse.json(
-          { success: false, error: 'Rejection reason is required when rejecting' },
-          { status: 400 }
-        );
-      }
-      result = await db.rejectScore(approvalId, approvedBy, rejectionReason);
+    if (action === 'publish') {
+      // Publish scores to make them visible to contestants/teachers
+      result = await db.publishPerformanceScores(performanceId, approvedBy);
+
+      return NextResponse.json({
+        success: true,
+        message: 'Scores published successfully',
+        result
+      });
     } else {
       return NextResponse.json(
-        { success: false, error: 'Invalid action. Use "approve" or "reject"' },
+        { success: false, error: 'Invalid action. Use "publish"' },
         { status: 400 }
       );
     }
-
-    return NextResponse.json({
-      success: true,
-      message: `Score ${action}d successfully`,
-      result
-    });
   } catch (error) {
     console.error('Error processing score approval:', error);
     return NextResponse.json(
