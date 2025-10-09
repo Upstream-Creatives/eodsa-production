@@ -86,6 +86,22 @@ interface Studio {
   createdAt: string;
 }
 
+interface Client {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  allowedDashboards: string[];
+  canViewAllEvents: boolean;
+  allowedEventIds: string[];
+  isActive: boolean;
+  isApproved: boolean;
+  createdAt: string;
+  createdBy?: string;
+  lastLoginAt?: string;
+  notes?: string;
+}
+
 interface StudioApplication {
   id: string;
   dancerId: string;
@@ -116,7 +132,8 @@ function AdminDashboard() {
   const [dancers, setDancers] = useState<Dancer[]>([]);
   const [studios, setStudios] = useState<Studio[]>([]);
   const [studioApplications, setStudioApplications] = useState<StudioApplication[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'staff' | 'assignments' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking'>('events');
+  const [clients, setClients] = useState<Client[]>([]);
+  const [activeTab, setActiveTab] = useState<'events' | 'staff' | 'assignments' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking' | 'clients'>('events');
   const [isLoading, setIsLoading] = useState(true);
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
@@ -132,6 +149,19 @@ function AdminDashboard() {
     venue: ''
   });
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+
+  // Client creation state
+  const [clientForm, setClientForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    allowedDashboards: [] as string[],
+    canViewAllEvents: false,
+    allowedEventIds: [] as string[],
+    notes: ''
+  });
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [createEventMessage, setCreateEventMessage] = useState('');
 
   // Judge creation state
@@ -229,13 +259,14 @@ function AdminDashboard() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [eventsRes, judgesRes, assignmentsRes, dancersRes, studiosRes, applicationsRes] = await Promise.all([
+      const [eventsRes, judgesRes, assignmentsRes, dancersRes, studiosRes, applicationsRes, clientsRes] = await Promise.all([
         fetch('/api/events'),
         fetch('/api/judges'),
         fetch('/api/judge-assignments/nationals-view'),
         fetch('/api/admin/dancers'),
         fetch('/api/admin/studios'),
-        fetch('/api/admin/studio-applications')
+        fetch('/api/admin/studio-applications'),
+        fetch('/api/clients')
       ]);
 
       const eventsData = await eventsRes.json();
@@ -244,6 +275,7 @@ function AdminDashboard() {
       const dancersData = await dancersRes.json();
       const studiosData = await studiosRes.json();
       const applicationsData = await applicationsRes.json();
+      const clientsData = await clientsRes.json();
 
       if (eventsData.success) setEvents(eventsData.events);
       if (judgesData.success) setJudges(judgesData.judges);
@@ -251,6 +283,7 @@ function AdminDashboard() {
       if (dancersData.success) setDancers(dancersData.dancers);
       if (studiosData.success) setStudios(studiosData.studios);
       if (applicationsData.success) setStudioApplications(applicationsData.applications);
+      if (clientsData.success) setClients(clientsData.clients);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -652,6 +685,73 @@ function AdminDashboard() {
       setCreateJudgeMessage('Error creating judge. Please check your connection and try again.');
     } finally {
       setIsCreatingJudge(false);
+    }
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isCreatingClient) {
+      return;
+    }
+
+    // Validate required fields
+    if (!clientForm.name || !clientForm.email || !clientForm.password) {
+      error('Name, email, and password are required');
+      return;
+    }
+
+    // Validate password strength
+    if (clientForm.password.length < 8) {
+      error('Password must be at least 8 characters long');
+      return;
+    }
+
+    setIsCreatingClient(true);
+
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        error('Session expired. Please log in again.');
+        return;
+      }
+
+      const adminData = JSON.parse(session);
+
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...clientForm,
+          createdBy: adminData.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        success('Client created successfully!');
+        setClientForm({
+          name: '',
+          email: '',
+          password: '',
+          phone: '',
+          allowedDashboards: [],
+          canViewAllEvents: false,
+          allowedEventIds: [],
+          notes: ''
+        });
+        fetchData();
+      } else {
+        error(data.error || 'Failed to create client');
+      }
+    } catch (err) {
+      console.error('Error creating client:', err);
+      error('Network error. Please try again.');
+    } finally {
+      setIsCreatingClient(false);
     }
   };
 
@@ -1417,10 +1517,11 @@ function AdminDashboard() {
           <nav className="flex flex-col sm:flex-row gap-2">
             {[
               { id: 'events', label: 'Events', icon: '🏆', color: 'indigo' },
-              { id: 'staff', label: 'Staff', icon: '👥', color: 'purple' },
+              { id: 'staff', label: 'Judges', icon: '👨‍⚖️', color: 'purple' },
               { id: 'assignments', label: 'Assignments', icon: '🔗', color: 'pink' },
               { id: 'dancers', label: 'Dancers', icon: '💃', color: 'rose' },
               { id: 'studios', label: 'Studios', icon: '🏢', color: 'orange' },
+              { id: 'clients', label: 'Staff Accounts', icon: '👤', color: 'emerald' },
               { id: 'sound-tech', label: 'Sound Tech', icon: '🎵', color: 'blue' },
               { id: 'music-tracking', label: 'Music Upload Tracking', icon: '🎼', color: 'cyan' }
             ].map((tab) => (
@@ -3834,6 +3935,366 @@ function AdminDashboard() {
                     </div>
                   </div>
                 </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clients Tab */}
+      {activeTab === 'clients' && (
+        <div className="space-y-6 sm:space-y-8 animate-fadeIn">
+          {/* Staff Creation Form */}
+          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+            <div className={`px-4 sm:px-6 py-4 bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-b ${themeClasses.cardBorder}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-lg">👤</span>
+                  </div>
+                  <div>
+                    <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Create Staff Account</h2>
+                    <p className={`text-xs ${themeClasses.textMuted}`}>Add a new staff member with dashboard access</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <form onSubmit={handleCreateClient} className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-semibold ${themeClasses.textPrimary} mb-2`}>
+                    Staff Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={clientForm.name}
+                    onChange={(e) => setClientForm(prev => ({ ...prev, name: e.target.value }))}
+                    className={`w-full px-4 py-2.5 border rounded-lg ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors`}
+                    placeholder="Enter staff member name"
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold ${themeClasses.textPrimary} mb-2`}>
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={clientForm.email}
+                    onChange={(e) => setClientForm(prev => ({ ...prev, email: e.target.value }))}
+                    className={`w-full px-4 py-2.5 border rounded-lg ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors`}
+                    placeholder="staff@email.com"
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold ${themeClasses.textPrimary} mb-2`}>
+                    Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={clientForm.password}
+                    onChange={(e) => setClientForm(prev => ({ ...prev, password: e.target.value }))}
+                    className={`w-full px-4 py-2.5 border rounded-lg ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors`}
+                    placeholder="Minimum 8 characters"
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold ${themeClasses.textPrimary} mb-2`}>
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={clientForm.phone}
+                    onChange={(e) => setClientForm(prev => ({ ...prev, phone: e.target.value }))}
+                    className={`w-full px-4 py-2.5 border rounded-lg ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors`}
+                    placeholder="+27 12 345 6789"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-semibold ${themeClasses.textPrimary} mb-3`}>
+                  Allowed Dashboards
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { id: 'announcer-dashboard', name: 'Announcer', icon: '📢' },
+                    { id: 'backstage-dashboard', name: 'Backstage', icon: '🎭' },
+                    { id: 'media-dashboard', name: 'Media', icon: '📸' },
+                    { id: 'registration-dashboard', name: 'Registration', icon: '📝' },
+                    { id: 'event-dashboard', name: 'Event Viewing', icon: '🏆' },
+                    { id: 'judge-dashboard', name: 'Judge', icon: '⚖️' }
+                  ].map((dashboard) => (
+                    <label 
+                      key={dashboard.id} 
+                      className={`flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        clientForm.allowedDashboards.includes(dashboard.id)
+                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-emerald-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={clientForm.allowedDashboards.includes(dashboard.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setClientForm(prev => ({
+                              ...prev,
+                              allowedDashboards: [...prev.allowedDashboards, dashboard.id]
+                            }));
+                          } else {
+                            setClientForm(prev => ({
+                              ...prev,
+                              allowedDashboards: prev.allowedDashboards.filter(d => d !== dashboard.id)
+                            }));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="text-lg">{dashboard.icon}</span>
+                      <span className={`text-sm font-medium ${themeClasses.textPrimary}`}>{dashboard.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className={`p-4 rounded-lg border-2 ${themeClasses.cardBorder} ${themeClasses.cardBg}`}>
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={clientForm.canViewAllEvents}
+                    onChange={(e) => setClientForm(prev => ({ ...prev, canViewAllEvents: e.target.checked }))}
+                    className="mt-1 w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className={`text-sm font-semibold ${themeClasses.textPrimary} block`}>Can view all events</span>
+                    <p className={`text-xs ${themeClasses.textMuted} mt-1`}>
+                      If unchecked, staff will only see events they are specifically assigned to
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-semibold ${themeClasses.textPrimary} mb-2`}>
+                  Notes
+                </label>
+                <textarea
+                  value={clientForm.notes}
+                  onChange={(e) => setClientForm(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  className={`w-full px-4 py-2.5 border rounded-lg ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors resize-none`}
+                  placeholder="Internal notes about this staff member..."
+                />
+              </div>
+
+              <div className="flex justify-end pt-4 border-t ${themeClasses.cardBorder}">
+                <button
+                  type="submit"
+                  disabled={isCreatingClient}
+                  className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  {isCreatingClient ? (
+                    <span className="flex items-center space-x-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span>Creating...</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center space-x-2">
+                      <span>✓</span>
+                      <span>Create Staff Account</span>
+                    </span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Staff List */}
+          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+            <div className={`px-4 sm:px-6 py-4 bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-b ${themeClasses.cardBorder}`}>
+              <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Staff Accounts</h2>
+              <p className={`text-sm ${themeClasses.textMuted} mt-1`}>
+                Manage staff accounts and their dashboard access permissions
+              </p>
+            </div>
+
+            <div className="p-6">
+              {clients.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-2xl">👤</span>
+                  </div>
+                  <h3 className={`text-lg font-semibold ${themeClasses.textPrimary} mb-2`}>No Staff Yet</h3>
+                  <p className={`${themeClasses.textMuted}`}>
+                    Create your first staff account to get started
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className={`border-b ${themeClasses.cardBorder}`}>
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>
+                          Staff Member
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>
+                          Phone
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>
+                          Dashboards
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>
+                          Status
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>
+                          Last Login
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${themeClasses.cardBorder}`}>
+                      {clients.map((client) => (
+                        <tr key={client.id} className="hover:bg-gray-50/50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>
+                                {client.name}
+                              </div>
+                              <div className={`text-sm ${themeClasses.textMuted}`}>
+                                {client.email}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className={`text-sm ${themeClasses.textPrimary}`}>
+                              {client.phone || '-'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1">
+                              {client.allowedDashboards && client.allowedDashboards.length > 0 ? (
+                                client.allowedDashboards.map((dashboard) => (
+                                  <span
+                                    key={dashboard}
+                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"
+                                  >
+                                    {dashboard.replace('-dashboard', '')}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-gray-400">No access</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-col space-y-1">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                client.isActive && client.isApproved
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {client.isActive && client.isApproved ? 'Active' : 'Inactive'}
+                              </span>
+                              {client.canViewAllEvents && (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  All Events
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {client.lastLoginAt 
+                              ? new Date(client.lastLoginAt).toLocaleDateString()
+                              : 'Never'
+                            }
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={async () => {
+                                  const newStatus = !client.isActive;
+                                  try {
+                                    const response = await fetch('/api/clients', {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        id: client.id,
+                                        name: client.name,
+                                        email: client.email,
+                                        phone: client.phone,
+                                        allowedDashboards: client.allowedDashboards,
+                                        canViewAllEvents: client.canViewAllEvents,
+                                        allowedEventIds: client.allowedEventIds,
+                                        isActive: newStatus,
+                                        isApproved: newStatus ? true : client.isApproved, // Auto-approve when activating
+                                        notes: client.notes,
+                                        updatedBy: JSON.parse(localStorage.getItem('adminSession') || '{}').id
+                                      })
+                                    });
+                                    const data = await response.json();
+                                    if (data.success) {
+                                      success(`Staff ${newStatus ? 'activated' : 'deactivated'}`);
+                                      fetchData();
+                                    } else {
+                                      error(data.error || 'Failed to update staff');
+                                    }
+                                  } catch (err) {
+                                    error('Network error');
+                                  }
+                                }}
+                                className={`px-3 py-1 text-xs rounded ${
+                                  client.isActive && client.isApproved
+                                    ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                }`}
+                              >
+                                {client.isActive && client.isApproved ? 'Deactivate' : 'Activate'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  showConfirm(
+                                    'Are you sure you want to delete this staff member? This action cannot be undone.',
+                                    async () => {
+                                      try {
+                                        const response = await fetch(`/api/clients?id=${client.id}`, {
+                                          method: 'DELETE'
+                                        });
+                                        const data = await response.json();
+                                        if (data.success) {
+                                          success('Staff deleted successfully');
+                                          fetchData();
+                                        } else {
+                                          error(data.error || 'Failed to delete staff');
+                                        }
+                                      } catch (err) {
+                                        error('Network error');
+                                      }
+                                    }
+                                  );
+                                }}
+                                className="px-3 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>

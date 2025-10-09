@@ -4,6 +4,53 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   
+  // Client access control for dashboard routes
+  const protectedDashboards = [
+    '/announcer-dashboard',
+    '/backstage-dashboard', 
+    '/media-dashboard',
+    '/registration-dashboard',
+    '/event-dashboard',
+    '/judge/dashboard'
+  ];
+
+  // Check if accessing a protected dashboard
+  const isDashboardRoute = protectedDashboards.some(path => 
+    request.nextUrl.pathname.startsWith(path)
+  );
+
+  if (isDashboardRoute) {
+    // Check for client session in cookies or headers
+    const clientSession = request.cookies.get('clientSession')?.value;
+    
+    if (clientSession) {
+      try {
+        const session = JSON.parse(clientSession);
+        const currentPath = request.nextUrl.pathname;
+        
+        // Extract dashboard ID from path
+        let dashboardId = '';
+        if (currentPath.startsWith('/judge/dashboard')) {
+          dashboardId = 'judge-dashboard';
+        } else {
+          dashboardId = currentPath.split('/')[1] + '-dashboard';
+        }
+        
+        // Check if client has access to this dashboard
+        if (session.userType === 'client' && session.allowedDashboards) {
+          if (!session.allowedDashboards.includes(dashboardId)) {
+            console.log(`🚫 Client ${session.email} denied access to ${dashboardId}`);
+            return NextResponse.redirect(new URL('/client-dashboard?error=access_denied', request.url));
+          } else {
+            console.log(`✅ Client ${session.email} granted access to ${dashboardId}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing client session:', error);
+      }
+    }
+  }
+  
   // Special handling for file upload routes
   if (request.nextUrl.pathname.includes('/api/upload/music')) {
     response.headers.set('X-Upload-Route', 'true');
