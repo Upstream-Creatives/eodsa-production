@@ -249,9 +249,10 @@ export default function RegistrationDashboard() {
     );
   };
 
-  // Show all live entries (solos, duets, trios, groups) - hide only virtual entries
+  // FIXED: Show ALL entries (both live and virtual) for registration check-in
   const filteredPerformances = performances.filter(perf => {
-    const isLive = (perf.entryType || 'live') === 'live';
+    // FIXED: Registration should see ALL performances (both live and virtual)
+    // Registration staff needs to check in all performers regardless of entry type
     const matchesPresence = presenceFilter === 'all' || 
       (presenceFilter === 'present' && perf.presence?.present) ||
       (presenceFilter === 'absent' && !perf.presence?.present);
@@ -272,8 +273,8 @@ export default function RegistrationDashboard() {
       }
     })();
     
-    // Debug: All live entries should be included regardless of participant count
-    return isLive && matchesPresence && matchesSearch;
+    // Registration shows ALL entries (both live and virtual) for check-in purposes
+    return matchesPresence && matchesSearch;
   });
 
   const presentCount = performances.filter(p => p.presence?.present).length;
