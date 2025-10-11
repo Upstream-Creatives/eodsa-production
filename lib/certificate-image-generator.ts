@@ -72,97 +72,121 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
       dateFontSize: 39,
     };
 
-    // Calculate baseline offsets (approximate font size * 0.9)
-    const nameBaselineOffset = pos.nameFontSize * 0.9;
-    const percentageBaselineOffset = pos.percentageFontSize * 0.9;
-    const styleBaselineOffset = pos.styleFontSize * 0.9;
-    const titleBaselineOffset = pos.titleFontSize * 0.9;
-    const medallionBaselineOffset = pos.medallionFontSize * 0.9;
-    const dateBaselineOffset = pos.dateFontSize * 0.9;
+    // Helper function to create text SVG
+    const createTextSVG = (text: string, x: number, y: number, fontSize: number, bold: boolean = true, centered: boolean = false) => {
+      return `<svg width="${width}" height="${height}">
+        <text 
+          x="${x}" 
+          y="${y}"
+          font-family="Arial, Helvetica, sans-serif"
+          font-size="${fontSize}"
+          font-weight="${bold ? 'bold' : 'normal'}"
+          fill="white"
+          ${centered ? 'text-anchor="middle"' : ''}
+        >${text}</text>
+      </svg>`;
+    };
 
-    // Create SVG overlay with text
-    // Using Arial as primary font since it's available on Vercel serverless
-    const svgOverlay = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <style>
-          .dancer-name {
-            fill: white;
-            font-family: Arial, Helvetica, sans-serif;
-            font-weight: bold;
-            font-size: ${pos.nameFontSize}px;
-            text-anchor: middle;
-            letter-spacing: 4px;
-          }
-          .percentage {
-            fill: white;
-            font-family: Arial, Helvetica, sans-serif;
-            font-weight: bold;
-            font-size: ${pos.percentageFontSize}px;
-          }
-          .style-text {
-            fill: white;
-            font-family: Arial, Helvetica, sans-serif;
-            font-weight: bold;
-            font-size: ${pos.styleFontSize}px;
-            text-transform: uppercase;
-          }
-          .title-text {
-            fill: white;
-            font-family: Arial, Helvetica, sans-serif;
-            font-weight: bold;
-            font-size: ${pos.titleFontSize}px;
-            text-transform: uppercase;
-          }
-          .medallion-text {
-            fill: white;
-            font-family: Arial, Helvetica, sans-serif;
-            font-weight: bold;
-            font-size: ${pos.medallionFontSize}px;
-            text-transform: uppercase;
-          }
-          .date-text {
-            fill: white;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: ${pos.dateFontSize}px;
-          }
-        </style>
+    // Start with the base template
+    let sharpInstance = sharp(templatePath);
 
-        <!-- Dancer Name -->
-        <text x="${width * (pos.nameLeft / 100)}" y="${height * (pos.nameTop / 100) + nameBaselineOffset}" class="dancer-name">${escapeXml(data.dancerName)}</text>
+    // Add each text element as a separate composite layer
+    const composites = [];
 
-        <!-- Percentage -->
-        <text x="${width * (pos.percentageLeft / 100)}" y="${height * (pos.percentageTop / 100) + percentageBaselineOffset}" class="percentage">${data.percentage}</text>
+    // Dancer Name (centered)
+    composites.push({
+      input: Buffer.from(createTextSVG(
+        data.dancerName,
+        width * (pos.nameLeft / 100),
+        height * (pos.nameTop / 100),
+        pos.nameFontSize,
+        true,
+        true
+      )),
+      top: 0,
+      left: 0
+    });
 
-        <!-- Style -->
-        <text x="${width * (pos.styleLeft / 100)}" y="${height * (pos.styleTop / 100) + styleBaselineOffset}" class="style-text">${escapeXml(data.style)}</text>
+    // Percentage
+    composites.push({
+      input: Buffer.from(createTextSVG(
+        data.percentage.toString(),
+        width * (pos.percentageLeft / 100),
+        height * (pos.percentageTop / 100),
+        pos.percentageFontSize,
+        true,
+        false
+      )),
+      top: 0,
+      left: 0
+    });
 
-        <!-- Title -->
-        <text x="${width * (pos.titleLeft / 100)}" y="${height * (pos.titleTop / 100) + titleBaselineOffset}" class="title-text">${escapeXml(data.title)}</text>
+    // Style
+    composites.push({
+      input: Buffer.from(createTextSVG(
+        data.style.toUpperCase(),
+        width * (pos.styleLeft / 100),
+        height * (pos.styleTop / 100),
+        pos.styleFontSize,
+        true,
+        false
+      )),
+      top: 0,
+      left: 0
+    });
 
-        <!-- Medallion -->
-        <text x="${width * (pos.medallionLeft / 100)}" y="${height * (pos.medallionTop / 100) + medallionBaselineOffset}" class="medallion-text">${escapeXml(data.medallion)}</text>
+    // Title
+    composites.push({
+      input: Buffer.from(createTextSVG(
+        data.title.toUpperCase(),
+        width * (pos.titleLeft / 100),
+        height * (pos.titleTop / 100),
+        pos.titleFontSize,
+        true,
+        false
+      )),
+      top: 0,
+      left: 0
+    });
 
-        <!-- Date -->
-        <text x="${width * (pos.dateLeft / 100)}" y="${height * (pos.dateTop / 100) + dateBaselineOffset}" class="date-text">${escapeXml(data.date)}</text>
-      </svg>
-    `;
+    // Medallion
+    composites.push({
+      input: Buffer.from(createTextSVG(
+        data.medallion.toUpperCase(),
+        width * (pos.medallionLeft / 100),
+        height * (pos.medallionTop / 100),
+        pos.medallionFontSize,
+        true,
+        false
+      )),
+      top: 0,
+      left: 0
+    });
 
-    // Composite the SVG overlay onto the template
-    const certificateBuffer = await sharp(templatePath)
-      .composite([
-        {
-          input: Buffer.from(svgOverlay),
-          top: 0,
-          left: 0,
-        },
-      ])
+    // Date
+    composites.push({
+      input: Buffer.from(createTextSVG(
+        data.date,
+        width * (pos.dateLeft / 100),
+        height * (pos.dateTop / 100),
+        pos.dateFontSize,
+        false,
+        false
+      )),
+      top: 0,
+      left: 0
+    });
+
+    // Apply all composites
+    const certificateBuffer = await sharpInstance
+      .composite(composites)
       .jpeg({ quality: 95 })
       .toBuffer();
 
     return certificateBuffer;
   } catch (error) {
     console.error('Error generating certificate image:', error);
-    throw new Error('Failed to generate certificate image');
+    throw new Error(`Failed to generate certificate image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
