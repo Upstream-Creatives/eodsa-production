@@ -24,6 +24,20 @@ interface StudioApplication {
   rejectionReason?: string;
 }
 
+interface Certificate {
+  id: string;
+  dancerName: string;
+  percentage: number;
+  style: string;
+  title: string;
+  medallion: string;
+  eventDate: string;
+  certificateUrl: string;
+  sentAt?: string;
+  downloaded: boolean;
+  createdAt: string;
+}
+
 // Music Upload Section Component
 function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession }) {
   const [musicEntries, setMusicEntries] = useState<any[]>([]);
@@ -904,6 +918,168 @@ function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSes
   );
 }
 
+// Certificates Section Component
+function CertificatesSection({ dancerSession }: { dancerSession: DancerSession }) {
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCertificates();
+  }, [dancerSession.id]);
+
+  const loadCertificates = async () => {
+    try {
+      const response = await fetch(`/api/certificates/generate?dancerId=${dancerSession.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setCertificates(data);
+      } else {
+        setError('Failed to load certificates');
+      }
+    } catch (err) {
+      console.error('Error loading certificates:', err);
+      setError('Failed to load certificates');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = async (cert: Certificate) => {
+    try {
+      window.open(cert.certificateUrl, '_blank');
+      
+      // Mark as downloaded
+      await fetch(`/api/certificates/mark-downloaded`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ certificateId: cert.id })
+      });
+      
+      // Reload certificates
+      loadCertificates();
+    } catch (err) {
+      console.error('Error downloading certificate:', err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
+        <div className="p-6 border-b border-gray-700">
+          <h3 className="text-xl font-bold text-white">🎖️ My Certificates</h3>
+          <p className="text-gray-400 text-sm mt-1">View and download your achievement certificates</p>
+        </div>
+        <div className="p-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading certificates...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
+      <div className="p-6 border-b border-gray-700">
+        <h3 className="text-xl font-bold text-white">🎖️ My Certificates</h3>
+        <p className="text-gray-400 text-sm mt-1">View and download your achievement certificates</p>
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-900/20 border-b border-red-700/30">
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
+
+      {certificates.length === 0 ? (
+        <div className="p-8 text-center">
+          <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">📜</span>
+          </div>
+          <p className="text-gray-400 mb-2">No certificates yet</p>
+          <p className="text-gray-500 text-sm">
+            Certificates will appear here once you've achieved a ranking position in competitions.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+          {certificates.map((cert) => (
+            <div key={cert.id} className="bg-gray-900/50 rounded-xl border border-gray-700 overflow-hidden hover:border-purple-500/50 transition-all">
+              <div
+                className="relative h-48 cursor-pointer"
+                onClick={() => setPreviewUrl(cert.certificateUrl)}
+              >
+                <img
+                  src={cert.certificateUrl}
+                  alt={`Certificate for ${cert.title}`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                  <span className="text-white text-4xl opacity-0 hover:opacity-100 transition-opacity">🔍</span>
+                </div>
+              </div>
+              <div className="p-4">
+                <h4 className="font-semibold text-white mb-2">{cert.title}</h4>
+                <div className="space-y-1 text-sm">
+                  <p className="text-gray-400">
+                    <span className="text-gray-500">Style:</span> {cert.style}
+                  </p>
+                  <p className="text-gray-400">
+                    <span className="text-gray-500">Score:</span> {cert.percentage}%
+                  </p>
+                  <p className="text-gray-400">
+                    <span className="text-gray-500">Medal:</span> {cert.medallion}
+                  </p>
+                  <p className="text-gray-400">
+                    <span className="text-gray-500">Date:</span> {cert.eventDate}
+                  </p>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => handleDownload(cert)}
+                    className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-semibold"
+                  >
+                    📥 Download
+                  </button>
+                  <button
+                    onClick={() => setPreviewUrl(cert.certificateUrl)}
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                  >
+                    👁️
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewUrl(null)}
+              className="absolute -top-12 right-0 text-white text-xl hover:text-gray-300 bg-gray-800/50 px-4 py-2 rounded-lg"
+            >
+              ✕ Close
+            </button>
+            <img
+              src={previewUrl}
+              alt="Certificate Preview"
+              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DancerDashboardPage() {
   const [dancerSession, setDancerSession] = useState<DancerSession | null>(null);
   const [applications, setApplications] = useState<StudioApplication[]>([]);
@@ -1030,6 +1206,9 @@ export default function DancerDashboardPage() {
       <div className="container mx-auto p-4 space-y-6">
         {/* Scores & Feedback Section */}
         <ScoresFeedbackSection dancerSession={dancerSession} />
+
+        {/* Certificates Section */}
+        <CertificatesSection dancerSession={dancerSession} />
 
         {/* Competition Entries Section */}
         <CompetitionEntriesSection dancerSession={dancerSession} />

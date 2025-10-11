@@ -1,149 +1,211 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/database';
-import { emailService } from '@/lib/email';
-import { generateCertificateHTML, getMedalFromPercentage, formatCertificateDate } from '@/lib/certificate-generator';
-import { getMedalFromPercentage as getTypeMedal } from '@/lib/types';
+import { v2 as cloudinary } from 'cloudinary';
+import { getSql } from '@/lib/database';
 
-/**
- * POST /api/certificates/generate
- * Generate and email a certificate for a completed performance
- */
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+interface CertificateData {
+  dancerId: string;
+  dancerName: string;
+  eodsaId?: string;
+  email?: string;
+  performanceId?: string;
+  eventEntryId?: string;
+  percentage: number;
+  style: string;
+  title: string;
+  medallion: string;
+  eventDate: string;
+  createdBy?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { performanceId } = await request.json();
+    const body: CertificateData = await request.json();
+    const {
+      dancerId,
+      dancerName,
+      eodsaId,
+      email,
+      performanceId,
+      eventEntryId,
+      percentage,
+      style,
+      title,
+      medallion,
+      eventDate,
+      createdBy
+    } = body;
 
-    if (!performanceId) {
+    // Validate required fields
+    if (!dancerId || !dancerName || !percentage || !style || !title || !medallion || !eventDate) {
       return NextResponse.json(
-        { error: 'Performance ID is required' },
+        { error: 'Missing required certificate data' },
         { status: 400 }
       );
     }
 
-    // Get performance details
-    const allPerformances = await db.getAllPerformances();
-    const performance = allPerformances.find(p => p.id === performanceId);
-
-    if (!performance) {
-      return NextResponse.json(
-        { error: 'Performance not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if performance is completed
-    if (performance.status !== 'completed') {
-      return NextResponse.json(
-        { error: 'Performance must be completed before generating certificate' },
-        { status: 400 }
-      );
-    }
-
-    // Get scores for this performance
-    const scores = await db.getScoresByPerformance(performanceId);
-
-    if (!scores || scores.length === 0) {
-      return NextResponse.json(
-        { error: 'No scores found for this performance' },
-        { status: 404 }
-      );
-    }
-
-    // Calculate average percentage from all judge scores
-    const totalPercentage = scores.reduce((sum, score) => {
-      const scoreTotal = score.technicalScore + score.musicalScore + score.performanceScore + score.stylingScore + score.overallImpressionScore;
-      return sum + scoreTotal;
-    }, 0);
-    const averagePercentage = Math.round(totalPercentage / scores.length);
-
-    // Get medallion
-    const medallion = getMedalFromPercentage(averagePercentage);
-
-    // Get dancer information
-    const allDancers = await db.getAllDancers();
-    const dancer = allDancers.find(d => performance.participantNames.includes(d.name));
-
-    if (!dancer) {
-      return NextResponse.json(
-        { error: 'Dancer not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get contestant to get email
-    const allContestants = await db.getAllContestants();
-    const contestant = allContestants.find(c => c.dancers.some(d => d.id === dancer.id));
-
-    if (!contestant || !contestant.email) {
-      return NextResponse.json(
-        { error: 'Contestant email not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get event details for date
-    const allEvents = await db.getAllEvents();
-    const event = allEvents.find(e => e.id === performance.eventId);
-
-    if (!event) {
-      return NextResponse.json(
-        { error: 'Event not found' },
-        { status: 404 }
-      );
-    }
-
-    // Generate certificate HTML
-    const certificateHTML = generateCertificateHTML({
-      dancerName: performance.participantNames.join(', '),
-      percentage: averagePercentage,
-      style: performance.itemStyle,
-      title: performance.title,
-      medallion: medallion,
-      date: formatCertificateDate(event.eventDate)
+    // Generate certificate using Cloudinary with exact positioning
+    const certificateUrl = cloudinary.url('Template_syz7di', {
+      transformation: [
+        {
+          overlay: {
+            font_family: 'Montserrat',
+            font_size: 65,
+            font_weight: 'bold',
+            text: dancerName.toUpperCase(),
+            letter_spacing: 2
+          },
+          color: 'white',
+          gravity: 'north',
+          y: Math.floor(48.5 * 13)
+        },
+        {
+          overlay: {
+            font_family: 'Montserrat',
+            font_size: 76,
+            font_weight: 'bold',
+            text: percentage.toString()
+          },
+          color: 'white',
+          gravity: 'north_west',
+          x: Math.floor(15.5 * 9),
+          y: Math.floor(65.5 * 13)
+        },
+        {
+          overlay: {
+            font_family: 'Montserrat',
+            font_size: 33,
+            font_weight: 'bold',
+            text: style.toUpperCase()
+          },
+          color: 'white',
+          gravity: 'north',
+          x: Math.floor((77.5 - 50) * 9),
+          y: Math.floor(67 * 13)
+        },
+        {
+          overlay: {
+            font_family: 'Montserrat',
+            font_size: 29,
+            font_weight: 'bold',
+            text: title.toUpperCase()
+          },
+          color: 'white',
+          gravity: 'north',
+          x: Math.floor((74 - 50) * 9),
+          y: Math.floor(74 * 13)
+        },
+        {
+          overlay: {
+            font_family: 'Montserrat',
+            font_size: 46,
+            font_weight: 'bold',
+            text: medallion.toUpperCase()
+          },
+          color: 'white',
+          gravity: 'north',
+          x: Math.floor((72 - 50) * 9),
+          y: Math.floor(80.5 * 13)
+        },
+        {
+          overlay: {
+            font_family: 'Montserrat',
+            font_size: 39,
+            text: eventDate
+          },
+          color: 'white',
+          gravity: 'north',
+          x: Math.floor((66.5 - 50) * 9),
+          y: Math.floor(90 * 13)
+        }
+      ],
+      format: 'jpg',
+      quality: 95
     });
 
-    // For now, we'll create a simple URL to view the certificate
-    // In production, you might want to save this to a file storage service
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const certificateUrl = `${appUrl}/certificates/${performanceId}`;
+    // Generate unique certificate ID
+    const certificateId = `cert_${Date.now()}${Math.random().toString(36).substring(2, 9)}`;
+    const createdAt = new Date().toISOString();
 
-    // Save certificate HTML to database or file system
-    // For this implementation, we'll store it as a reference
-    // You could extend this to save to Cloudinary or another storage service
-
-    // Send email with certificate
-    const emailResult = await emailService.sendCertificateEmail(
-      performance.participantNames.join(', '),
-      contestant.email,
-      averagePercentage,
-      medallion,
-      certificateUrl
-    );
-
-    if (!emailResult.success) {
-      return NextResponse.json(
-        { error: 'Failed to send certificate email', details: emailResult.error },
-        { status: 500 }
-      );
-    }
+    // Save certificate to database
+    const sqlClient = getSql();
+    await sqlClient`
+      INSERT INTO certificates (
+        id, dancer_id, dancer_name, eodsa_id, email,
+        performance_id, event_entry_id, percentage, style, title,
+        medallion, event_date, certificate_url, created_at, created_by
+      ) VALUES (
+        ${certificateId}, ${dancerId}, ${dancerName}, ${eodsaId || null}, ${email || null},
+        ${performanceId || null}, ${eventEntryId || null}, ${percentage}, ${style}, ${title},
+        ${medallion}, ${eventDate}, ${certificateUrl}, ${createdAt}, ${createdBy || null}
+      )
+    `;
 
     return NextResponse.json({
       success: true,
-      message: 'Certificate generated and emailed successfully',
-      data: {
-        performanceId,
-        dancerName: performance.participantNames.join(', '),
-        percentage: averagePercentage,
-        medallion,
-        certificateUrl,
-        emailSent: true,
-        recipientEmail: contestant.email
-      }
+      certificateId,
+      certificateUrl,
+      message: 'Certificate generated successfully'
     });
 
   } catch (error) {
     console.error('Error generating certificate:', error);
     return NextResponse.json(
       { error: 'Failed to generate certificate' },
+      { status: 500 }
+    );
+  }
+}
+
+// GET endpoint to retrieve certificate by ID
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const certificateId = searchParams.get('id');
+    const dancerId = searchParams.get('dancerId');
+
+    const sqlClient = getSql();
+
+    if (certificateId) {
+      const result = await sqlClient`
+        SELECT * FROM certificates WHERE id = ${certificateId}
+      ` as any[];
+
+      if (result.length === 0) {
+        return NextResponse.json(
+          { error: 'Certificate not found' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json(result[0]);
+    }
+
+    if (dancerId) {
+      const result = await sqlClient`
+        SELECT * FROM certificates 
+        WHERE dancer_id = ${dancerId}
+        ORDER BY created_at DESC
+      ` as any[];
+
+      return NextResponse.json(result);
+    }
+
+    return NextResponse.json(
+      { error: 'Missing certificateId or dancerId parameter' },
+      { status: 400 }
+    );
+
+  } catch (error) {
+    console.error('Error fetching certificate:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch certificate' },
       { status: 500 }
     );
   }

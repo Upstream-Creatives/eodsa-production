@@ -195,6 +195,32 @@ export const initializeDatabase = async () => {
       )
     `;
 
+    // Certificates table
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS certificates (
+        id TEXT PRIMARY KEY,
+        dancer_id TEXT NOT NULL,
+        dancer_name TEXT NOT NULL,
+        eodsa_id TEXT,
+        email TEXT,
+        performance_id TEXT,
+        event_entry_id TEXT,
+        percentage DECIMAL(5,2) NOT NULL,
+        style TEXT NOT NULL,
+        title TEXT NOT NULL,
+        medallion TEXT NOT NULL,
+        event_date TEXT,
+        certificate_url TEXT,
+        cloudinary_public_id TEXT,
+        sent_at TEXT,
+        sent_by TEXT,
+        downloaded BOOLEAN DEFAULT FALSE,
+        downloaded_at TEXT,
+        created_at TEXT NOT NULL,
+        created_by TEXT
+      )
+    `;
+
     console.log('✅ Database schema is up to date.');
     
     // Return the database object for use in API routes
