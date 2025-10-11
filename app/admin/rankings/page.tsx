@@ -84,14 +84,14 @@ function AdminRankingsPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [rankings, viewMode, masteryFilter, entryTypeFilter, selectedAgeCategory]);
+  }, [rankings, viewMode, masteryFilter, entryTypeFilter, selectedAgeCategory, selectedPerformanceType]);
 
-  // Trigger rankings reload when server-side filters change (performance type only, age is client-side now)
+  // Load rankings only once on authentication (all filters are client-side for Nationals)
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       loadRankings();
     }
-  }, [selectedPerformanceType, isAuthenticated]);
+  }, [isAuthenticated]);
 
   const loadInitialData = async () => {
     setIsLoading(true);
@@ -118,9 +118,8 @@ function AdminRankingsPage() {
       const params = new URLSearchParams();
       params.append('type', 'nationals'); // Only nationals now
       
-      // Age category is now filtered client-side (due to dynamic age calculation)
-      // Only send performance type to server
-      if (selectedPerformanceType) params.append('performanceType', selectedPerformanceType);
+      // All filters are client-side for Nationals (due to dynamic age calculation)
+      // Load all data and filter on client
       
       const url = `/api/rankings?${params.toString()}`;
       console.log('Loading rankings from:', url);
@@ -147,6 +146,11 @@ function AdminRankingsPage() {
     // Apply age category filter (client-side for Nationals due to dynamic age calculation)
     if (selectedAgeCategory) {
       filtered = filtered.filter(ranking => ranking.ageCategory === selectedAgeCategory);
+    }
+    
+    // Apply performance type filter (client-side for Nationals)
+    if (selectedPerformanceType) {
+      filtered = filtered.filter(ranking => ranking.performanceType === selectedPerformanceType);
     }
     
     // Apply entry type filter
@@ -660,7 +664,8 @@ function AdminRankingsPage() {
                       <th className="text-left py-4 px-6 font-bold text-white">Item #</th>
                       <th className="text-left py-4 px-6 font-bold text-white">Performance</th>
                       <th className="text-left py-4 px-6 font-bold text-white">Contestant</th>
-                      <th className="text-left py-4 px-6 font-bold text-white">Age Category</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Type</th>
+                      <th className="text-left py-4 px-6 font-bold text-white">Age</th>
                       <th className="text-left py-4 px-6 font-bold text-white">Score</th>
                       <th className="text-left py-4 px-6 font-bold text-white">Level</th>
                     </tr>
@@ -706,6 +711,11 @@ function AdminRankingsPage() {
                             {ranking.studioName && (
                               <div className="text-xs text-gray-400 mt-1">{ranking.studioName}</div>
                             )}
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-700 text-blue-200 border border-blue-500">
+                              {ranking.performanceType}
+                            </div>
                           </td>
                           <td className="py-4 px-6">
                             <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-indigo-700 text-indigo-200 border border-indigo-500">

@@ -1057,7 +1057,16 @@ export const db = {
               e.name as event_name,
               e.region,
               e.age_category,
-              e.performance_type,
+              COALESCE(
+                ee.performance_type,
+                CASE 
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) = 1 THEN 'Solo'
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) = 2 THEN 'Duet'
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) = 3 THEN 'Trio'
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) >= 4 THEN 'Group'
+                  ELSE e.performance_type
+                END
+              ) as performance_type,
               e.event_date,
               p.title,
               p.item_style,
@@ -1076,9 +1085,9 @@ export const db = {
             LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
             LEFT JOIN scores s ON p.id = s.performance_id
             WHERE e.id = ${eventId} AND p.scores_published = true
-            GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
+            GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, ee.performance_type, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
-            ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
+            ORDER BY e.region, e.age_category, performance_type, total_score DESC
           ` as any[];
         } else {
           // For multiple events, we'll query each separately and combine
@@ -1094,7 +1103,16 @@ export const db = {
                 e.name as event_name,
                 e.region,
                 e.age_category,
-                e.performance_type,
+                COALESCE(
+                  ee.performance_type,
+                  CASE 
+                    WHEN jsonb_array_length(ee.participant_ids::jsonb) = 1 THEN 'Solo'
+                    WHEN jsonb_array_length(ee.participant_ids::jsonb) = 2 THEN 'Duet'
+                    WHEN jsonb_array_length(ee.participant_ids::jsonb) = 3 THEN 'Trio'
+                    WHEN jsonb_array_length(ee.participant_ids::jsonb) >= 4 THEN 'Group'
+                    ELSE e.performance_type
+                  END
+                ) as performance_type,
                 e.event_date,
                 p.title,
                 p.item_style,
@@ -1113,9 +1131,9 @@ export const db = {
               LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
               LEFT JOIN scores s ON p.id = s.performance_id
               WHERE e.id = ${eventId} AND p.scores_published = true
-              GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
+              GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, ee.performance_type, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
               HAVING COUNT(s.id) > 0
-              ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
+              ORDER BY e.region, e.age_category, performance_type, total_score DESC
             ` as any[];
             allResults.push(...eventResult);
           }
@@ -1236,7 +1254,16 @@ export const db = {
               e.name as event_name,
               e.region,
               e.age_category,
-              e.performance_type,
+              COALESCE(
+                ee.performance_type,
+                CASE 
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) = 1 THEN 'Solo'
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) = 2 THEN 'Duet'
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) = 3 THEN 'Trio'
+                  WHEN jsonb_array_length(ee.participant_ids::jsonb) >= 4 THEN 'Group'
+                  ELSE e.performance_type
+                END
+              ) as performance_type,
               e.event_date,
               p.title,
               p.item_style,
@@ -1255,9 +1282,9 @@ export const db = {
             LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
             LEFT JOIN scores s ON p.id = s.performance_id
             WHERE p.scores_published = true
-            GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
+            GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, ee.performance_type, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
-            ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
+            ORDER BY e.region, e.age_category, performance_type, total_score DESC
           ` as any[];
         }
       }
