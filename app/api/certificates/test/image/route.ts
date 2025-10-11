@@ -26,78 +26,79 @@ export async function GET(request: NextRequest) {
     const medallion = searchParams.get('medallion') || 'GOLD';
     const date = searchParams.get('date') || '4 October 2025';
 
-    // Use Cloudinary's text overlay feature to add text
+    // Use Cloudinary's text overlay feature with Montserrat font
     const certificateUrl = cloudinary.url('Template_syz7di', {
       transformation: [
         {
           overlay: {
-            font_family: 'Arial',
-            font_size: 65,
+            font_family: 'Montserrat',
+            font_size: 50,
             font_weight: 'bold',
-            text: dancerName
+            text: dancerName,
+            letter_spacing: 2
           },
           color: 'white',
-          gravity: 'north',
-          y: 440
+          gravity: 'center',
+          y: -170
         },
         {
           overlay: {
-            font_family: 'Arial',
-            font_size: 76,
+            font_family: 'Montserrat',
+            font_size: 60,
             font_weight: 'bold',
             text: percentage
           },
           color: 'white',
-          gravity: 'north_west',
+          gravity: 'west',
           x: 140,
-          y: 840
+          y: 190
         },
         {
           overlay: {
-            font_family: 'Arial',
-            font_size: 33,
+            font_family: 'Montserrat',
+            font_size: 24,
             font_weight: 'bold',
             text: style.toUpperCase()
           },
           color: 'white',
-          gravity: 'north',
-          x: 100,
-          y: 865
+          gravity: 'center',
+          x: 80,
+          y: 230
         },
         {
           overlay: {
-            font_family: 'Arial',
-            font_size: 29,
+            font_family: 'Montserrat',
+            font_size: 22,
             font_weight: 'bold',
             text: title.toUpperCase()
           },
           color: 'white',
-          gravity: 'north',
-          x: 50,
-          y: 948
+          gravity: 'center',
+          x: 30,
+          y: 310
         },
         {
           overlay: {
-            font_family: 'Arial',
-            font_size: 46,
+            font_family: 'Montserrat',
+            font_size: 32,
             font_weight: 'bold',
             text: medallion.toUpperCase()
           },
           color: 'white',
-          gravity: 'north',
-          x: 150,
-          y: 1030
+          gravity: 'center',
+          x: 120,
+          y: 390
         },
         {
           overlay: {
-            font_family: 'Arial',
-            font_size: 39,
+            font_family: 'Montserrat',
+            font_size: 28,
             text: date
           },
           color: 'white',
-          gravity: 'north',
-          x: 20,
-          y: 1160
+          gravity: 'south_east',
+          x: 230,
+          y: 100
         }
       ],
       format: 'jpg',
