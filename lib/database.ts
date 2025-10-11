@@ -1744,6 +1744,7 @@ export const db = {
     const sqlClient = getSql();
 
     // Get all published scores for performances where this dancer participated
+    // Check both event_entries and nationals_event_entries tables
     const result = await sqlClient`
       SELECT
         s.*,
@@ -1751,14 +1752,15 @@ export const db = {
         p.id as performance_id,
         p.title as performance_title,
         p.scores_published,
-        p.scores_published_at
-      FROM nationals_event_entries nee
-      JOIN scores s ON s.performance_id = nee.id
+        p.scores_published_at,
+        ee.item_name as entry_title
+      FROM event_entries ee
+      JOIN performances p ON p.event_entry_id = ee.id
+      JOIN scores s ON s.performance_id = p.id
       JOIN judges j ON j.id = s.judge_id
-      JOIN performances p ON p.id = nee.id
       WHERE (
-        nee.eodsa_id = ${eodsaId}
-        OR nee.participant_ids::text LIKE ${`%${eodsaId}%`}
+        ee.eodsa_id = ${eodsaId}
+        OR ee.participant_ids::text LIKE ${`%${eodsaId}%`}
       )
       AND p.scores_published = true
       ORDER BY s.submitted_at DESC
@@ -1769,7 +1771,7 @@ export const db = {
       judgeId: row.judge_id,
       judgeName: row.judge_name,
       performanceId: row.performance_id,
-      performanceTitle: row.performance_title,
+      performanceTitle: row.performance_title || row.entry_title,
       technicalScore: parseFloat(row.technical_score),
       musicalScore: parseFloat(row.musical_score || 0),
       performanceScore: parseFloat(row.performance_score || 0),
