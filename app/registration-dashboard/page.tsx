@@ -249,10 +249,9 @@ export default function RegistrationDashboard() {
     );
   };
 
-  // FIXED: Show ALL entries (both live and virtual) for registration check-in
+  // Registration: show ONLY live entries (hide virtual)
   const filteredPerformances = performances.filter(perf => {
-    // FIXED: Registration should see ALL performances (both live and virtual)
-    // Registration staff needs to check in all performers regardless of entry type
+    const isLive = (perf.entryType || 'live') === 'live';
     const matchesPresence = presenceFilter === 'all' || 
       (presenceFilter === 'present' && perf.presence?.present) ||
       (presenceFilter === 'absent' && !perf.presence?.present);
@@ -273,12 +272,12 @@ export default function RegistrationDashboard() {
       }
     })();
     
-    // Registration shows ALL entries (both live and virtual) for check-in purposes
-    return matchesPresence && matchesSearch;
+    // Registration shows ONLY live entries for check-in purposes
+    return isLive && matchesPresence && matchesSearch;
   });
 
-  const presentCount = performances.filter(p => p.presence?.present).length;
-  const absentCount = performances.filter(p => !p.presence?.present).length;
+  const presentCount = filteredPerformances.filter(p => p.presence?.present).length;
+  const absentCount = filteredPerformances.filter(p => !p.presence?.present).length;
 
   if (isLoading && !event) {
     return (
