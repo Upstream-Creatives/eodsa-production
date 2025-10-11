@@ -668,11 +668,30 @@ function AdminRankingsPage() {
                   <tbody>
                     {filteredRankings.map((ranking, index) => {
                       const { percentage, rankingLevel, rankingColor, medalEmoji } = calculatePercentageAndRanking(ranking.totalScore, ranking.judgeCount);
+                      
+                      // Calculate display rank based on view mode
+                      let displayRank = index + 1;
+                      
+                      // For top3_age view, calculate rank within age group
+                      if (viewMode === 'top3_age') {
+                        const sameAgeBeforeThis = filteredRankings.slice(0, index).filter(
+                          r => r.ageCategory === ranking.ageCategory
+                        ).length;
+                        displayRank = sameAgeBeforeThis + 1;
+                      }
+                      // For top3_style view, calculate rank within style group
+                      else if (viewMode === 'top3_style') {
+                        const sameStyleBeforeThis = filteredRankings.slice(0, index).filter(
+                          r => r.itemStyle === ranking.itemStyle
+                        ).length;
+                        displayRank = sameStyleBeforeThis + 1;
+                      }
+                      
                       return (
                         <tr key={ranking.performanceId} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
                           <td className="py-4 px-6">
-                            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold border ${getRankBadgeColor(ranking.rank)}`}>
-                              {getRankIcon(ranking.rank)}
+                            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold border ${getRankBadgeColor(displayRank)}`}>
+                              {getRankIcon(displayRank)}
                             </div>
                           </td>
                           <td className="py-4 px-6">

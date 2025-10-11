@@ -1937,8 +1937,16 @@ export const db = {
   async getDancerScores(eodsaId: string) {
     const sqlClient = getSql();
 
+    // First, get the dancer's ID from their EODSA ID
+    // This is needed because participant_ids may contain dancer IDs instead of EODSA IDs
+    const dancerResult = await sqlClient`
+      SELECT id FROM dancers WHERE eodsa_id = ${eodsaId}
+    ` as any[];
+    
+    const dancerId = dancerResult.length > 0 ? dancerResult[0].id : null;
+
     // Get all published scores for performances where this dancer participated
-    // Check both event_entries and nationals_event_entries tables
+    // Check both EODSA ID and dancer ID in participant_ids for consistency
     const result = await sqlClient`
       SELECT
         s.*,
@@ -1955,6 +1963,7 @@ export const db = {
       WHERE (
         ee.eodsa_id = ${eodsaId}
         OR ee.participant_ids::text LIKE ${`%${eodsaId}%`}
+        ${dancerId ? sqlClient`OR ee.participant_ids::text LIKE ${`%${dancerId}%`}` : sqlClient``}
       )
       AND p.scores_published = true
       ORDER BY s.submitted_at DESC
