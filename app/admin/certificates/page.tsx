@@ -100,7 +100,7 @@ export default function AdminCertificatesPage() {
       percentage: ranking.percentage.toString(),
       style: ranking.itemStyle,
       title: ranking.title,
-      medallion: getMedalFromPercentage(ranking.percentage),
+      medallion: getMedalFromPercentage(ranking.percentage).label,
       date: ranking.eventDate || new Date().toLocaleDateString()
     }).toString();
     
@@ -136,7 +136,7 @@ export default function AdminCertificatesPage() {
               percentage: winner.percentage,
               style: winner.itemStyle,
               title: winner.title,
-              medallion: getMedalFromPercentage(winner.percentage),
+              medallion: getMedalFromPercentage(winner.percentage).label,
               eventDate: winner.eventDate || new Date().toLocaleDateString(),
               createdBy: 'admin'
             })
@@ -347,12 +347,12 @@ export default function AdminCertificatesPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              getMedalFromPercentage(ranking.percentage) === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
-                              getMedalFromPercentage(ranking.percentage) === 'Silver' ? 'bg-gray-100 text-gray-800' :
-                              getMedalFromPercentage(ranking.percentage) === 'Bronze' ? 'bg-orange-100 text-orange-800' :
+                              getMedalFromPercentage(ranking.percentage).label === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
+                              getMedalFromPercentage(ranking.percentage).label === 'Silver' ? 'bg-gray-100 text-gray-800' :
+                              getMedalFromPercentage(ranking.percentage).label === 'Bronze' ? 'bg-orange-100 text-orange-800' :
                               'bg-blue-100 text-blue-800'
                             }`}>
-                              {getMedalFromPercentage(ranking.percentage)}
+                              {getMedalFromPercentage(ranking.percentage).label}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
