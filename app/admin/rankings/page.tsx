@@ -89,15 +89,15 @@ function AdminRankingsPage() {
     if (isAuthenticated && !isLoading) {
       loadRankings();
     }
-  }, [selectedAgeCategory, selectedPerformanceType]);
+  }, [selectedAgeCategory, selectedPerformanceType, isAuthenticated]);
 
   const loadInitialData = async () => {
     setIsLoading(true);
     setError('');
     
     try {
-      // Load all rankings
-      await loadRankings();
+      // Load all rankings (force load since this is initial data load)
+      await loadRankings(true);
     } catch (error) {
       setError('Failed to load data');
     } finally {
@@ -105,8 +105,8 @@ function AdminRankingsPage() {
     }
   };
 
-  const loadRankings = async () => {
-    if (!isAuthenticated) return;
+  const loadRankings = async (forceLoad = false) => {
+    if (!isAuthenticated && !forceLoad) return;
     
     setIsRefreshing(true);
     setError('');
@@ -549,7 +549,7 @@ function AdminRankingsPage() {
                 className="w-full px-4 py-3 border-2 border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium bg-gray-700 text-white"
               >
                 <option value="">All Ages</option>
-                {['Primary', 'Junior', 'Senior', 'Youth', 'Adult', 'Elite'].map(age => (
+                {['4 & Under', '6 & Under', '7-9', '10-12', '13-14', '15-17', '18-24', '25-39', '40+', '60+'].map(age => (
                   <option key={age} value={age}>{age}</option>
                 ))}
               </select>
