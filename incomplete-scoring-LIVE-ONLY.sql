@@ -45,3 +45,4 @@ ORDER BY item_number, contestant_name;
 -- ✗ But NOT all judges have scored yet
 -- Excludes: Not started (0 judges) and Complete items
 
+

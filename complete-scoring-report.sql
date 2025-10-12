@@ -71,3 +71,4 @@ ORDER BY
 -- 🟠 READY TO PUBLISH - All judges scored BUT NOT PUBLISHED (missing from rankings)
 -- ✅ PUBLISHED - All judges scored AND published (visible in rankings)
 
+

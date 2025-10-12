@@ -41,3 +41,4 @@ FROM performance_judge_counts
 WHERE judges_scored < total_judges_assigned
 ORDER BY item_number, contestant_name;
 
+

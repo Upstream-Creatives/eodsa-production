@@ -143,14 +143,6 @@ function AdminRankingsPage() {
   const applyFilters = () => {
     let filtered = rankings;
     
-    // Check if any filter is active
-    const hasActiveFilters = 
-      selectedAgeCategory !== '' ||
-      selectedPerformanceType !== '' ||
-      entryTypeFilter !== 'all' ||
-      masteryFilter !== 'all' ||
-      viewMode !== 'all';
-    
     // Apply age category filter (client-side for Nationals due to dynamic age calculation)
     if (selectedAgeCategory) {
       filtered = filtered.filter(ranking => ranking.ageCategory === selectedAgeCategory);
@@ -173,22 +165,19 @@ function AdminRankingsPage() {
       filtered = filtered.filter(ranking => ranking.mastery?.toLowerCase().includes('fire') || ranking.mastery?.toLowerCase().includes('advanced'));
     }
     
-    // If any filter is active, deduplicate by contestant name (keep only best performance per person)
-    if (hasActiveFilters) {
+    // Apply view mode filters with deduplication
+    // When using "Top X" view modes, deduplicate by contestant name (keep only best performance per person)
+    if (viewMode === 'top3_age') {
+      // Deduplicate first: keep only best performance per contestant
       const bestPerformanceByContestant = new Map<string, RankingData>();
-      
       filtered.forEach(ranking => {
         const existing = bestPerformanceByContestant.get(ranking.contestantName);
         if (!existing || ranking.totalScore > existing.totalScore) {
           bestPerformanceByContestant.set(ranking.contestantName, ranking);
         }
       });
-      
       filtered = Array.from(bestPerformanceByContestant.values());
-    }
-    
-    // Apply view mode filters
-    if (viewMode === 'top3_age') {
+      
       // Group by age category and get top 3 from each
       const groupedByAge = filtered.reduce((groups, ranking) => {
         if (!groups[ranking.ageCategory]) {
@@ -202,6 +191,16 @@ function AdminRankingsPage() {
         group.sort((a, b) => b.totalScore - a.totalScore).slice(0, 3)
       );
     } else if (viewMode === 'top3_style') {
+      // Deduplicate first: keep only best performance per contestant
+      const bestPerformanceByContestant = new Map<string, RankingData>();
+      filtered.forEach(ranking => {
+        const existing = bestPerformanceByContestant.get(ranking.contestantName);
+        if (!existing || ranking.totalScore > existing.totalScore) {
+          bestPerformanceByContestant.set(ranking.contestantName, ranking);
+        }
+      });
+      filtered = Array.from(bestPerformanceByContestant.values());
+      
       // Group by style and get top 3 from each
       const groupedByStyle = filtered.reduce((groups, ranking) => {
         if (!groups[ranking.itemStyle]) {
@@ -215,27 +214,67 @@ function AdminRankingsPage() {
         group.sort((a, b) => b.totalScore - a.totalScore).slice(0, 3)
       );
     } else if (viewMode === 'top3_duets') {
-      // Filter for duets only and get top 3
-      filtered = filtered
+      // Deduplicate first: keep only best performance per contestant
+      const bestPerformanceByContestant = new Map<string, RankingData>();
+      filtered
         .filter(ranking => ranking.performanceType === 'Duet')
+        .forEach(ranking => {
+          const existing = bestPerformanceByContestant.get(ranking.contestantName);
+          if (!existing || ranking.totalScore > existing.totalScore) {
+            bestPerformanceByContestant.set(ranking.contestantName, ranking);
+          }
+        });
+      
+      // Filter for duets only and get top 3
+      filtered = Array.from(bestPerformanceByContestant.values())
         .sort((a, b) => b.totalScore - a.totalScore)
         .slice(0, 3);
     } else if (viewMode === 'top3_groups') {
-      // Filter for groups only and get top 3
-      filtered = filtered
+      // Deduplicate first: keep only best performance per contestant
+      const bestPerformanceByContestant = new Map<string, RankingData>();
+      filtered
         .filter(ranking => ranking.performanceType === 'Group')
+        .forEach(ranking => {
+          const existing = bestPerformanceByContestant.get(ranking.contestantName);
+          if (!existing || ranking.totalScore > existing.totalScore) {
+            bestPerformanceByContestant.set(ranking.contestantName, ranking);
+          }
+        });
+      
+      // Filter for groups only and get top 3
+      filtered = Array.from(bestPerformanceByContestant.values())
         .sort((a, b) => b.totalScore - a.totalScore)
         .slice(0, 3);
     } else if (viewMode === 'top3_trios') {
-      // Filter for trios only and get top 3
-      filtered = filtered
+      // Deduplicate first: keep only best performance per contestant
+      const bestPerformanceByContestant = new Map<string, RankingData>();
+      filtered
         .filter(ranking => ranking.performanceType === 'Trio')
+        .forEach(ranking => {
+          const existing = bestPerformanceByContestant.get(ranking.contestantName);
+          if (!existing || ranking.totalScore > existing.totalScore) {
+            bestPerformanceByContestant.set(ranking.contestantName, ranking);
+          }
+        });
+      
+      // Filter for trios only and get top 3
+      filtered = Array.from(bestPerformanceByContestant.values())
         .sort((a, b) => b.totalScore - a.totalScore)
         .slice(0, 3);
     } else if (viewMode === 'top10_soloists') {
-      // Filter for solos only and get top 10
-      filtered = filtered
+      // Deduplicate first: keep only best performance per contestant
+      const bestPerformanceByContestant = new Map<string, RankingData>();
+      filtered
         .filter(ranking => ranking.performanceType === 'Solo')
+        .forEach(ranking => {
+          const existing = bestPerformanceByContestant.get(ranking.contestantName);
+          if (!existing || ranking.totalScore > existing.totalScore) {
+            bestPerformanceByContestant.set(ranking.contestantName, ranking);
+          }
+        });
+      
+      // Filter for solos only and get top 10
+      filtered = Array.from(bestPerformanceByContestant.values())
         .sort((a, b) => b.totalScore - a.totalScore)
         .slice(0, 10);
     }
@@ -249,6 +288,89 @@ function AdminRankingsPage() {
     setViewMode('all');
     setMasteryFilter('all');
     setEntryTypeFilter('all');
+  };
+
+  const exportToCSV = () => {
+    if (filteredRankings.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      'Rank',
+      'Item Number',
+      'Performance Title',
+      'Contestant Name',
+      'Studio',
+      'Performance Type',
+      'Age Category',
+      'Style',
+      'Mastery Level',
+      'Entry Type',
+      'Total Score',
+      'Average Score',
+      'Percentage',
+      'Medal/Level',
+      'Judge Count',
+      'Event Name',
+      'Region'
+    ];
+
+    // Convert data to CSV rows
+    const rows = filteredRankings.map((ranking, index) => {
+      const { percentage, rankingLevel } = calculatePercentageAndRanking(ranking.totalScore, ranking.judgeCount);
+      
+      return [
+        index + 1, // Rank
+        ranking.itemNumber || 'N/A',
+        `"${ranking.title.replace(/"/g, '""')}"`, // Escape quotes in title
+        `"${ranking.contestantName.replace(/"/g, '""')}"`,
+        `"${(ranking.studioName || '').replace(/"/g, '""')}"`,
+        ranking.performanceType,
+        ranking.ageCategory,
+        `"${ranking.itemStyle.replace(/"/g, '""')}"`,
+        ranking.mastery || 'N/A',
+        ranking.entryType || 'live',
+        ranking.totalScore.toFixed(2),
+        ranking.averageScore.toFixed(2),
+        percentage.toFixed(2),
+        rankingLevel,
+        ranking.judgeCount,
+        `"${ranking.eventName.replace(/"/g, '""')}"`,
+        ranking.region
+      ];
+    });
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    // Generate filename with timestamp and current view mode
+    const timestamp = new Date().toISOString().split('T')[0];
+    const viewModeLabel = viewMode === 'all' ? 'All' : 
+                          viewMode === 'top3_age' ? 'Top3ByAge' :
+                          viewMode === 'top3_style' ? 'Top3ByStyle' :
+                          viewMode === 'top3_duets' ? 'Top3Duets' :
+                          viewMode === 'top3_groups' ? 'Top3Groups' :
+                          viewMode === 'top3_trios' ? 'Top3Trios' :
+                          viewMode === 'top10_soloists' ? 'Top10Soloists' : 'Rankings';
+    
+    const filename = `Nationals_Rankings_${viewModeLabel}_${timestamp}.csv`;
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const getRankBadgeColor = (rank: number) => {
@@ -350,6 +472,13 @@ function AdminRankingsPage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <button
+                onClick={exportToCSV}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+              >
+                <span>📊</span>
+                <span>Export CSV</span>
+              </button>
               <button
                 onClick={() => window.location.href = '/admin'}
                 className="px-4 py-2 text-gray-400 hover:text-white font-medium"
@@ -632,6 +761,13 @@ function AdminRankingsPage() {
             <div>
               <label className="block text-sm font-semibold text-gray-300 mb-3">Actions</label>
               <div className="flex flex-col space-y-2">
+                <button
+                  onClick={exportToCSV}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold shadow-md flex items-center justify-center space-x-2"
+                >
+                  <span>📊</span>
+                  <span>Export to CSV</span>
+                </button>
                 <button
                   onClick={clearFilters}
                   className="w-full px-4 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-200 font-semibold shadow-md"
