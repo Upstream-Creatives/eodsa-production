@@ -285,7 +285,16 @@ function AdminRankingsPage() {
         .slice(0, 10);
     }
     
-    setFilteredRankings(filtered);
+    // Sort filtered results by total score (descending) and recalculate ranks
+    filtered.sort((a, b) => b.totalScore - a.totalScore);
+    
+    // Recalculate ranks for filtered results
+    const rankedFiltered = filtered.map((ranking, index) => ({
+      ...ranking,
+      rank: index + 1 // Assign new rank based on position in filtered list
+    }));
+    
+    setFilteredRankings(rankedFiltered);
   };
 
   const clearFilters = () => {
@@ -848,8 +857,9 @@ function AdminRankingsPage() {
                     {filteredRankings.map((ranking, index) => {
                       const { percentage, rankingLevel, rankingColor, medalEmoji } = calculatePercentageAndRanking(ranking.totalScore, ranking.judgeCount);
                       
-                      // Calculate display rank based on view mode
-                      let displayRank = index + 1;
+                      // Use the recalculated rank from applyFilters
+                      // For top3_age and top3_style, calculate rank within groups
+                      let displayRank = ranking.rank;
                       
                       // For top3_age view, calculate rank within age group
                       if (viewMode === 'top3_age') {
