@@ -55,6 +55,7 @@ function AdminRankingsPage() {
   // Region filtering removed - Nationals only now
   const [selectedAgeCategory, setSelectedAgeCategory] = useState('');
   const [selectedPerformanceType, setSelectedPerformanceType] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState('');
   const [viewMode, setViewMode] = useState<'all' | 'top3_age' | 'top3_style' | 'top3_duets' | 'top3_groups' | 'top3_trios' | 'top10_soloists'>('all');
   const [masteryFilter, setMasteryFilter] = useState<'all' | 'competitive' | 'advanced'>('all');
   const [entryTypeFilter, setEntryTypeFilter] = useState<'all' | 'live' | 'virtual'>('all');
@@ -84,7 +85,7 @@ function AdminRankingsPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [rankings, viewMode, masteryFilter, entryTypeFilter, selectedAgeCategory, selectedPerformanceType]);
+  }, [rankings, viewMode, masteryFilter, entryTypeFilter, selectedAgeCategory, selectedPerformanceType, selectedStyle]);
 
   // Load rankings only once on authentication (all filters are client-side for Nationals)
   useEffect(() => {
@@ -151,6 +152,11 @@ function AdminRankingsPage() {
     // Apply performance type filter (client-side for Nationals)
     if (selectedPerformanceType) {
       filtered = filtered.filter(ranking => ranking.performanceType === selectedPerformanceType);
+    }
+    
+    // Apply style filter
+    if (selectedStyle) {
+      filtered = filtered.filter(ranking => ranking.itemStyle === selectedStyle);
     }
     
     // Apply entry type filter
@@ -285,6 +291,7 @@ function AdminRankingsPage() {
   const clearFilters = () => {
     setSelectedAgeCategory('');
     setSelectedPerformanceType('');
+    setSelectedStyle('');
     setViewMode('all');
     setMasteryFilter('all');
     setEntryTypeFilter('all');
@@ -696,7 +703,7 @@ function AdminRankingsPage() {
             <h2 className="text-xl font-bold text-white">Filter Avalon Rankings</h2>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-300 mb-3">Competition</label>
               <div className="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white font-medium">
@@ -728,6 +735,20 @@ function AdminRankingsPage() {
                 <option value="">All Types</option>
                 {['Solo', 'Duet', 'Trio', 'Group'].map(type => (
                   <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-300 mb-3">Style</label>
+              <select
+                value={selectedStyle}
+                onChange={(e) => setSelectedStyle(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium bg-gray-700 text-white"
+              >
+                <option value="">All Styles</option>
+                {Array.from(new Set(rankings.map(r => r.itemStyle).filter(s => s))).sort().map(style => (
+                  <option key={style} value={style}>{style}</option>
                 ))}
               </select>
             </div>
