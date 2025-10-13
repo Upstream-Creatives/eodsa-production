@@ -52,17 +52,31 @@ export default function EventTypeManagerPage() {
       const eventsResponse = await fetch('/api/events');
       const eventsData = await eventsResponse.json();
       
-      setEntries(entriesData);
-      setEvents(eventsData.events || []);
+      // Handle different response formats
+      const entriesArray = Array.isArray(entriesData) ? entriesData : (entriesData.entries || []);
+      const eventsArray = eventsData.events || eventsData || [];
+      
+      setEntries(entriesArray);
+      setEvents(eventsArray);
+      
+      console.log('Loaded entries:', entriesArray.length);
+      console.log('Loaded events:', eventsArray.length);
     } catch (error) {
       console.error('Error loading data:', error);
-      setErrorMessage('Failed to load data');
+      setErrorMessage('Failed to load data. Please refresh the page.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const applyFilters = () => {
+    // Ensure entries is an array
+    if (!Array.isArray(entries)) {
+      console.error('Entries is not an array:', entries);
+      setFilteredEntries([]);
+      return;
+    }
+
     let filtered = [...entries];
 
     // Filter by event
@@ -141,9 +155,9 @@ export default function EventTypeManagerPage() {
   };
 
   const stats = {
-    total: entries.length,
-    live: entries.filter(e => e.entryType === 'live').length,
-    virtual: entries.filter(e => e.entryType === 'virtual').length,
+    total: Array.isArray(entries) ? entries.length : 0,
+    live: Array.isArray(entries) ? entries.filter(e => e.entryType === 'live').length : 0,
+    virtual: Array.isArray(entries) ? entries.filter(e => e.entryType === 'virtual').length : 0,
   };
 
   if (isLoading) {
