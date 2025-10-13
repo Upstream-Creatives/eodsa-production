@@ -279,7 +279,7 @@ export default function AdminCertificatesPage() {
       for (const winner of winnersToGenerate) {
         try {
           const percentage = Math.round(winner.averageScore);
-          const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+          const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
           
           // Fetch the performance to get the actual dancer ID
           let dancerId = winner.performanceId; // fallback to performanceId

@@ -146,14 +146,14 @@ export function getMedalFromPercentage(percentage: number): 'Gold' | 'Silver' | 
 }
 
 /**
- * Format date for certificate (e.g., "15 March 2025")
+ * Format date for certificate (e.g., "October 11, 2025")
  */
 export function formatCertificateDate(dateString: string): string {
   const date = new Date(dateString);
   const options: Intl.DateTimeFormatOptions = {
-    day: 'numeric',
     month: 'long',
+    day: 'numeric',
     year: 'numeric'
   };
-  return date.toLocaleDateString('en-GB', options);
+  return date.toLocaleDateString('en-US', options);
 }
