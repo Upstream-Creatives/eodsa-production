@@ -1379,6 +1379,11 @@ export default function CompetitionEntryPage() {
                   const totalSoloCount = existingSolos + sessionSolos;
                   const nextSoloFee = type === 'Solo' ? calculateFallbackEntryFee('Solo', 1) : 0;
                   
+                  // Get currency symbol from event
+                  const currency = event?.currency || 'ZAR';
+                  const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : 'R';
+                  const additionalFee = event?.soloAdditionalFee || 100;
+                  
                   // For independent dancers (non-studio mode), only allow Solo
                   const isDisabled = !isStudioMode && type !== 'Solo';
                   
@@ -1405,22 +1410,22 @@ export default function CompetitionEntryPage() {
                          {type === 'Solo' && (
                            <div className="text-sm mb-2">
                              <div className="font-semibold text-emerald-200">
-                               Next: R{nextSoloFee}
+                               Next: {currencySymbol}{nextSoloFee}
                              </div>
                              {totalSoloCount === 0 && <div className="text-xs opacity-75">1st Solo</div>}
                              {totalSoloCount === 1 && <div className="text-xs opacity-75">2nd Solo (Package deal)</div>}
                              {totalSoloCount === 2 && <div className="text-xs opacity-75">3rd Solo (Package deal)</div>}
                              {totalSoloCount === 3 && <div className="text-xs opacity-75">4th Solo (Package deal)</div>}
                              {totalSoloCount === 4 && <div className="text-xs opacity-75">FREE!</div>}
-                             {totalSoloCount > 4 && <div className="text-xs opacity-75">+R100</div>}
+                             {totalSoloCount > 4 && <div className="text-xs opacity-75">+{currencySymbol}{additionalFee}</div>}
                            </div>
                          )}
                          
-                         {/* Static pricing for others */}
+                         {/* Dynamic pricing for others */}
                          {type !== 'Solo' && (
                            <div className="text-sm mb-2">
                              <div className="font-semibold text-emerald-200">
-                               From R{getStartingFee(type)}
+                               From {currencySymbol}{getStartingFee(type)}
                              </div>
                            </div>
                          )}
