@@ -215,11 +215,28 @@ export async function GET(request: NextRequest) {
     }
 
     if (dancerId) {
-      const result = await sqlClient`
+      // Try to find certificates by dancer_id, eodsa_id, or by looking up the dancer first
+      let result = await sqlClient`
         SELECT * FROM certificates 
         WHERE dancer_id = ${dancerId}
+        OR eodsa_id = ${dancerId}
         ORDER BY created_at DESC
       ` as any[];
+      
+      // If no results, try to get the EODSA ID from the dancers table
+      if (result.length === 0) {
+        const dancerInfo = await sqlClient`
+          SELECT eodsa_id FROM dancers WHERE id = ${dancerId}
+        ` as any[];
+        
+        if (dancerInfo.length > 0 && dancerInfo[0].eodsa_id) {
+          result = await sqlClient`
+            SELECT * FROM certificates 
+            WHERE eodsa_id = ${dancerInfo[0].eodsa_id}
+            ORDER BY created_at DESC
+          ` as any[];
+        }
+      }
 
       return NextResponse.json(result);
     }

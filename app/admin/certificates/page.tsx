@@ -186,7 +186,8 @@ export default function AdminCertificatesPage() {
     if (!ranking) return;
     
     const percentage = Math.round(ranking.averageScore);
-    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    // Use October 11, 2025 as the event date for Nationals 2025
+    const eventDate = new Date('2025-10-11').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const baseUrl = `/api/certificates/adjust/image?`;
     const params = new URLSearchParams({
       name: ranking.contestantName || 'Unknown',
@@ -194,7 +195,7 @@ export default function AdminCertificatesPage() {
       style: ranking.itemStyle || 'Contemporary',
       title: ranking.title || 'Performance',
       medallion: getMedalFromPercentage(percentage).label,
-      date: today,
+      date: eventDate,
       nameTop: nameTop.toString(),
       nameFontSize: nameFontSize.toString(),
       percentageTop: percentageTop.toString(),
@@ -279,16 +280,37 @@ export default function AdminCertificatesPage() {
       for (const winner of winnersToGenerate) {
         try {
           const percentage = Math.round(winner.averageScore);
-          const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+          // Use October 11, 2025 as the event date for Nationals 2025
+          const eventDate = new Date('2025-10-11').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
           
-          // Fetch the performance to get the actual dancer ID
+          // Fetch the performance to get the actual dancer ID and EODSA ID
           let dancerId = winner.performanceId; // fallback to performanceId
+          let eodsaId = null;
+          let email = null;
+          
           try {
             const perfResponse = await fetch(`/api/performances/${winner.performanceId}`);
             if (perfResponse.ok) {
               const perfData = await perfResponse.json();
               if (perfData.performance?.contestantId) {
                 dancerId = perfData.performance.contestantId;
+                eodsaId = perfData.performance.eodsaId;
+              }
+              
+              // Try to get email from contestant/dancer
+              if (dancerId) {
+                try {
+                  const dancerResponse = await fetch(`/api/dancers/${dancerId}`);
+                  if (dancerResponse.ok) {
+                    const dancerData = await dancerResponse.json();
+                    if (dancerData.dancer) {
+                      eodsaId = eodsaId || dancerData.dancer.eodsaId;
+                      email = dancerData.dancer.email || dancerData.dancer.guardianEmail;
+                    }
+                  }
+                } catch (err) {
+                  console.warn('Could not fetch dancer details');
+                }
               }
             }
           } catch (err) {
@@ -301,12 +323,14 @@ export default function AdminCertificatesPage() {
             body: JSON.stringify({
               dancerId: dancerId, // Use actual dancer/contestant ID
               dancerName: winner.contestantName,
+              eodsaId: eodsaId, // Include EODSA ID for lookup
+              email: email, // Include email for sending
               performanceId: winner.performanceId,
               percentage: percentage,
               style: winner.itemStyle,
               title: winner.title,
               medallion: getMedalFromPercentage(percentage).label,
-              eventDate: today,
+              eventDate: eventDate,
               createdBy: 'admin'
             })
           });
