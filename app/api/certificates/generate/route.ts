@@ -238,7 +238,24 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      return NextResponse.json(result);
+      // Map database fields (snake_case) to frontend format (camelCase)
+      const mappedResult = result.map((cert: any) => ({
+        id: cert.id,
+        dancerName: cert.dancer_name,
+        eodsaId: cert.eodsa_id,
+        email: cert.email,
+        percentage: parseFloat(cert.percentage),
+        style: cert.style,
+        title: cert.title,
+        medallion: cert.medallion,
+        eventDate: cert.event_date,
+        certificateUrl: cert.certificate_url,
+        sentAt: cert.sent_at,
+        downloaded: cert.downloaded,
+        createdAt: cert.created_at
+      }));
+
+      return NextResponse.json(mappedResult);
     }
 
     return NextResponse.json(
