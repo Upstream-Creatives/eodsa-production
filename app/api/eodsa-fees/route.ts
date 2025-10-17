@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
       numberOfParticipants = 1, 
       soloCount = 1, 
       includeRegistration = true,
-      participantIds = []
+      participantIds = [],
+      eventId = null
     } = body;
     
     if (!masteryLevel || !performanceType) {
@@ -92,7 +93,8 @@ export async function POST(request: NextRequest) {
         performanceType,
         participantIds,
         {
-          soloCount
+          soloCount,
+          eventId // Pass eventId to get event-specific fees
         }
       );
     } else {
@@ -103,7 +105,8 @@ export async function POST(request: NextRequest) {
         numberOfParticipants,
         {
           soloCount,
-          includeRegistration
+          includeRegistration,
+          eventId // Pass eventId for event-specific fees
         }
       );
     }

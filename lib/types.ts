@@ -402,10 +402,12 @@ export const calculateEODSAFee = (
     soloCount?: number;
     includeRegistration?: boolean;
     participantDancers?: Dancer[];
+    eventId?: string;
+    eventRegistrationFee?: number; // Event-specific registration fee
   }
 ): { registrationFee: number; performanceFee: number; totalFee: number; breakdown: string; registrationBreakdown?: string } => {
   
-  const { isMultipleSolos = false, soloCount = 1, includeRegistration = true, participantDancers = [] } = options || {};
+  const { isMultipleSolos = false, soloCount = 1, includeRegistration = true, participantDancers = [], eventRegistrationFee } = options || {};
   
   // Calculate registration fee - same for both Water and Fire
   let registrationFee = 0;
@@ -426,7 +428,9 @@ export const calculateEODSAFee = (
     });
     
     if (unpaidDancers.length > 0) {
-      registrationFee = EODSA_FEES.REGISTRATION[masteryLevel as keyof typeof EODSA_FEES.REGISTRATION] * unpaidDancers.length;
+      // Use event-specific registration fee if provided, otherwise use default
+      const regFeePerDancer = eventRegistrationFee || EODSA_FEES.REGISTRATION[masteryLevel as keyof typeof EODSA_FEES.REGISTRATION];
+      registrationFee = regFeePerDancer * unpaidDancers.length;
       
       if (unpaidDancers.length === participantDancers.length) {
         registrationBreakdown = `Registration fee for ${unpaidDancers.length} dancer${unpaidDancers.length > 1 ? 's' : ''} (${masteryLevel})`;
@@ -439,7 +443,9 @@ export const calculateEODSAFee = (
     }
   } else if (includeRegistration) {
     // Fallback calculation if no dancer data provided
-    registrationFee = EODSA_FEES.REGISTRATION[masteryLevel as keyof typeof EODSA_FEES.REGISTRATION] * numberOfParticipants;
+    // Use event-specific registration fee if provided, otherwise use default
+    const regFeePerDancer = eventRegistrationFee || EODSA_FEES.REGISTRATION[masteryLevel as keyof typeof EODSA_FEES.REGISTRATION];
+    registrationFee = regFeePerDancer * numberOfParticipants;
     registrationBreakdown = `Registration fee for ${numberOfParticipants} dancer${numberOfParticipants > 1 ? 's' : ''}`;
   }
   

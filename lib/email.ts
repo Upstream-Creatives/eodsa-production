@@ -367,6 +367,58 @@ export const emailTemplates = {
         </div>
       </div>
     `
+  }),
+
+  // Studio password recovery email (sends password directly)
+  studioPasswordRecovery: (studioName: string, password: string) => ({
+    subject: 'Your Studio Password - EODSA',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🔐 Studio Password Recovery</h1>
+          <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">EODSA Studio Portal</p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+          <h2 style="color: #333; margin: 0 0 20px 0;">Hello ${studioName},</h2>
+
+          <p style="color: #555; font-size: 16px; line-height: 1.6;">
+            You requested your studio password. Here are your login credentials:
+          </p>
+
+          <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; border-left: 4px solid #4caf50; margin: 20px 0;">
+            <h3 style="color: #2e7d32; margin: 0 0 15px 0;">Your Studio Login Details:</h3>
+            <p style="margin: 5px 0; color: #2e7d32;"><strong>Studio Name:</strong> ${studioName}</p>
+            <p style="margin: 5px 0; color: #2e7d32;"><strong>Password:</strong> <code style="background: #fff; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold;">${password}</code></p>
+          </div>
+
+          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeaa7; margin: 20px 0;">
+            <p style="color: #856404; margin: 0; font-size: 14px;">
+              <strong>🔒 Security Note:</strong> Please keep your password secure and do not share it with unauthorized persons.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/studio-login"
+               style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; font-size: 16px;">
+              Login to Studio Dashboard
+            </a>
+          </div>
+
+          <h3 style="color: #333; margin: 25px 0 15px 0;">Studio Dashboard Features:</h3>
+          <ul style="color: #555; line-height: 1.8;">
+            <li>Add and manage your dancers</li>
+            <li>Register dancers for competitions</li>
+            <li>View dancer profiles and EODSA IDs</li>
+            <li>Track competition entries and payments</li>
+          </ul>
+
+          <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
+            Need help? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+          </p>
+        </div>
+      </div>
+    `
   })
 };
 
@@ -509,6 +561,27 @@ export const emailService = {
       return { success: true };
     } catch (error) {
       console.error('Error sending certificate email:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+
+  // Send studio password recovery email
+  async sendStudioPasswordEmail(email: string, studioName: string, password: string) {
+    try {
+      const template = emailTemplates.studioPasswordRecovery(studioName, password);
+      
+      const mailOptions = {
+        from: '"EODSA Studio Support" <devops@upstreamcreatives.co.za>',
+        to: email,
+        subject: template.subject,
+        html: template.html
+      };
+
+      const result = await transporter.sendMail(mailOptions);
+      console.log(`✅ Studio password email sent to ${email} - Message ID: ${result.messageId}`);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Failed to send studio password email:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   },

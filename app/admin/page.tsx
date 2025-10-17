@@ -25,6 +25,16 @@ interface Event {
   entryFee: number;
   createdBy: string;
   createdAt: string;
+  // Fee configuration
+  registrationFeePerDancer?: number;
+  solo1Fee?: number;
+  solo2Fee?: number;
+  solo3Fee?: number;
+  soloAdditionalFee?: number;
+  duoTrioFeePerDancer?: number;
+  groupFeePerDancer?: number;
+  largeGroupFeePerDancer?: number;
+  currency?: string;
 }
 
 interface Judge {
@@ -242,7 +252,17 @@ function AdminDashboard() {
     eventEndDate: '',
     registrationDeadline: '',
     venue: '',
-    status: 'upcoming'
+    status: 'upcoming',
+    // Fee configuration fields
+    registrationFeePerDancer: 300,
+    solo1Fee: 400,
+    solo2Fee: 750,
+    solo3Fee: 1050,
+    soloAdditionalFee: 100,
+    duoTrioFeePerDancer: 280,
+    groupFeePerDancer: 220,
+    largeGroupFeePerDancer: 190,
+    currency: 'ZAR'
   });
   const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
   const [updateEventMessage, setUpdateEventMessage] = useState('');
@@ -510,7 +530,17 @@ function AdminDashboard() {
       eventEndDate: formatDateForInput(event.eventEndDate), // Format for HTML date input
       registrationDeadline: formatDateForInput(event.registrationDeadline), // Format for HTML date input
       venue: event.venue,
-      status: event.status
+      status: event.status,
+      // Include fee configuration
+      registrationFeePerDancer: event.registrationFeePerDancer || 300,
+      solo1Fee: event.solo1Fee || 400,
+      solo2Fee: event.solo2Fee || 750,
+      solo3Fee: event.solo3Fee || 1050,
+      soloAdditionalFee: event.soloAdditionalFee || 100,
+      duoTrioFeePerDancer: event.duoTrioFeePerDancer || 280,
+      groupFeePerDancer: event.groupFeePerDancer || 220,
+      largeGroupFeePerDancer: event.largeGroupFeePerDancer || 190,
+      currency: event.currency || 'ZAR'
     });
     setUpdateEventMessage('');
     setShowEditEventModal(true);
@@ -3401,6 +3431,124 @@ function AdminDashboard() {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
                     placeholder="Event description (optional)"
                   />
+                </div>
+              </div>
+
+              {/* Fee Configuration Section */}
+              <div className="mt-8 p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200">
+                <h3 className="text-lg font-bold text-green-800 mb-4 flex items-center space-x-2">
+                  💰 Fee Configuration
+                </h3>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Currency</label>
+                    <select
+                      value={editEventData.currency}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, currency: e.target.value }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="ZAR">ZAR (R)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Registration Fee (per dancer)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.registrationFeePerDancer}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, registrationFeePerDancer: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">1 Solo Package</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.solo1Fee}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, solo1Fee: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">2 Solos Package</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.solo2Fee}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, solo2Fee: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">3 Solos Package</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.solo3Fee}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, solo3Fee: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Each Additional Solo</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.soloAdditionalFee}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, soloAdditionalFee: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Duo/Trio (per dancer)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.duoTrioFeePerDancer}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, duoTrioFeePerDancer: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Small Group (per dancer, 4-9)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.groupFeePerDancer}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, groupFeePerDancer: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Large Group (per dancer, 10+)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editEventData.largeGroupFeePerDancer}
+                      onChange={(e) => setEditEventData(prev => ({ ...prev, largeGroupFeePerDancer: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
               </div>
 

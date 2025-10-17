@@ -697,19 +697,33 @@ export default function CompetitionEntryPage() {
         });
       }
 
-      // Compute performance-only fee locally to avoid DB dependency
+      // Compute performance-only fee locally using event configuration
       let fee = 0;
       if (capitalizedPerformanceType === 'Solo') {
-        if (soloCount === 1) fee = 400;
-        else if (soloCount === 2) fee = 350;
-        else if (soloCount === 3) fee = 300;
-        else if (soloCount === 4) fee = 250;
-        else if (soloCount === 5) fee = 0;
-        else fee = 100;
+        // Use event-specific solo pricing
+        if (soloCount === 1) {
+          fee = event?.solo1Fee || 400;
+        } else if (soloCount === 2) {
+          // 2nd solo: Calculate incremental cost from package pricing
+          const total2 = event?.solo2Fee || 750;
+          const total1 = event?.solo1Fee || 400;
+          fee = total2 - total1;
+        } else if (soloCount === 3) {
+          // 3rd solo: Calculate incremental cost from package pricing
+          const total3 = event?.solo3Fee || 1050;
+          const total2 = event?.solo2Fee || 750;
+          fee = total3 - total2;
+        } else {
+          // 4th+ solos: Additional solo fee
+          fee = event?.soloAdditionalFee || 100;
+        }
       } else if (capitalizedPerformanceType === 'Duet' || capitalizedPerformanceType === 'Trio') {
-        fee = 280 * participantIds.length;
+        fee = (event?.duoTrioFeePerDancer || 280) * participantIds.length;
       } else if (capitalizedPerformanceType === 'Group') {
-        fee = participantIds.length <= 9 ? 220 * participantIds.length : 190 * participantIds.length;
+        const perPerson = participantIds.length <= 9 
+          ? (event?.groupFeePerDancer || 220)
+          : (event?.largeGroupFeePerDancer || 190);
+        fee = perPerson * participantIds.length;
       }
       console.log('SOLO_DEBUG: calculateEntryFee:feeResult', { fee, soloCount, type: capitalizedPerformanceType });
       return fee;
@@ -884,15 +898,25 @@ export default function CompetitionEntryPage() {
       if (removedEntry && removedEntry.performanceType === 'Solo') {
         const soloEntries = newEntries.filter(entry => entry.performanceType === 'Solo');
         
-        // Recalculate solo fees based on new positioning
+        // Recalculate solo fees based on new positioning using event configuration
         soloEntries.forEach((entry, index) => {
           const soloCount = index + 1;
-          if (soloCount === 1) entry.fee = 400;
-          else if (soloCount === 2) entry.fee = 750 - 400; // R350 for 2nd solo
-          else if (soloCount === 3) entry.fee = 1000 - 750; // R250 for 3rd solo
-          else if (soloCount === 4) entry.fee = 1200 - 1000; // R200 for 4th solo
-          else if (soloCount === 5) entry.fee = 0; // 5th solo is FREE
-          else if (soloCount > 5) entry.fee = 100; // Additional solos R100 each
+          if (soloCount === 1) {
+            entry.fee = event?.solo1Fee || 400;
+          } else if (soloCount === 2) {
+            // 2nd solo: incremental cost
+            const total2 = event?.solo2Fee || 750;
+            const total1 = event?.solo1Fee || 400;
+            entry.fee = total2 - total1;
+          } else if (soloCount === 3) {
+            // 3rd solo: incremental cost
+            const total3 = event?.solo3Fee || 1050;
+            const total2 = event?.solo2Fee || 750;
+            entry.fee = total3 - total2;
+          } else {
+            // 4th+ solos: additional fee
+            entry.fee = event?.soloAdditionalFee || 100;
+          }
         });
       }
       
@@ -931,7 +955,8 @@ export default function CompetitionEntryPage() {
               masteryLevel,
               performanceType: 'Solo', // Use Solo to trigger registration fee logic
               participantIds: Array.from(participantIds),
-              includeRegistration: true
+              includeRegistration: true,
+              eventId: eventId // Pass eventId to get event-specific fees
             })
           });
           
@@ -949,8 +974,9 @@ export default function CompetitionEntryPage() {
           }));
         } catch (error) {
           console.error('Error checking registration status:', error);
-          // Fallback to charging all participants (old behavior)
-          registrationFee = uniqueParticipants.size * 300;
+          // Fallback to charging all participants using event configuration
+          const regFeePerDancer = event?.registrationFeePerDancer || 300;
+          registrationFee = uniqueParticipants.size * regFeePerDancer;
         }
       }
     }
@@ -2026,7 +2052,7 @@ export default function CompetitionEntryPage() {
                    </>
                  )}
                  <div className="text-xs text-slate-400">
-                   ({new Set(entries.flatMap(e => e.participantIds)).size} unique participants × R300)
+                   ({new Set(entries.flatMap(e => e.participantIds)).size} unique participants × R{event?.registrationFeePerDancer || 300})
                  </div>
                  
                  {/* Preview total with pending entry */}

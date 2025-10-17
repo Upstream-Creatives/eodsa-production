@@ -23,6 +23,7 @@ export const calculateSmartEODSAFee = async (
   participantIds: string[],
   options?: {
     soloCount?: number;
+    eventId?: string;
   }
 ) => {
   // REGISTRATION FEE CHECKING FOR ALL PERFORMANCE TYPES
@@ -49,6 +50,20 @@ export const calculateSmartEODSAFee = async (
     })
   );
   
+  // Fetch event-specific registration fee if eventId provided
+  let eventRegistrationFee: number | undefined = undefined;
+  if (options?.eventId) {
+    try {
+      const { db } = await import('./database');
+      const event = await db.getEventById(options.eventId);
+      if (event && event.registrationFeePerDancer) {
+        eventRegistrationFee = event.registrationFeePerDancer;
+      }
+    } catch (error) {
+      console.error('Error fetching event for registration fee:', error);
+    }
+  }
+
   // Calculate fees with intelligent registration fee handling
   const feeBreakdown = calculateEODSAFee(
     masteryLevel,
@@ -57,7 +72,9 @@ export const calculateSmartEODSAFee = async (
     {
       soloCount: options?.soloCount || 1,
       includeRegistration: true,
-      participantDancers: dancersWithPendingCheck // Use the enhanced dancer data
+      participantDancers: dancersWithPendingCheck, // Use the enhanced dancer data
+      eventId: options?.eventId, // Pass eventId for event-specific fees
+      eventRegistrationFee // Pass event-specific registration fee
     }
   );
 
@@ -95,7 +112,8 @@ export const markGroupRegistrationFeePaid = async (
 export const checkGroupRegistrationStatus = async (
   dancerIds: string[],
   masteryLevel: string,
-  performanceType?: 'Solo' | 'Duet' | 'Trio' | 'Group'
+  performanceType?: 'Solo' | 'Duet' | 'Trio' | 'Group',
+  eventId?: string
 ) => {
   // REGISTRATION FEE CHECKING FOR ALL PERFORMANCE TYPES
   
@@ -114,11 +132,20 @@ export const checkGroupRegistrationStatus = async (
   };
 
   if (analysis.needRegistration.length > 0) {
-    const registrationFeePerPerson = {
-      'Water (Competitive)': 300,
-      'Fire (Advanced)': 300,
-      'Nationals': 300
-    }[masteryLevel] || 300; // Default to R300 if unknown mastery level
+    // Try to get event-specific registration fee
+    let registrationFeePerPerson = 300; // Default
+    
+    if (eventId) {
+      try {
+        const { db } = await import('./database');
+        const event = await db.getEventById(eventId);
+        if (event && event.registrationFeePerDancer) {
+          registrationFeePerPerson = event.registrationFeePerDancer;
+        }
+      } catch (error) {
+        console.error('Error fetching event for registration fee:', error);
+      }
+    }
 
     analysis.registrationFeeRequired = registrationFeePerPerson * analysis.needRegistration.length;
   }
