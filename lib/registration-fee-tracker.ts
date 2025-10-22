@@ -1,5 +1,6 @@
 // Registration Fee Tracking System
-// This module handles tracking of one-time registration fees per dancer
+// This module handles tracking of registration fees per dancer per event
+// Since we don't have per-event registration tracking, we check for existing entries in the event
 
 import { unifiedDb } from './database';
 import { Dancer, calculateEODSAFee } from './types';
@@ -30,70 +31,75 @@ export const calculateSmartEODSAFee = async (
   // Get dancer registration status for all participants regardless of performance type
   const dancers = await unifiedDb.getDancersWithRegistrationStatus(participantIds);
 
-  // IMPORTANT FIX: Check if dancer has paid registration for THIS SPECIFIC EVENT, not globally
-  // A dancer must pay registration for EACH event, even if they paid before
+  // SIMPLIFIED APPROACH: Ignore global registration_fee_paid column
+  // Only check if dancer has ANY entries for THIS specific event
   const dancersWithPendingCheck = await Promise.all(
     dancers.map(async (dancer) => {
-      // Check if this dancer has any PAID entries for THIS specific event
-      // Only waive registration fee if they've already paid for THIS event
-      let hasPaidForThisEvent = false;
+      // Check if this dancer has ANY entries for THIS specific event (paid or unpaid)
+      let hasEntryForThisEvent = false;
 
       if (options?.eventId) {
         try {
-          const { db } = await import('./database');
-          // Check for any paid entries for this dancer in this event
-          const paidEntries = await db.sql`
+          const { getSql } = await import('./database');
+          const sqlClient = getSql();
+          // Check for ANY entries for this dancer in this event
+          const existingEntries = await sqlClient`
             SELECT COUNT(*) as count FROM event_entries
             WHERE contestant_id = ${dancer.id}
             AND event_id = ${options.eventId}
-            AND payment_status = 'paid'
             LIMIT 1
           ` as any[];
 
-          hasPaidForThisEvent = paidEntries && paidEntries[0] && paidEntries[0].count > 0;
+          hasEntryForThisEvent = existingEntries && existingEntries[0] && existingEntries[0].count > 0;
 
           console.log(`🔍 Dancer ${dancer.name} (${dancer.id}):`);
-          console.log(`   - Has paid entry for this event (${options.eventId}): ${hasPaidForThisEvent}`);
+          console.log(`   - Has entry for this event (${options.eventId}): ${hasEntryForThisEvent}`);
+          console.log(`   - Registration fee logic: ${hasEntryForThisEvent ? 'WAIVED (already has entry in this event)' : 'CHARGED (new entry for this event)'}`);
         } catch (error) {
-          console.error(`Error checking paid entries for dancer ${dancer.id}:`, error);
+          console.error(`Error checking existing entries for dancer ${dancer.id}:`, error);
         }
       }
 
-      // Check if this dancer has any pending entries that include registration fees
-      const hasPendingRegistrationEntry = await unifiedDb.hasPendingRegistrationEntry(dancer.id, masteryLevel);
-
-      console.log(`🔍 Dancer ${dancer.name} (${dancer.id}):`);
-      console.log(`   - Registration fee paid (global): ${dancer.registrationFeePaid}`);
-      console.log(`   - Registration fee mastery level: ${dancer.registrationFeeMasteryLevel}`);
-      console.log(`   - Has pending registration entry: ${hasPendingRegistrationEntry}`);
-      console.log(`   - Has paid entry for THIS event: ${hasPaidForThisEvent}`);
-
       return {
         ...dancer,
-        // Only consider registration fee as "paid" if:
-        // 1. They have a pending entry with registration fee, OR
-        // 2. They've already paid for THIS specific event
-        registrationFeePaid: hasPendingRegistrationEntry || hasPaidForThisEvent,
-        registrationFeeMasteryLevel: (hasPendingRegistrationEntry || hasPaidForThisEvent) ? masteryLevel : undefined
+        // Only consider registration fee as "paid" if they already have an entry for THIS event
+        registrationFeePaid: hasEntryForThisEvent,
+        registrationFeeMasteryLevel: hasEntryForThisEvent ? masteryLevel : undefined
       };
     })
   );
   
-  // Fetch event-specific registration fee if eventId provided
-  let eventRegistrationFee: number | undefined = undefined;
+  // Fetch ALL event-specific fees if eventId provided
+  let eventFees: any = {};
   if (options?.eventId) {
     try {
       const { db } = await import('./database');
       const event = await db.getEventById(options.eventId);
-      if (event && event.registrationFeePerDancer) {
-        eventRegistrationFee = event.registrationFeePerDancer;
+      if (event) {
+        eventFees = {
+          eventRegistrationFee: event.registrationFeePerDancer,
+          eventSolo1Fee: event.solo1Fee,
+          eventSolo2Fee: event.solo2Fee,
+          eventSolo3Fee: event.solo3Fee,
+          eventSoloAdditionalFee: event.soloAdditionalFee,
+          eventDuoTrioFee: event.duoTrioFeePerDancer,
+          eventGroupFee: event.groupFeePerDancer,
+          eventCurrency: event.currency
+        };
+        
+        console.log(`💰 Using event-specific fees for event ${options.eventId}:`);
+        console.log(`   - Currency: ${event.currency}`);
+        console.log(`   - Registration: ${event.currency}${event.registrationFeePerDancer}`);
+        console.log(`   - Solo 1: ${event.currency}${event.solo1Fee}`);
+        console.log(`   - Duo/Trio per dancer: ${event.currency}${event.duoTrioFeePerDancer}`);
+        console.log(`   - Group per dancer: ${event.currency}${event.groupFeePerDancer}`);
       }
     } catch (error) {
-      console.error('Error fetching event for registration fee:', error);
+      console.error('Error fetching event fees:', error);
     }
   }
 
-  // Calculate fees with intelligent registration fee handling
+  // Calculate fees with intelligent registration fee handling and event-specific fees
   const feeBreakdown = calculateEODSAFee(
     masteryLevel,
     performanceType,
@@ -103,7 +109,7 @@ export const calculateSmartEODSAFee = async (
       includeRegistration: true,
       participantDancers: dancersWithPendingCheck, // Use the enhanced dancer data
       eventId: options?.eventId, // Pass eventId for event-specific fees
-      eventRegistrationFee // Pass event-specific registration fee
+      ...eventFees // Spread all event-specific fees
     }
   );
 

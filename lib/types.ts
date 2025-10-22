@@ -404,10 +404,30 @@ export const calculateEODSAFee = (
     participantDancers?: Dancer[];
     eventId?: string;
     eventRegistrationFee?: number; // Event-specific registration fee
+    eventSolo1Fee?: number; // Event-specific solo 1 fee
+    eventSolo2Fee?: number; // Event-specific solo 2 fee
+    eventSolo3Fee?: number; // Event-specific solo 3 fee
+    eventSoloAdditionalFee?: number; // Event-specific additional solo fee
+    eventDuoTrioFee?: number; // Event-specific duo/trio fee per dancer
+    eventGroupFee?: number; // Event-specific group fee per dancer
+    eventCurrency?: string; // Event currency
   }
-): { registrationFee: number; performanceFee: number; totalFee: number; breakdown: string; registrationBreakdown?: string } => {
+): { registrationFee: number; performanceFee: number; totalFee: number; breakdown: string; registrationBreakdown?: string; currency?: string } => {
   
-  const { isMultipleSolos = false, soloCount = 1, includeRegistration = true, participantDancers = [], eventRegistrationFee } = options || {};
+  const { 
+    isMultipleSolos = false, 
+    soloCount = 1, 
+    includeRegistration = true, 
+    participantDancers = [], 
+    eventRegistrationFee,
+    eventSolo1Fee,
+    eventSolo2Fee,
+    eventSolo3Fee,
+    eventSoloAdditionalFee,
+    eventDuoTrioFee,
+    eventGroupFee,
+    eventCurrency
+  } = options || {};
   
   // Calculate registration fee - same for both Water and Fire
   let registrationFee = 0;
@@ -452,35 +472,39 @@ export const calculateEODSAFee = (
   let performanceFee = 0;
   let breakdown = '';
   
-  // Calculate performance fees - same for both Water and Fire
+  // Use event-specific fees if provided, otherwise use defaults
+  const solo1Fee = eventSolo1Fee ?? EODSA_FEES.PERFORMANCE.Solo;
+  const solo2Fee = eventSolo2Fee ?? (EODSA_FEES.SOLO_PACKAGES[2] || 520);
+  const solo3Fee = eventSolo3Fee ?? (EODSA_FEES.SOLO_PACKAGES[3] || 700);
+  const soloAdditionalFee = eventSoloAdditionalFee ?? EODSA_FEES.PERFORMANCE.SoloAdditional;
+  const duoTrioFee = eventDuoTrioFee ?? EODSA_FEES.PERFORMANCE.Duet;
+  const groupFee = eventGroupFee ?? EODSA_FEES.PERFORMANCE.SmallGroup;
+  const currency = eventCurrency || 'ZAR';
+  
+  // Calculate performance fees using event-specific or default fees
   if (performanceType === 'Solo') {
-    if (soloCount && soloCount > 1) {
-      // Multiple solos - use package pricing
-      if (soloCount <= 5) {
-        performanceFee = EODSA_FEES.SOLO_PACKAGES[soloCount as keyof typeof EODSA_FEES.SOLO_PACKAGES] || 0;
-        breakdown = `${soloCount} Solo${soloCount > 1 ? 's' : ''} Package`;
-      } else {
-        // More than 5 solos: 3-solo package + additional solos at R180 each after 3rd
-        const packageFee = EODSA_FEES.SOLO_PACKAGES[3];
-        const additionalFee = (soloCount - 3) * EODSA_FEES.PERFORMANCE.SoloAdditional;
-        performanceFee = packageFee + additionalFee;
-        breakdown = `3 Solos Package + ${soloCount - 3} Additional Solo${soloCount - 3 > 1 ? 's' : ''}`;
-      }
-    } else {
-      // Single solo
-      performanceFee = EODSA_FEES.PERFORMANCE.Solo;
-      breakdown = '1 Solo';
+    if (soloCount === 1) {
+      performanceFee = solo1Fee;
+      breakdown = `1 Solo`;
+    } else if (soloCount === 2) {
+      performanceFee = solo2Fee;
+      breakdown = `2 Solos Package`;
+    } else if (soloCount === 3) {
+      performanceFee = solo3Fee;
+      breakdown = `3 Solos Package`;
+    } else if (soloCount > 3) {
+      // More than 3 solos: use 3-solo package + additional solos
+      performanceFee = solo3Fee + ((soloCount - 3) * soloAdditionalFee);
+      breakdown = `3 Solos Package + ${soloCount - 3} Additional Solo${soloCount - 3 > 1 ? 's' : ''}`;
     }
   } else if (performanceType === 'Duet' || performanceType === 'Trio') {
-    // Duos/trios: R200 per person
-    const feePerPerson = EODSA_FEES.PERFORMANCE.Duet;
-    performanceFee = feePerPerson * numberOfParticipants;
-    breakdown = `${performanceType} (R${feePerPerson} × ${numberOfParticipants} dancers)`;
+    // Duos/trios: per person fee
+    performanceFee = duoTrioFee * numberOfParticipants;
+    breakdown = `${performanceType} (${currency}${duoTrioFee} × ${numberOfParticipants} dancers)`;
   } else if (performanceType === 'Group') {
-    // Groups: R180 per person
-    const feePerPerson = EODSA_FEES.PERFORMANCE.SmallGroup;
-    performanceFee = feePerPerson * numberOfParticipants;
-    breakdown = `Group (R${feePerPerson} × ${numberOfParticipants} dancers)`;
+    // Groups: per person fee
+    performanceFee = groupFee * numberOfParticipants;
+    breakdown = `Group (${currency}${groupFee} × ${numberOfParticipants} dancers)`;
   }
   
   const totalFee = registrationFee + performanceFee;
@@ -490,7 +514,8 @@ export const calculateEODSAFee = (
     performanceFee,
     totalFee,
     breakdown,
-    registrationBreakdown
+    registrationBreakdown,
+    currency
   };
 };
 
