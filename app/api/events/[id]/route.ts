@@ -121,39 +121,60 @@ export async function PUT(
       }
     }
 
-    // Build update object for each field
+    // Build update object for each field with proper camelCase to snake_case conversion
     const updates: Record<string, any> = {};
+    
+    // Manual mapping for fee fields to ensure correct snake_case conversion
+    const fieldMapping: Record<string, string> = {
+      'registrationFeePerDancer': 'registration_fee_per_dancer',
+      'solo1Fee': 'solo_1_fee',
+      'solo2Fee': 'solo_2_fee',
+      'solo3Fee': 'solo_3_fee',
+      'soloAdditionalFee': 'solo_additional_fee',
+      'duoTrioFeePerDancer': 'duo_trio_fee_per_dancer',
+      'groupFeePerDancer': 'group_fee_per_dancer',
+      'largeGroupFeePerDancer': 'large_group_fee_per_dancer',
+    };
+    
     Object.entries(updateData).forEach(([key, value]) => {
-      const dbField = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      // Use manual mapping if available, otherwise use regex conversion
+      const dbField = fieldMapping[key] || key.replace(/([A-Z])/g, '_$1').toLowerCase();
       updates[dbField] = value;
     });
 
+    console.log('📝 Update data received:', updateData);
+    console.log('🔄 Converted to DB fields:', updates);
+    console.log('🔍 Fee fields specifically:');
+    console.log('  - solo1Fee (received):', updateData.solo1Fee, 'type:', typeof updateData.solo1Fee);
+    console.log('  - solo_1_fee (converted):', updates.solo_1_fee, 'type:', typeof updates.solo_1_fee);
+
     // Execute single update query with all fields that match database schema
+    // Use !== undefined to allow 0 values
     const updatedEvent = await sql`
       UPDATE events 
       SET 
-        name = COALESCE(${updates.name || null}, name),
-        description = COALESCE(${updates.description || null}, description),
-        region = COALESCE(${updates.region || null}, region),
-        age_category = COALESCE(${updates.age_category || null}, age_category),
-        performance_type = COALESCE(${updates.performance_type || null}, performance_type),
-        event_date = COALESCE(${updates.event_date || null}, event_date),
-        event_end_date = COALESCE(${updates.event_end_date || null}, event_end_date),
-        registration_deadline = COALESCE(${updates.registration_deadline || null}, registration_deadline),
-        venue = COALESCE(${updates.venue || null}, venue),
-        status = COALESCE(${updates.status || null}, status),
-        max_participants = COALESCE(${updates.max_participants || null}, max_participants),
-        entry_fee = COALESCE(${updates.entry_fee || null}, entry_fee),
-        payment_required = COALESCE(${updates.payment_required || null}, payment_required),
-        registration_fee_per_dancer = COALESCE(${updates.registration_fee_per_dancer || null}, registration_fee_per_dancer),
-        solo_1_fee = COALESCE(${updates.solo_1_fee || null}, solo_1_fee),
-        solo_2_fee = COALESCE(${updates.solo_2_fee || null}, solo_2_fee),
-        solo_3_fee = COALESCE(${updates.solo_3_fee || null}, solo_3_fee),
-        solo_additional_fee = COALESCE(${updates.solo_additional_fee || null}, solo_additional_fee),
-        duo_trio_fee_per_dancer = COALESCE(${updates.duo_trio_fee_per_dancer || null}, duo_trio_fee_per_dancer),
-        group_fee_per_dancer = COALESCE(${updates.group_fee_per_dancer || null}, group_fee_per_dancer),
-        large_group_fee_per_dancer = COALESCE(${updates.large_group_fee_per_dancer || null}, large_group_fee_per_dancer),
-        currency = COALESCE(${updates.currency || null}, currency)
+        name = COALESCE(${updates.name !== undefined ? updates.name : null}, name),
+        description = COALESCE(${updates.description !== undefined ? updates.description : null}, description),
+        region = COALESCE(${updates.region !== undefined ? updates.region : null}, region),
+        age_category = COALESCE(${updates.age_category !== undefined ? updates.age_category : null}, age_category),
+        performance_type = COALESCE(${updates.performance_type !== undefined ? updates.performance_type : null}, performance_type),
+        event_date = COALESCE(${updates.event_date !== undefined ? updates.event_date : null}, event_date),
+        event_end_date = COALESCE(${updates.event_end_date !== undefined ? updates.event_end_date : null}, event_end_date),
+        registration_deadline = COALESCE(${updates.registration_deadline !== undefined ? updates.registration_deadline : null}, registration_deadline),
+        venue = COALESCE(${updates.venue !== undefined ? updates.venue : null}, venue),
+        status = COALESCE(${updates.status !== undefined ? updates.status : null}, status),
+        max_participants = COALESCE(${updates.max_participants !== undefined ? updates.max_participants : null}, max_participants),
+        entry_fee = COALESCE(${updates.entry_fee !== undefined ? updates.entry_fee : null}, entry_fee),
+        payment_required = COALESCE(${updates.payment_required !== undefined ? updates.payment_required : null}, payment_required),
+        registration_fee_per_dancer = COALESCE(${updates.registration_fee_per_dancer !== undefined ? updates.registration_fee_per_dancer : null}, registration_fee_per_dancer),
+        solo_1_fee = COALESCE(${updates.solo_1_fee !== undefined ? updates.solo_1_fee : null}, solo_1_fee),
+        solo_2_fee = COALESCE(${updates.solo_2_fee !== undefined ? updates.solo_2_fee : null}, solo_2_fee),
+        solo_3_fee = COALESCE(${updates.solo_3_fee !== undefined ? updates.solo_3_fee : null}, solo_3_fee),
+        solo_additional_fee = COALESCE(${updates.solo_additional_fee !== undefined ? updates.solo_additional_fee : null}, solo_additional_fee),
+        duo_trio_fee_per_dancer = COALESCE(${updates.duo_trio_fee_per_dancer !== undefined ? updates.duo_trio_fee_per_dancer : null}, duo_trio_fee_per_dancer),
+        group_fee_per_dancer = COALESCE(${updates.group_fee_per_dancer !== undefined ? updates.group_fee_per_dancer : null}, group_fee_per_dancer),
+        large_group_fee_per_dancer = COALESCE(${updates.large_group_fee_per_dancer !== undefined ? updates.large_group_fee_per_dancer : null}, large_group_fee_per_dancer),
+        currency = COALESCE(${updates.currency !== undefined ? updates.currency : null}, currency)
       WHERE id = ${eventId}
       RETURNING *
     `;

@@ -1280,6 +1280,18 @@ export default function CompetitionEntryPage() {
   );
 }
 
+  // Helper function to get currency symbol from event
+  const getCurrencySymbol = () => {
+    const currency = event?.currency || 'ZAR';
+    switch (currency) {
+      case 'USD': return '$';
+      case 'EUR': return '€';
+      case 'GBP': return '£';
+      case 'ZAR':
+      default: return 'R';
+    }
+  };
+
   // Calculate fees in real-time
   const feeCalculation = totalFeeCalculation;
 
@@ -1887,22 +1899,22 @@ export default function CompetitionEntryPage() {
                        }`}>
                          {(currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
                            currentForm.participantIds.length > getParticipantLimits(showAddForm).max)
-                           ? 'Invalid'
-                           : (previewFee === 0 ? 'FREE' : `R${previewFee}`)}
-                       </span>
+                          ? 'Invalid'
+                          : (previewFee === 0 ? 'FREE' : `${getCurrencySymbol()}${previewFee}`)}
+                      </span>
                      </div>
                      {showAddForm === 'Solo' && !(
-                       currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
-                       currentForm.participantIds.length > getParticipantLimits(showAddForm).max
-                     ) && (
-                       <div className="text-xs text-slate-400 mt-1">
-                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 0 && '1st Solo: R400'}
-                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 1 && '2nd Solo: R350 (Package: R750 total)'}
-                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 2 && '3rd Solo: R250 (Package: R1000 total)'}
-                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 3 && '4th Solo: R200 (Package: R1200 total)'}
-                         {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) >= 4 && '5th Solo: FREE! (Additional: R100 each)'}
-                       </div>
-                     )}
+                      currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
+                      currentForm.participantIds.length > getParticipantLimits(showAddForm).max
+                    ) && (
+                      <div className="text-xs text-slate-400 mt-1">
+                        {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 0 && `1st Solo: ${getCurrencySymbol()}${event?.solo1Fee || 400}`}
+                        {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 1 && `2nd Solo: ${getCurrencySymbol()}${((event?.solo2Fee || 750) - (event?.solo1Fee || 400))} (Package: ${getCurrencySymbol()}${event?.solo2Fee || 750} total)`}
+                        {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 2 && `3rd Solo: ${getCurrencySymbol()}${((event?.solo3Fee || 1050) - (event?.solo2Fee || 750))} (Package: ${getCurrencySymbol()}${event?.solo3Fee || 1050} total)`}
+                        {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) === 3 && `4th Solo: ${getCurrencySymbol()}${event?.soloAdditionalFee || 100}`}
+                        {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) >= 4 && `5th+ Solo: ${getCurrencySymbol()}${event?.soloAdditionalFee || 100} each`}
+                      </div>
+                    )}
                      {(currentForm.participantIds.length > 0 && (
                        currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
                        currentForm.participantIds.length > getParticipantLimits(showAddForm).max
@@ -1977,7 +1989,7 @@ export default function CompetitionEntryPage() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-lg text-emerald-400">R{entry.fee}</p>
+                          <p className="font-semibold text-lg text-emerald-400">{getCurrencySymbol()}{entry.fee}</p>
                           <button
                             onClick={() => handleRemoveEntry(entry.id)}
                             className="text-red-400 hover:text-red-300 text-sm"
@@ -2004,15 +2016,15 @@ export default function CompetitionEntryPage() {
                    <span>{entries.length}{showAddForm && previewFee > 0 && <span className="text-slate-400"> (+1)</span>}</span>
                  </div>
                  
-                 {/* Pending entry preview */}
-                 {showAddForm && previewFee > 0 && (
-                   <div className="text-xs text-slate-400 bg-slate-700/20 p-2 rounded border border-slate-600/30">
-                     <div className="flex justify-between">
-                       <span>+ Adding {showAddForm}:</span>
-                       <span className="text-emerald-400">R{previewFee}</span>
-                     </div>
-                   </div>
-                 )}
+                {/* Pending entry preview */}
+                {showAddForm && previewFee > 0 && (
+                  <div className="text-xs text-slate-400 bg-slate-700/20 p-2 rounded border border-slate-600/30">
+                    <div className="flex justify-between">
+                      <span>+ Adding {showAddForm}:</span>
+                      <span className="text-emerald-400">{getCurrencySymbol()}{previewFee}</span>
+                    </div>
+                  </div>
+                )}
                  
                  {/* Solo package info */}
                  {(existingDbEntries.filter(e => e.participantIds && e.participantIds.length === 1).length + entries.filter(e => e.performanceType === 'Solo').length) > 0 && (
@@ -2026,11 +2038,11 @@ export default function CompetitionEntryPage() {
                          ✓ Solo package pricing applied
                        </div>
                      )}
-                     {entries.filter(e => e.performanceType === 'Solo').length >= 5 && (
-                       <div className="text-emerald-400">
-                         ✓ 5th solo entry is FREE! (Additional solos R100 each)
-                       </div>
-                     )}
+                    {entries.filter(e => e.performanceType === 'Solo').length >= 4 && (
+                      <div className="text-emerald-400">
+                        ✓ Additional solos: {getCurrencySymbol()}{event?.soloAdditionalFee || 100} each
+                      </div>
+                    )}
                    </div>
                  )}
                  
@@ -2040,39 +2052,39 @@ export default function CompetitionEntryPage() {
                      <span className="text-emerald-300">Calculating fees...</span>
                    </div>
                  ) : (
-                   <>
-                     <div className="flex justify-between">
-                       <span>Performance Fees:</span>
-                       <span>R{feeCalculation.performanceFee}</span>
-                     </div>
-                     <div className="flex justify-between">
-                       <span>Registration Fees:</span>
-                       <span>R{feeCalculation.registrationFee}</span>
-                     </div>
-                   </>
+                  <>
+                    <div className="flex justify-between">
+                      <span>Performance Fees:</span>
+                      <span>{getCurrencySymbol()}{feeCalculation.performanceFee}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Registration Fees:</span>
+                      <span>{getCurrencySymbol()}{feeCalculation.registrationFee}</span>
+                    </div>
+                  </>
                  )}
-                 <div className="text-xs text-slate-400">
-                   ({new Set(entries.flatMap(e => e.participantIds)).size} unique participants × R{event?.registrationFeePerDancer || 300})
-                 </div>
+                <div className="text-xs text-slate-400">
+                  ({new Set(entries.flatMap(e => e.participantIds)).size} unique participants × {getCurrencySymbol()}{event?.registrationFeePerDancer || 300})
+                </div>
                  
                  {/* Preview total with pending entry */}
-                 {showAddForm && previewFee > 0 && (
-                   <div className="border-t border-slate-600/50 pt-2">
-                     <div className="flex justify-between text-sm text-slate-400">
-                       <span>Preview Total:</span>
-                       <span>R{feeCalculation.total + previewFee}</span>
-                     </div>
-                   </div>
-                 )}
-                 
-                 <div className="border-t border-slate-600 pt-2">
-                   <div className="flex justify-between font-semibold text-lg text-emerald-400">
-                     <span>Total:</span>
-                     <span className="transition-all duration-300 transform hover:scale-110">
-                       R{feeCalculation.total}
-                     </span>
-                   </div>
-                 </div>
+                {showAddForm && previewFee > 0 && (
+                  <div className="border-t border-slate-600/50 pt-2">
+                    <div className="flex justify-between text-sm text-slate-400">
+                      <span>Preview Total:</span>
+                      <span>{getCurrencySymbol()}{feeCalculation.total + previewFee}</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="border-t border-slate-600 pt-2">
+                  <div className="flex justify-between font-semibold text-lg text-emerald-400">
+                    <span>Total:</span>
+                    <span className="transition-all duration-300 transform hover:scale-110">
+                      {getCurrencySymbol()}{feeCalculation.total}
+                    </span>
+                  </div>
+                </div>
                </div>
 
               <button
@@ -2171,8 +2183,8 @@ export default function CompetitionEntryPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-300">Total Fee:</span>
-                <span className="text-emerald-400 font-semibold text-lg">R{submissionResult?.totalFee}</span>
-                </div>
+                <span className="text-emerald-400 font-semibold text-lg">{getCurrencySymbol()}{submissionResult?.totalFee}</span>
+              </div>
                 <div className="pt-2 border-t border-slate-600">
                   <p className="text-sm text-slate-300">
                     ✅ All entries qualified for nationals
@@ -2271,7 +2283,7 @@ export default function CompetitionEntryPage() {
                 <div className="text-slate-300 text-sm space-y-2">
                   <div className="flex justify-between">
                     <span>Total Amount:</span>
-                    <span className="text-emerald-400 font-semibold text-lg">R{totalFeeCalculation.total}</span>
+                    <span className="text-emerald-400 font-semibold text-lg">{getCurrencySymbol()}{totalFeeCalculation.total}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Entries:</span>
@@ -2372,7 +2384,7 @@ export default function CompetitionEntryPage() {
                     
                     <div className="bg-emerald-900/30 border border-emerald-500/40 rounded-lg p-3">
                       <div className="text-emerald-300 text-xs uppercase tracking-wide mb-1">Amount</div>
-                      <div className="text-emerald-200 font-bold text-xl">R{totalFeeCalculation.total}</div>
+                      <div className="text-emerald-200 font-bold text-xl">{getCurrencySymbol()}{totalFeeCalculation.total}</div>
                     </div>
                   </div>
                 </div>

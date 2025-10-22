@@ -158,14 +158,14 @@ function AdminDashboard() {
     registrationDeadline: '',
     venue: '',
     entryFee: 0,
-    registrationFeePerDancer: 300,
-    solo1Fee: 400,
-    solo2Fee: 750,
-    solo3Fee: 1050,
-    soloAdditionalFee: 100,
-    duoTrioFeePerDancer: 280,
-    groupFeePerDancer: 220,
-    largeGroupFeePerDancer: 190,
+    registrationFeePerDancer: 0,
+    solo1Fee: 0,
+    solo2Fee: 0,
+    solo3Fee: 0,
+    soloAdditionalFee: 0,
+    duoTrioFeePerDancer: 0,
+    groupFeePerDancer: 0,
+    largeGroupFeePerDancer: 0,
     currency: 'ZAR'
   });
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
@@ -253,15 +253,15 @@ function AdminDashboard() {
     registrationDeadline: '',
     venue: '',
     status: 'upcoming',
-    // Fee configuration fields
-    registrationFeePerDancer: 300,
-    solo1Fee: 400,
-    solo2Fee: 750,
-    solo3Fee: 1050,
-    soloAdditionalFee: 100,
-    duoTrioFeePerDancer: 280,
-    groupFeePerDancer: 220,
-    largeGroupFeePerDancer: 190,
+    // Fee configuration fields - NO HARDCODED DEFAULTS
+    registrationFeePerDancer: 0,
+    solo1Fee: 0,
+    solo2Fee: 0,
+    solo3Fee: 0,
+    soloAdditionalFee: 0,
+    duoTrioFeePerDancer: 0,
+    groupFeePerDancer: 0,
+    largeGroupFeePerDancer: 0,
     currency: 'ZAR'
   });
   const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
@@ -483,14 +483,14 @@ function AdminDashboard() {
           registrationDeadline: '',
           venue: '',
           entryFee: 0,
-          registrationFeePerDancer: 300,
-          solo1Fee: 400,
-          solo2Fee: 750,
-          solo3Fee: 1050,
-          soloAdditionalFee: 100,
-          duoTrioFeePerDancer: 280,
-          groupFeePerDancer: 220,
-          largeGroupFeePerDancer: 190,
+          registrationFeePerDancer: 0,
+          solo1Fee: 0,
+          solo2Fee: 0,
+          solo3Fee: 0,
+          soloAdditionalFee: 0,
+          duoTrioFeePerDancer: 0,
+          groupFeePerDancer: 0,
+          largeGroupFeePerDancer: 0,
           currency: 'ZAR'
         });
         fetchData();
@@ -531,15 +531,15 @@ function AdminDashboard() {
       registrationDeadline: formatDateForInput(event.registrationDeadline), // Format for HTML date input
       venue: event.venue,
       status: event.status,
-      // Include fee configuration
-      registrationFeePerDancer: event.registrationFeePerDancer || 300,
-      solo1Fee: event.solo1Fee || 400,
-      solo2Fee: event.solo2Fee || 750,
-      solo3Fee: event.solo3Fee || 1050,
-      soloAdditionalFee: event.soloAdditionalFee || 100,
-      duoTrioFeePerDancer: event.duoTrioFeePerDancer || 280,
-      groupFeePerDancer: event.groupFeePerDancer || 220,
-      largeGroupFeePerDancer: event.largeGroupFeePerDancer || 190,
+      // Include fee configuration - NO DEFAULTS, show exactly what's in the database
+      registrationFeePerDancer: event.registrationFeePerDancer !== undefined ? event.registrationFeePerDancer : 0,
+      solo1Fee: event.solo1Fee !== undefined ? event.solo1Fee : 0,
+      solo2Fee: event.solo2Fee !== undefined ? event.solo2Fee : 0,
+      solo3Fee: event.solo3Fee !== undefined ? event.solo3Fee : 0,
+      soloAdditionalFee: event.soloAdditionalFee !== undefined ? event.soloAdditionalFee : 0,
+      duoTrioFeePerDancer: event.duoTrioFeePerDancer !== undefined ? event.duoTrioFeePerDancer : 0,
+      groupFeePerDancer: event.groupFeePerDancer !== undefined ? event.groupFeePerDancer : 0,
+      largeGroupFeePerDancer: event.largeGroupFeePerDancer !== undefined ? event.largeGroupFeePerDancer : 0,
       currency: event.currency || 'ZAR'
     });
     setUpdateEventMessage('');
@@ -563,15 +563,19 @@ function AdminDashboard() {
         return;
       }
 
+      const updatePayload = {
+        ...editEventData,
+        adminSession: session
+      };
+      
+      console.log('📤 Sending event update:', updatePayload);
+
       const response = await fetch(`/api/events/${editingEvent.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...editEventData,
-          adminSession: session
-        }),
+        body: JSON.stringify(updatePayload),
       });
 
       const data = await response.json();

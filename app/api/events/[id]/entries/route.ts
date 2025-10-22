@@ -127,19 +127,66 @@ export async function GET(
             const contestant = await db.getContestantById(entry.contestantId);
             if (contestant) {
               console.log(`Found legacy contestant: ${contestant.name} (${contestant.eodsaId})`);
+              
+              // Get SQL client for queries
+              const sqlClient = getSql();
+              
+              // IMPORTANT FIX: Try to get studio from participants instead of contestant
+              // Look up each participant in dancers table with studio_applications join
+              const participantDetails = await Promise.all(
+                entry.participantIds.map(async (participantId) => {
+                  try {
+                    // Try to find dancer with studio info
+                    const dancerRows = await sqlClient`
+                      SELECT 
+                        d.id,
+                        d.name,
+                        d.eodsa_id,
+                        s.id as studio_id,
+                        s.name as studio_name,
+                        s.email as studio_email
+                      FROM dancers d
+                      LEFT JOIN studio_applications sa ON d.id = sa.dancer_id AND sa.status = 'accepted'
+                      LEFT JOIN studios s ON sa.studio_id = s.id
+                      WHERE d.id = ${participantId}
+                    ` as any[];
+                    
+                    if (dancerRows.length > 0) {
+                      return {
+                        name: dancerRows[0].name,
+                        studioName: dancerRows[0].studio_name || null,
+                        studioId: dancerRows[0].studio_id || null,
+                        studioEmail: dancerRows[0].studio_email || null
+                      };
+                    }
+                  } catch (error) {
+                    console.error(`Error fetching participant ${participantId}:`, error);
+                  }
+                  
+                  // Fallback to contestant dancers
+                  const dancer = contestant.dancers.find(d => d.id === participantId);
+                  return {
+                    name: dancer?.name || 'Unknown Dancer',
+                    studioName: null,
+                    studioId: null,
+                    studioEmail: null
+                  };
+                })
+              );
+              
+              // Get studio name from first participant with studio info
+              const studioInfo = participantDetails.find(p => p.studioName);
+              
               return {
                 ...entry,
                 contestantName: contestant.name,
                 contestantEmail: contestant.email || '',
-                participantNames: entry.participantIds.map(id => {
-                  const dancer = contestant.dancers.find(d => d.id === id);
-                  return dancer?.name || 'Unknown Dancer';
-                }),
-                // Legacy system - studio info may not be available
-                studioName: 'Legacy Entry',
-                studioId: null,
-                studioEmail: null,
-                participantStudios: entry.participantIds.map(() => 'Legacy Entry'),
+                participantNames: participantDetails.map(p => p.name),
+                // Use studio from participants if available, otherwise "Independent"
+                studioName: studioInfo?.studioName || 'Independent',
+                studioId: studioInfo?.studioId || null,
+                studioEmail: studioInfo?.studioEmail || null,
+                participantStudios: participantDetails.map(p => p.studioName || 'Independent'),
                 computedAgeCategory
               };
             } else {

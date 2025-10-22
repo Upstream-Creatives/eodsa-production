@@ -21,6 +21,15 @@ interface Event {
   status: string;
   maxParticipants?: number;
   entryFee: number;
+  registrationFeePerDancer?: number;
+  solo1Fee?: number;
+  solo2Fee?: number;
+  solo3Fee?: number;
+  soloAdditionalFee?: number;
+  duoTrioFeePerDancer?: number;
+  groupFeePerDancer?: number;
+  largeGroupFeePerDancer?: number;
+  currency?: string;
 }
 
 interface Contestant {
@@ -135,6 +144,18 @@ export default function PerformanceTypeEntryPage() {
 
   // Create a dynamic query parameter for authentication
   const authQueryParam = isStudioMode ? `studioId=${studioId}` : `eodsaId=${eodsaId}`;
+
+  // Helper function to get currency symbol from selected event
+  const getCurrencySymbol = () => {
+    const currency = selectedEvent?.currency || 'ZAR';
+    switch (currency) {
+      case 'USD': return '$';
+      case 'EUR': return '€';
+      case 'GBP': return '£';
+      case 'ZAR':
+      default: return 'R';
+    }
+  };
 
   // Skip validation entirely if studio mode, otherwise require eodsaId or allowEmptyStart
   if (!region || !performanceType || (!eodsaId && !studioId && !allowEmptyStart)) {
@@ -1963,16 +1984,16 @@ export default function PerformanceTypeEntryPage() {
                         <div className="space-y-3">
                           <div className="flex justify-between text-purple-200 text-lg">
                             <span>{feeBreakdown.registrationBreakdown || `Registration Fee (${formData.participantIds.length} dancers)`}</span>
-                            <span className="font-semibold">R{feeBreakdown.registrationFee.toFixed(2)}</span>
+                            <span className="font-semibold">{getCurrencySymbol()}{feeBreakdown.registrationFee.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-purple-200 text-lg">
                             <span>{`Performance Fee (${feeBreakdown.breakdown})`}</span>
-                            <span className="font-semibold">R{feeBreakdown.performanceFee.toFixed(2)}</span>
+                            <span className="font-semibold">{getCurrencySymbol()}{feeBreakdown.performanceFee.toFixed(2)}</span>
                           </div>
                           <div className="border-t border-purple-400/30 pt-3 mt-4">
                             <div className="flex justify-between items-center">
                               <span className="text-2xl font-bold text-purple-100">Total Amount Due:</span>
-                              <span className="text-3xl font-bold text-green-300">R{feeBreakdown.totalFee.toFixed(2)}</span>
+                              <span className="text-3xl font-bold text-green-300">{getCurrencySymbol()}{feeBreakdown.totalFee.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
