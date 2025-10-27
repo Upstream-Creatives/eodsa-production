@@ -1797,7 +1797,7 @@ export default function StudioDashboardPage() {
                     };
 
                     const getMedalColor = (total: number) => {
-                      if (total < 69) return 'text-orange-400'; // Bronze
+                      if (total <= 69) return 'text-orange-400'; // Bronze
                       if (total >= 70 && total <= 74) return 'text-gray-300'; // Silver
                       if (total >= 75 && total <= 79) return 'text-slate-300'; // Silver+
                       if (total >= 80 && total <= 84) return 'text-yellow-400'; // Gold
@@ -1807,7 +1807,7 @@ export default function StudioDashboardPage() {
                     };
 
                     const getMedalName = (total: number) => {
-                      if (total < 69) return 'Bronze';
+                      if (total <= 69) return 'Bronze';
                       if (total >= 70 && total <= 74) return 'Silver';
                       if (total >= 75 && total <= 79) return 'Silver+';
                       if (total >= 80 && total <= 84) return 'Gold';

@@ -190,10 +190,13 @@ export default function ScoringApprovalPage() {
 
   const getMedalColor = (medal: string) => {
     const colors: Record<string, string> = {
-      'Legend': 'from-purple-500 to-pink-500',
-      'Gold': 'from-yellow-400 to-yellow-600',
-      'Silver': 'from-gray-300 to-gray-500',
-      'Bronze': 'from-orange-400 to-orange-600',
+      'Elite': 'from-yellow-600 to-yellow-800',
+      'Opus': 'from-yellow-500 to-yellow-700',
+      'Legend': 'from-yellow-400 to-yellow-600',
+      'Gold': 'from-yellow-300 to-yellow-500',
+      'Silver+': 'from-slate-300 to-slate-500',
+      'Silver': 'from-gray-400 to-gray-600',
+      'Bronze': 'from-amber-500 to-amber-700',
     };
     return colors[medal] || 'from-gray-400 to-gray-600';
   };

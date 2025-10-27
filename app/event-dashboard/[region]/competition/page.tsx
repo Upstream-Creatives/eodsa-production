@@ -1654,9 +1654,12 @@ export default function CompetitionEntryPage() {
                       <button
                         type="button"
                         onClick={() => setCurrentForm({...currentForm, entryType: 'live', videoExternalUrl: '', musicFileUrl: currentForm.entryType === 'virtual' ? '' : currentForm.musicFileUrl})}
+                        disabled={event?.participationMode === 'virtual'}
                         className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] min-h-[100px] sm:min-h-[120px] ${
                           currentForm.entryType === 'live'
                             ? 'border-purple-500 bg-purple-500/20 text-purple-300 ring-2 ring-purple-500/30 shadow-lg shadow-purple-500/25'
+                            : event?.participationMode === 'virtual'
+                            ? 'border-slate-700 bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
                             : 'border-slate-600 bg-slate-700/30 text-slate-400 hover:border-purple-400 hover:bg-purple-500/10'
                         }`}
                       >
@@ -1664,7 +1667,7 @@ export default function CompetitionEntryPage() {
                           <span className="text-3xl">🎵</span>
                           <span className="font-semibold text-base">Live Performance</span>
                           <span className="text-xs text-center opacity-90 leading-relaxed">
-                            Upload music file for in-person performance
+                            {event?.participationMode === 'virtual' ? 'Not available for this event' : 'Upload music file for in-person performance'}
                           </span>
                         </div>
                       </button>
@@ -1672,9 +1675,12 @@ export default function CompetitionEntryPage() {
                       <button
                         type="button"
                         onClick={() => setCurrentForm({...currentForm, entryType: 'virtual', musicFileUrl: '', musicFileName: ''})}
+                        disabled={event?.participationMode === 'live'}
                         className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] min-h-[100px] sm:min-h-[120px] ${
                           currentForm.entryType === 'virtual'
                             ? 'border-purple-500 bg-purple-500/20 text-purple-300 ring-2 ring-purple-500/30 shadow-lg shadow-purple-500/25'
+                            : event?.participationMode === 'live'
+                            ? 'border-slate-700 bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
                             : 'border-slate-600 bg-slate-700/30 text-slate-400 hover:border-purple-400 hover:bg-purple-500/10'
                         }`}
                       >
@@ -1682,11 +1688,25 @@ export default function CompetitionEntryPage() {
                           <span className="text-3xl">📹</span>
                           <span className="font-semibold text-base">Virtual Performance</span>
                           <span className="text-xs text-center opacity-90 leading-relaxed">
-                            Submit video URL (YouTube/Vimeo)
+                            {event?.participationMode === 'live' ? 'Not available for this event' : 'Submit video URL (YouTube/Vimeo)'}
                           </span>
                         </div>
                       </button>
                     </div>
+                    {event?.participationMode === 'virtual' && (
+                      <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-sm text-blue-300">
+                          ℹ️ <strong>Virtual Event:</strong> This event only accepts video submissions. Live performances are not available.
+                        </p>
+                      </div>
+                    )}
+                    {event?.participationMode === 'live' && (
+                      <div className="mt-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                        <p className="text-sm text-purple-300">
+                          ℹ️ <strong>Live Event:</strong> This event only accepts live in-person performances. Virtual submissions are not available.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Conditional Fields Based on Entry Type */}

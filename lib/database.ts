@@ -70,6 +70,9 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS group_fee_per_dancer DECIMAL(10,2) DEFAULT 220`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS large_group_fee_per_dancer DECIMAL(10,2) DEFAULT 190`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'ZAR'`;
+    
+    // Add participation mode column to events table (live, virtual, or hybrid)
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS participation_mode TEXT DEFAULT 'hybrid' CHECK (participation_mode IN ('live', 'virtual', 'hybrid'))`;
 
     // Phase 2: Virtual entry support columns
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS entry_type TEXT DEFAULT 'live'`;
@@ -101,8 +104,20 @@ export const initializeDatabase = async () => {
     // Fix performance type constraint to allow 'All' - FORCE UPDATE
     try {
       console.log('🔧 Updating performance type constraint...');
-      await sqlClient`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_performance_type_check`;
-      await sqlClient`ALTER TABLE events ADD CONSTRAINT events_performance_type_check CHECK (performance_type IN ('Solo', 'Duet', 'Trio', 'Group', 'All'))`;
+      await sqlClient`
+        DO $$ 
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'events_performance_type_check'
+          ) THEN
+            ALTER TABLE events DROP CONSTRAINT events_performance_type_check;
+          END IF;
+          
+          ALTER TABLE events ADD CONSTRAINT events_performance_type_check 
+            CHECK (performance_type IN ('Solo', 'Duet', 'Trio', 'Group', 'All'));
+        END $$;
+      `;
       console.log('✅ Performance type constraint updated successfully');
     } catch (error) {
       console.error('❌ Error updating performance type constraint:', error);
@@ -111,8 +126,20 @@ export const initializeDatabase = async () => {
     // Fix payment method constraint to allow 'eft' - FORCE UPDATE
     try {
       console.log('🔧 Updating payment method constraint...');
-      await sqlClient`ALTER TABLE event_entries DROP CONSTRAINT IF EXISTS event_entries_payment_method_check`;
-      await sqlClient`ALTER TABLE event_entries ADD CONSTRAINT event_entries_payment_method_check CHECK (payment_method IN ('credit_card', 'bank_transfer', 'invoice', 'payfast', 'eft'))`;
+      await sqlClient`
+        DO $$ 
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'event_entries_payment_method_check'
+          ) THEN
+            ALTER TABLE event_entries DROP CONSTRAINT event_entries_payment_method_check;
+          END IF;
+          
+          ALTER TABLE event_entries ADD CONSTRAINT event_entries_payment_method_check 
+            CHECK (payment_method IN ('credit_card', 'bank_transfer', 'invoice', 'payfast', 'eft'));
+        END $$;
+      `;
       console.log('✅ Payment method constraint updated successfully');
     } catch (error) {
       console.error('❌ Error updating payment method constraint:', error);
@@ -2106,7 +2133,8 @@ export const db = {
       duoTrioFeePerDancer: row.duo_trio_fee_per_dancer != null ? parseFloat(row.duo_trio_fee_per_dancer) : 280,
       groupFeePerDancer: row.group_fee_per_dancer != null ? parseFloat(row.group_fee_per_dancer) : 220,
       largeGroupFeePerDancer: row.large_group_fee_per_dancer != null ? parseFloat(row.large_group_fee_per_dancer) : 190,
-      currency: row.currency || 'ZAR'
+      currency: row.currency || 'ZAR',
+      participationMode: row.participation_mode || 'hybrid'
     } as Event;
   },
 

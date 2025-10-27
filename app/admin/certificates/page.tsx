@@ -618,7 +618,11 @@ export default function AdminCertificatesPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              getMedalFromPercentage(ranking.averageScore).label === 'Elite' ? 'bg-yellow-100 text-yellow-900' :
+                              getMedalFromPercentage(ranking.averageScore).label === 'Opus' ? 'bg-yellow-100 text-yellow-800' :
+                              getMedalFromPercentage(ranking.averageScore).label === 'Legend' ? 'bg-yellow-50 text-yellow-700' :
                               getMedalFromPercentage(ranking.averageScore).label === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
+                              getMedalFromPercentage(ranking.averageScore).label === 'Silver+' ? 'bg-slate-100 text-slate-800' :
                               getMedalFromPercentage(ranking.averageScore).label === 'Silver' ? 'bg-gray-100 text-gray-800' :
                               getMedalFromPercentage(ranking.averageScore).label === 'Bronze' ? 'bg-orange-100 text-orange-800' :
                               'bg-blue-100 text-blue-800'

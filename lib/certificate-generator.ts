@@ -138,10 +138,14 @@ export function generateCertificateHTML(data: CertificateData): string {
 /**
  * Get medal type from percentage score
  */
-export function getMedalFromPercentage(percentage: number): 'Gold' | 'Silver' | 'Bronze' | '' {
-  if (percentage >= 85) return 'Gold';
-  if (percentage >= 75) return 'Silver';
-  if (percentage >= 65) return 'Bronze';
+export function getMedalFromPercentage(percentage: number): 'Elite' | 'Opus' | 'Legend' | 'Gold' | 'Silver+' | 'Silver' | 'Bronze' | '' {
+  if (percentage >= 95) return 'Elite';
+  if (percentage >= 90) return 'Opus';
+  if (percentage >= 85) return 'Legend';
+  if (percentage >= 80) return 'Gold';
+  if (percentage >= 75) return 'Silver+';
+  if (percentage >= 70) return 'Silver';
+  if (percentage <= 69) return 'Bronze';
   return '';
 }
 

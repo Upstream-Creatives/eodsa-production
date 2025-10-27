@@ -88,6 +88,8 @@ export interface Event {
   groupFeePerDancer?: number;
   largeGroupFeePerDancer?: number;
   currency?: string;
+  // NEW: Participation mode - determines what types of entries are allowed
+  participationMode?: 'live' | 'virtual' | 'hybrid'; // live = only live entries, virtual = only virtual entries, hybrid = both allowed
 }
 
 export interface EventEntry {
@@ -552,7 +554,7 @@ export interface MedalInfo {
 }
 
 export const getMedalFromPercentage = (percentage: number): MedalInfo => {
-  if (percentage < 69) {
+  if (percentage <= 69) {
     return {
       type: 'bronze',
       label: 'Bronze',
