@@ -834,7 +834,7 @@ export const db = {
     const result = await sqlClient`
       SELECT p.*, c.name as contestant_name 
       FROM performances p 
-      JOIN contestants c ON p.contestant_id = c.id 
+      LEFT JOIN contestants c ON p.contestant_id = c.id 
       ORDER BY p.scheduled_time ASC
     ` as any[];
     
@@ -865,7 +865,7 @@ export const db = {
     const result = await sqlClient`
       SELECT p.*, c.name as contestant_name 
       FROM performances p 
-      JOIN contestants c ON p.contestant_id = c.id 
+      LEFT JOIN contestants c ON p.contestant_id = c.id 
       WHERE p.id = ${performanceId}
     ` as any[];
     
@@ -1173,7 +1173,7 @@ export const db = {
               COUNT(s.id) as judge_count
             FROM performances p
             JOIN events e ON p.event_id = e.id
-            JOIN contestants c ON p.contestant_id = c.id
+            LEFT JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
             LEFT JOIN scores s ON p.id = s.performance_id
             WHERE e.id = ${eventId} AND p.scores_published = true
@@ -1257,12 +1257,12 @@ export const db = {
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
               COUNT(s.id) as judge_count
-            FROM performances p
-            JOIN events e ON p.event_id = e.id
-            JOIN contestants c ON p.contestant_id = c.id
-            LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
-            LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType} AND p.scores_published = true
+              FROM performances p
+              JOIN events e ON p.event_id = e.id
+              LEFT JOIN contestants c ON p.contestant_id = c.id
+              LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
+              LEFT JOIN scores s ON p.id = s.performance_id
+              WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType} AND p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
@@ -1291,12 +1291,12 @@ export const db = {
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
               COUNT(s.id) as judge_count
-            FROM performances p
-            JOIN events e ON p.event_id = e.id
-            JOIN contestants c ON p.contestant_id = c.id
-            LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
-            LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND p.scores_published = true
+              FROM performances p
+              JOIN events e ON p.event_id = e.id
+              LEFT JOIN contestants c ON p.contestant_id = c.id
+              LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
+              LEFT JOIN scores s ON p.id = s.performance_id
+              WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
@@ -1325,12 +1325,12 @@ export const db = {
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
               COUNT(s.id) as judge_count
-            FROM performances p
-            JOIN events e ON p.event_id = e.id
-            JOIN contestants c ON p.contestant_id = c.id
-            LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
-            LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE e.region = ${region} AND p.scores_published = true
+              FROM performances p
+              JOIN events e ON p.event_id = e.id
+              LEFT JOIN contestants c ON p.contestant_id = c.id
+              LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
+              LEFT JOIN scores s ON p.id = s.performance_id
+              WHERE e.region = ${region} AND p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, e.performance_type, total_score DESC
@@ -1368,12 +1368,12 @@ export const db = {
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
               AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
               COUNT(s.id) as judge_count
-            FROM performances p
-            JOIN events e ON p.event_id = e.id
-            JOIN contestants c ON p.contestant_id = c.id
-            LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
-            LEFT JOIN scores s ON p.id = s.performance_id
-            WHERE p.scores_published = true
+              FROM performances p
+              JOIN events e ON p.event_id = e.id
+              LEFT JOIN contestants c ON p.contestant_id = c.id
+              LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
+              LEFT JOIN scores s ON p.id = s.performance_id
+              WHERE p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, ee.performance_type, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
             ORDER BY e.region, e.age_category, performance_type, total_score DESC

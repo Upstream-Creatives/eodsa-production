@@ -61,10 +61,46 @@ export async function PATCH(
           entry.participantIds.forEach((_, i) => participantNames.push(`Participant ${i + 1}`));
         }
 
+        // CRITICAL FIX: Validate contestant_id exists before creating performance
+        let validContestantId = entry.contestantId;
+        try {
+          const { getSql } = await import('@/lib/database');
+          const sqlClient = getSql();
+          
+          // Check if contestant exists
+          const contestantCheck = await sqlClient`
+            SELECT id FROM contestants WHERE id = ${entry.contestantId}
+          ` as any[];
+          
+          if (contestantCheck.length === 0) {
+            console.warn(`⚠️  Contestant ${entry.contestantId} doesn't exist, using first participant as contestant`);
+            
+            // Try to use first participant as contestant
+            if (entry.participantIds && entry.participantIds.length > 0) {
+              const firstParticipant = entry.participantIds[0];
+              
+              // Check if participant is a dancer
+              const dancerCheck = await sqlClient`
+                SELECT id FROM dancers WHERE id = ${firstParticipant} OR eodsa_id = ${firstParticipant}
+              ` as any[];
+              
+              if (dancerCheck.length > 0) {
+                validContestantId = dancerCheck[0].id;
+                console.log(`✅ Using dancer ID as contestant: ${validContestantId}`);
+              } else {
+                // Use entry contestant_id anyway and let it fail with proper error
+                console.error(`❌ Cannot find valid contestant for entry ${entryId}`);
+              }
+            }
+          }
+        } catch (checkErr) {
+          console.error('Error checking contestant:', checkErr);
+        }
+
         await db.createPerformance({
           eventId: entry.eventId,
           eventEntryId: entryId,
-          contestantId: entry.contestantId,
+          contestantId: validContestantId,
           title: entry.itemName,
           participantNames,
           duration: entry.estimatedDuration || 0,
@@ -85,8 +121,10 @@ export async function PATCH(
         console.log(`ℹ️  Performance already exists for entry: ${entryId}`);
       }
     } catch (perfErr) {
-      console.error('⚠️  Failed to auto-create performance for entry', entryId, perfErr);
+      console.error('⚠️  Failed to auto-create performance for entry', entryId);
+      console.error('Error details:', perfErr);
       // Don't fail the approval if performance creation fails
+      // But log it prominently so we can investigate
     }
 
     // Auto-mark registration fees as paid for all participants since entry is now paid
