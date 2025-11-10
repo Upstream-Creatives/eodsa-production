@@ -103,6 +103,8 @@ export default function StudioDashboardPage() {
   const [activeTab, setActiveTab] = useState<'dancers' | 'entries' | 'music' | 'video' | 'scores'>('dancers');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [events, setEvents] = useState<Array<{id: string; name: string}>>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
   const [showAddDancerModal, setShowAddDancerModal] = useState(false);
   const [addDancerEodsaId, setAddDancerEodsaId] = useState('');
   const [addingDancer, setAddingDancer] = useState(false);
@@ -191,7 +193,22 @@ export default function StudioDashboardPage() {
     const parsedSession = JSON.parse(session);
     setStudioSession(parsedSession);
     loadData(parsedSession.id);
+    loadEvents();
   }, [router]);
+
+  const loadEvents = async () => {
+    try {
+      const response = await fetch('/api/events');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setEvents(data.events.map((e: any) => ({ id: e.id, name: e.name })));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  };
 
   // Cleanup timeout on component unmount
   useEffect(() => {
@@ -791,10 +808,31 @@ export default function StudioDashboardPage() {
     return uniqueEvents.size;
   };
 
+  // Filter data by selected event
+  const getFilteredEntries = () => {
+    if (selectedEventId === 'all') return competitionEntries;
+    return competitionEntries.filter(entry => entry.eventId === selectedEventId);
+  };
+
+  const getFilteredMusicEntries = () => {
+    if (selectedEventId === 'all') return musicEntries;
+    return musicEntries.filter(entry => entry.eventId === selectedEventId);
+  };
+
+  const getFilteredVideoEntries = () => {
+    if (selectedEventId === 'all') return videoEntries;
+    return videoEntries.filter(entry => entry.eventId === selectedEventId);
+  };
+
+  const getFilteredScores = () => {
+    if (selectedEventId === 'all') return scores;
+    return scores.filter(score => score.eventId === selectedEventId);
+  };
+
   // Reset pagination when search/filters change
   useEffect(() => {
     resetPagination();
-  }, [dancerSearchQuery, ageFilter, recentFilter, sortBy, sortOrder]);
+  }, [dancerSearchQuery, ageFilter, recentFilter, sortBy, sortOrder, selectedEventId]);
 
   const getFilteredAndSortedDancers = () => {
     let filtered = acceptedDancers;
@@ -1051,7 +1089,7 @@ export default function StudioDashboardPage() {
                   : 'text-gray-300 hover:text-white hover:bg-gray-700'
               }`}
             >
-              My Entries ({stats.totalEntries})
+              My Entries ({getFilteredEntries().length}{selectedEventId !== 'all' ? `/${competitionEntries.length}` : ''})
             </button>
             <button
               onClick={() => setActiveTab('music')}
@@ -1061,7 +1099,7 @@ export default function StudioDashboardPage() {
                   : 'text-gray-300 hover:text-white hover:bg-gray-700'
               }`}
             >
-              🎵 Music Uploads ({musicEntries.length})
+              🎵 Music Uploads ({getFilteredMusicEntries().length}{selectedEventId !== 'all' ? `/${musicEntries.length}` : ''})
             </button>
             <button
               onClick={() => setActiveTab('video')}
@@ -1071,7 +1109,7 @@ export default function StudioDashboardPage() {
                   : 'text-gray-300 hover:text-white hover:bg-gray-700'
               }`}
             >
-              📹 Video Uploads ({videoEntries.length})
+              📹 Video Uploads ({getFilteredVideoEntries().length}{selectedEventId !== 'all' ? `/${videoEntries.length}` : ''})
             </button>
             <button
               onClick={() => setActiveTab('scores')}
@@ -1081,7 +1119,7 @@ export default function StudioDashboardPage() {
                   : 'text-gray-300 hover:text-white hover:bg-gray-700'
               }`}
             >
-              🏅 Scores {scores.length > 0 && `(${scores.length})`}
+              🏅 Scores ({getFilteredScores().length}{selectedEventId !== 'all' ? `/${scores.length}` : ''})
             </button>
           </div>
         </div>
@@ -1392,36 +1430,56 @@ export default function StudioDashboardPage() {
         {activeTab === 'entries' && (
           <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
             <div className="p-6 border-b border-gray-700">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
                   <h3 className="text-xl font-bold text-white">Competition Entries</h3>
                   <p className="text-gray-400 text-sm mt-1">View and manage competition entries for your dancers</p>
                 </div>
-                <Link
-                  href={`/event-dashboard?studioId=${studioSession?.id}`}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span>Add New Entry</span>
-                </Link>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedEventId}
+                    onChange={(e) => setSelectedEventId(e.target.value)}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="all">All Events</option>
+                    {events.map(event => (
+                      <option key={event.id} value={event.id}>{event.name}</option>
+                    ))}
+                  </select>
+                  <Link
+                    href={`/event-dashboard?studioId=${studioSession?.id}`}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <span>Add New Entry</span>
+                  </Link>
+                </div>
               </div>
             </div>
 
-            {competitionEntries.length === 0 ? (
+            {getFilteredEntries().length === 0 ? (
               <div className="p-8 text-center">
                 <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <p className="text-gray-400 mb-2">No competition entries yet</p>
-                <p className="text-gray-500 text-sm">Start entering your dancers into competitions to see entries here</p>
+                <p className="text-gray-400 mb-2">
+                  {competitionEntries.length === 0 
+                    ? 'No competition entries yet' 
+                    : 'No entries found for selected event'}
+                </p>
+                <p className="text-gray-500 text-sm">
+                  {competitionEntries.length === 0 
+                    ? 'Start entering your dancers into competitions to see entries here'
+                    : 'Change the event filter to see entries from other events.'}
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-gray-700">
-                {competitionEntries.map((entry) => (
+                {getFilteredEntries().map((entry) => (
                   <div key={entry.id} className="p-6 hover:bg-gray-700/30 transition-colors">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -1499,12 +1557,22 @@ export default function StudioDashboardPage() {
         {activeTab === 'music' && (
           <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
             <div className="p-6 border-b border-gray-700">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
                   <h3 className="text-xl font-bold text-white">🎵 Music Uploads</h3>
                   <p className="text-gray-400 text-sm mt-1">Upload music files for your dancers' live performance entries</p>
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedEventId}
+                    onChange={(e) => setSelectedEventId(e.target.value)}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="all">All Events</option>
+                    {events.map(event => (
+                      <option key={event.id} value={event.id}>{event.name}</option>
+                    ))}
+                  </select>
                   <span className="inline-flex items-center px-2 py-1 bg-blue-900/30 text-blue-300 rounded-full text-xs">
                     💡 Studio managers can upload music on behalf of dancers
                   </span>
@@ -1512,19 +1580,27 @@ export default function StudioDashboardPage() {
               </div>
             </div>
 
-            {musicEntries.length === 0 ? (
+            {getFilteredMusicEntries().length === 0 ? (
               <div className="p-8 text-center">
                 <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                   </svg>
                 </div>
-                <p className="text-gray-400 mb-2">All entries have music uploaded</p>
-                <p className="text-gray-500 text-sm">Live performance entries that need music files will appear here</p>
+                <p className="text-gray-400 mb-2">
+                  {musicEntries.length === 0 
+                    ? 'All entries have music uploaded' 
+                    : 'No music uploads required for selected event'}
+                </p>
+                <p className="text-gray-500 text-sm">
+                  {musicEntries.length === 0 
+                    ? 'Live performance entries that need music files will appear here'
+                    : 'All entries for this event have music uploaded, or change the event filter to see other events.'}
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-gray-700">
-                {musicEntries.map((entry) => (
+                {getFilteredMusicEntries().map((entry) => (
                   <div key={entry.id} className="p-4 sm:p-6 hover:bg-gray-700/30 transition-colors">
                     <div className="flex flex-col gap-6">
                       <div className="flex-1">
@@ -1611,12 +1687,22 @@ export default function StudioDashboardPage() {
         {activeTab === 'video' && (
           <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
             <div className="p-6 border-b border-gray-700">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
                   <h3 className="text-xl font-bold text-white">📹 Video Uploads</h3>
                   <p className="text-gray-400 text-sm mt-1">Upload video files for your dancers' virtual performance entries</p>
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedEventId}
+                    onChange={(e) => setSelectedEventId(e.target.value)}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="all">All Events</option>
+                    {events.map(event => (
+                      <option key={event.id} value={event.id}>{event.name}</option>
+                    ))}
+                  </select>
                   <span className="inline-flex items-center px-2 py-1 bg-indigo-900/30 text-indigo-300 rounded-full text-xs">
                     💡 Studio managers can upload videos on behalf of dancers
                   </span>
@@ -1624,20 +1710,26 @@ export default function StudioDashboardPage() {
               </div>
             </div>
 
-            {videoEntries.length === 0 ? (
+            {getFilteredVideoEntries().length === 0 ? (
               <div className="p-12 text-center">
                 <div className="w-20 h-20 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">📹</span>
                 </div>
-                <h4 className="text-xl font-semibold text-white mb-2">No Video Uploads Required</h4>
+                <h4 className="text-xl font-semibold text-white mb-2">
+                  {videoEntries.length === 0 
+                    ? 'No Video Uploads Required' 
+                    : 'No Video Uploads Required for Selected Event'}
+                </h4>
                 <p className="text-gray-400 max-w-md mx-auto leading-relaxed">
-                  All virtual entries already have videos uploaded, or there are no virtual entries yet. Virtual entries that still need videos will appear here.
+                  {videoEntries.length === 0 
+                    ? 'All virtual entries already have videos uploaded, or there are no virtual entries yet. Virtual entries that still need videos will appear here.'
+                    : 'All entries for this event have videos uploaded, or change the event filter to see other events.'}
                 </p>
               </div>
             ) : (
               <div className="p-6">
                 <div className="grid gap-6">
-                  {videoEntries.map((entry) => (
+                  {getFilteredVideoEntries().map((entry) => (
                     <div key={entry.id} className="bg-gray-700/50 rounded-xl p-6 border border-gray-600 hover:border-indigo-500 transition-colors">
                       <div className="flex flex-col lg:flex-row lg:items-start space-y-6 lg:space-y-0 lg:space-x-8">
                         
@@ -1745,28 +1837,46 @@ export default function StudioDashboardPage() {
         {activeTab === 'scores' && (
           <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
             <div className="p-6 border-b border-gray-700">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
                   <h3 className="text-xl font-bold text-white">🏅 Studio Scores</h3>
                   <p className="text-gray-400 text-sm mt-1">View all published scores for your dancers</p>
                 </div>
-                <button
-                  onClick={() => studioSession && loadData(studioSession.id)}
-                  className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  ↻ Refresh
-                </button>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedEventId}
+                    onChange={(e) => setSelectedEventId(e.target.value)}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="all">All Events</option>
+                    {events.map(event => (
+                      <option key={event.id} value={event.id}>{event.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => studioSession && loadData(studioSession.id)}
+                    className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
               </div>
             </div>
 
-            {scores.length === 0 ? (
+            {getFilteredScores().length === 0 ? (
               <div className="p-12 text-center">
                 <div className="w-20 h-20 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">🏅</span>
                 </div>
-                <h4 className="text-xl font-semibold text-white mb-2">No Scores Available Yet</h4>
+                <h4 className="text-xl font-semibold text-white mb-2">
+                  {scores.length === 0 
+                    ? 'No Scores Available Yet' 
+                    : 'No Scores Found for Selected Event'}
+                </h4>
                 <p className="text-gray-400 max-w-md mx-auto leading-relaxed">
-                  Scores will appear here once judges have scored your dancers' performances and the scores have been published.
+                  {scores.length === 0 
+                    ? 'Scores will appear here once judges have scored your dancers\' performances and the scores have been published.'
+                    : 'Change the event filter to see scores from other events.'}
                 </p>
               </div>
             ) : (
@@ -1774,7 +1884,8 @@ export default function StudioDashboardPage() {
                 <div className="space-y-6">
                   {(() => {
                     // Group scores by performance
-                    const groupedScores = scores.reduce((acc: any, score: any) => {
+                    const filteredScoresList = getFilteredScores();
+                    const groupedScores = filteredScoresList.reduce((acc: any, score: any) => {
                       const perfId = score.performanceId;
                       if (!acc[perfId]) {
                         acc[perfId] = {

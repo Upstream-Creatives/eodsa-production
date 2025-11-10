@@ -222,6 +222,7 @@ function AdminDashboard() {
   const [uploadStatusFilter, setUploadStatusFilter] = useState<'all' | 'uploaded' | 'missing' | 'no_video'>('all');
   const [activeBackendFilter, setActiveBackendFilter] = useState<'all' | 'live' | 'virtual'>('all');
   const [videoLinkDrafts, setVideoLinkDrafts] = useState<Record<string, string>>({});
+  const [selectedMusicTrackingEventId, setSelectedMusicTrackingEventId] = useState<string>('all');
 
   // Dancer search and filter state
   const [dancerSearchTerm, setDancerSearchTerm] = useState('');
@@ -2057,6 +2058,7 @@ function AdminDashboard() {
                         <tr>
                           <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Name</th>
                           <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Age</th>
+                          <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Mastery</th>
                           <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Contact</th>
                           <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Studio</th>
                           <th className={`px-6 py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Guardian</th>
@@ -2069,7 +2071,14 @@ function AdminDashboard() {
                           <tr key={dancer.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                             <td className="px-6 py-4">
                               <div>
-                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{dancer.name}</div>
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>
+                                  <a
+                                    href={`/admin/dancers/${dancer.eodsaId}`}
+                                    className={`${theme === 'dark' ? 'text-blue-300 hover:text-blue-200' : 'text-blue-700 hover:text-blue-900'} underline decoration-dotted underline-offset-2`}
+                                  >
+                                    {dancer.name}
+                                  </a>
+                                </div>
                                 <div className={`text-xs ${themeClasses.textMuted}`}>ID: {dancer.nationalId}</div>
                                 <div className={`text-xs ${themeClasses.textMuted}`}>EODSA: {dancer.eodsaId}</div>
                                 <div className={`text-xs ${themeClasses.textMuted}`}>Registered: {new Date(dancer.createdAt).toLocaleDateString()}</div>
@@ -2078,6 +2087,27 @@ function AdminDashboard() {
                             <td className="px-6 py-4">
                               <div className="text-sm font-medium">{dancer.age}</div>
                               <div className={`text-xs ${themeClasses.textMuted}`}>{dancer.dateOfBirth}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              {(() => {
+                                const mastery = (dancer as any).registrationFeeMasteryLevel;
+                                if (!mastery) {
+                                  return <span className="text-sm text-gray-400">—</span>;
+                                }
+                                const isWater = mastery.toLowerCase().includes('water');
+                                const isFire = mastery.toLowerCase().includes('fire');
+                                return (
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    isWater 
+                                      ? theme === 'dark' ? 'bg-blue-900/80 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                      : isFire
+                                      ? theme === 'dark' ? 'bg-orange-900/80 text-orange-200' : 'bg-orange-100 text-orange-800'
+                                      : theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {mastery}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm font-medium">{dancer.email || 'N/A'}</div>
@@ -2524,9 +2554,31 @@ function AdminDashboard() {
                     <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Music Upload Tracking</h2>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                          <div className={`flex rounded-lg border overflow-hidden ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}>
+                    <select
+                      value={selectedMusicTrackingEventId}
+                      onChange={(e) => {
+                        setSelectedMusicTrackingEventId(e.target.value);
+                        const eventId = e.target.value === 'all' ? undefined : e.target.value;
+                        const entryType = activeBackendFilter === 'all' ? undefined : activeBackendFilter;
+                        fetchMusicTrackingData({ entryType, eventId });
+                      }}
+                      className={`px-3 py-2 rounded-lg border text-sm font-medium ${
+                        theme === 'dark' 
+                          ? 'bg-gray-800 border-gray-600 text-gray-100' 
+                          : 'bg-white border-gray-300 text-gray-900'
+                      } focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500`}
+                    >
+                      <option value="all">All Events</option>
+                      {events.map(event => (
+                        <option key={event.id} value={event.id}>{event.name}</option>
+                      ))}
+                    </select>
+                    <div className={`flex rounded-lg border overflow-hidden ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}>
                       <button
-                        onClick={() => fetchMusicTrackingData()}
+                        onClick={() => {
+                          const eventId = selectedMusicTrackingEventId === 'all' ? undefined : selectedMusicTrackingEventId;
+                          fetchMusicTrackingData({ eventId });
+                        }}
                         disabled={loadingMusicTracking}
                         className={`px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors touch-manipulation ${activeBackendFilter === 'all' 
                           ? 'bg-blue-600 text-white' 
@@ -2536,7 +2588,10 @@ function AdminDashboard() {
                         All
                       </button>
                       <button
-                        onClick={() => fetchMusicTrackingData({ entryType: 'live' })}
+                        onClick={() => {
+                          const eventId = selectedMusicTrackingEventId === 'all' ? undefined : selectedMusicTrackingEventId;
+                          fetchMusicTrackingData({ entryType: 'live', eventId });
+                        }}
                         disabled={loadingMusicTracking}
                         className={`px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors touch-manipulation ${theme === 'dark' ? 'border-l border-gray-600' : 'border-l border-gray-300'} ${activeBackendFilter === 'live' 
                           ? 'bg-blue-600 text-white' 
@@ -2547,7 +2602,10 @@ function AdminDashboard() {
                         <span className="sm:hidden">🎵 Live</span>
                       </button>
                       <button
-                        onClick={() => fetchMusicTrackingData({ entryType: 'virtual' })}
+                        onClick={() => {
+                          const eventId = selectedMusicTrackingEventId === 'all' ? undefined : selectedMusicTrackingEventId;
+                          fetchMusicTrackingData({ entryType: 'virtual', eventId });
+                        }}
                         disabled={loadingMusicTracking}
                         className={`px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors touch-manipulation ${theme === 'dark' ? 'border-l border-gray-600' : 'border-l border-gray-300'} ${activeBackendFilter === 'virtual' 
                           ? 'bg-blue-600 text-white' 
@@ -2559,7 +2617,11 @@ function AdminDashboard() {
                       </button>
                     </div>
                     <button
-                      onClick={() => fetchMusicTrackingData()}
+                      onClick={() => {
+                        const eventId = selectedMusicTrackingEventId === 'all' ? undefined : selectedMusicTrackingEventId;
+                        const entryType = activeBackendFilter === 'all' ? undefined : activeBackendFilter;
+                        fetchMusicTrackingData({ entryType, eventId });
+                      }}
                       disabled={loadingMusicTracking}
                       className="px-3 sm:px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-600 hover:to-blue-700 disabled:bg-gray-400 transition-all duration-200 font-medium text-sm"
                     >

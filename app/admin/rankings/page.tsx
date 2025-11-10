@@ -53,6 +53,8 @@ function AdminRankingsPage() {
   
   // Filters
   // Region filtering removed - Nationals only now
+  const [events, setEvents] = useState<Array<{id: string; name: string}>>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
   const [selectedAgeCategory, setSelectedAgeCategory] = useState('');
   const [selectedPerformanceType, setSelectedPerformanceType] = useState('');
   const [selectedStyle, setSelectedStyle] = useState('');
@@ -85,7 +87,7 @@ function AdminRankingsPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [rankings, viewMode, masteryFilter, entryTypeFilter, selectedAgeCategory, selectedPerformanceType, selectedStyle]);
+  }, [rankings, viewMode, masteryFilter, entryTypeFilter, selectedAgeCategory, selectedPerformanceType, selectedStyle, selectedEventId]);
 
   // Load rankings only once on authentication (all filters are client-side for Nationals)
   useEffect(() => {
@@ -99,6 +101,15 @@ function AdminRankingsPage() {
     setError('');
     
     try {
+      // Load events list for filter
+      const eventsRes = await fetch('/api/events');
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json();
+        if (eventsData.success) {
+          setEvents(eventsData.events.map((e: any) => ({ id: e.id, name: e.name })));
+        }
+      }
+      
       // Load all rankings (force load since this is initial data load)
       await loadRankings(true);
     } catch (error) {
@@ -143,6 +154,11 @@ function AdminRankingsPage() {
 
   const applyFilters = () => {
     let filtered = rankings;
+    
+    // Apply event filter
+    if (selectedEventId && selectedEventId !== 'all') {
+      filtered = filtered.filter(ranking => ranking.eventId === selectedEventId);
+    }
     
     // Apply age category filter (client-side for Nationals due to dynamic age calculation)
     if (selectedAgeCategory) {
@@ -298,6 +314,7 @@ function AdminRankingsPage() {
   };
 
   const clearFilters = () => {
+    setSelectedEventId('all');
     setSelectedAgeCategory('');
     setSelectedPerformanceType('');
     setSelectedStyle('');
@@ -709,15 +726,22 @@ function AdminRankingsPage() {
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white text-sm">🔍</span>
             </div>
-            <h2 className="text-xl font-bold text-white">Filter Avalon Rankings</h2>
+            <h2 className="text-xl font-bold text-white">Filter Rankings</h2>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-300 mb-3">Competition</label>
-              <div className="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white font-medium">
-                Avalon
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-semibold text-gray-300 mb-3">Event</label>
+              <select
+                value={selectedEventId}
+                onChange={(e) => setSelectedEventId(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 font-medium bg-gray-700 text-white"
+              >
+                <option value="all">All Events</option>
+                {events.map(event => (
+                  <option key={event.id} value={event.id}>{event.name}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -821,8 +845,8 @@ function AdminRankingsPage() {
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold">Avalon Nationals Rankings</h2>
-                <p className="text-indigo-100 mt-1">Performance results and awards</p>
+                <h2 className="text-2xl font-bold">Rankings</h2>
+                <p className="text-indigo-100 mt-1">Performance results and awards - Filter by event to view specific competition results</p>
               </div>
               <div className="text-right">
                 <div className="text-sm text-indigo-100">Total Results</div>

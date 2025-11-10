@@ -39,7 +39,7 @@ interface Certificate {
 }
 
 // Music Upload Section Component
-function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession }) {
+function MusicUploadSection({ dancerSession, selectedEventId, events, onEventChange }: { dancerSession: DancerSession; selectedEventId: string; events: Array<{id: string; name: string}>; onEventChange: (eventId: string) => void }) {
   const [musicEntries, setMusicEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -111,11 +111,30 @@ function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession })
     );
   }
 
+  // Filter entries by selected event
+  const filteredMusicEntries = selectedEventId === 'all' 
+    ? musicEntries 
+    : musicEntries.filter(entry => entry.eventId === selectedEventId);
+
   return (
     <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
       <div className="p-6 border-b border-gray-700">
-        <h3 className="text-xl font-bold text-white">🎵 Music Uploads Required</h3>
-        <p className="text-gray-400 text-sm mt-1">Upload music files for your live performance entries</p>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <div>
+            <h3 className="text-xl font-bold text-white">🎵 Music Uploads Required</h3>
+            <p className="text-gray-400 text-sm mt-1">Upload music files for your live performance entries</p>
+          </div>
+          <select
+            value={selectedEventId}
+            onChange={(e) => onEventChange(e.target.value)}
+            className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+          >
+            <option value="all">All Events</option>
+            {events.map(event => (
+              <option key={event.id} value={event.id}>{event.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -124,20 +143,26 @@ function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession })
         </div>
       )}
 
-      {musicEntries.length === 0 ? (
+      {filteredMusicEntries.length === 0 ? (
         <div className="p-8 text-center">
           <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🎵</span>
           </div>
-          <p className="text-gray-400 mb-2">No music uploads required</p>
+          <p className="text-gray-400 mb-2">
+            {musicEntries.length === 0 
+              ? 'No music uploads required' 
+              : 'No music uploads required for selected event'}
+          </p>
           <p className="text-gray-500 text-sm">
-            All your live entries already have music files uploaded, or you don't have any live entries yet.
+            {musicEntries.length === 0 
+              ? 'All your live entries already have music files uploaded, or you don\'t have any live entries yet.'
+              : 'All entries for this event have music uploaded, or change the event filter to see other events.'}
           </p>
         </div>
       ) : (
         <div className="p-6">
           <div className="space-y-6">
-            {musicEntries.map((entry) => {
+            {filteredMusicEntries.map((entry) => {
               const isGroupEntry = entry.participantIds && entry.participantIds.length > 1;
               const isOwner = entry.eodsaId === dancerSession.eodsaId;
               const performanceType = isGroupEntry 
@@ -223,7 +248,7 @@ function MusicUploadSection({ dancerSession }: { dancerSession: DancerSession })
 }
 
 // Video Upload Section Component
-function VideoUploadSection({ dancerSession }: { dancerSession: DancerSession }) {
+function VideoUploadSection({ dancerSession, selectedEventId, events, onEventChange }: { dancerSession: DancerSession; selectedEventId: string; events: Array<{id: string; name: string}>; onEventChange: (eventId: string) => void }) {
   const [videoEntries, setVideoEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -295,11 +320,30 @@ function VideoUploadSection({ dancerSession }: { dancerSession: DancerSession })
     );
   }
 
+  // Filter entries by selected event
+  const filteredVideoEntries = selectedEventId === 'all' 
+    ? videoEntries 
+    : videoEntries.filter(entry => entry.eventId === selectedEventId);
+
   return (
     <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
       <div className="p-6 border-b border-gray-700">
-        <h3 className="text-xl font-bold text-white">📹 Video Uploads Required</h3>
-        <p className="text-gray-400 text-sm mt-1">Upload video files for your virtual performance entries</p>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <div>
+            <h3 className="text-xl font-bold text-white">📹 Video Uploads Required</h3>
+            <p className="text-gray-400 text-sm mt-1">Upload video files for your virtual performance entries</p>
+          </div>
+          <select
+            value={selectedEventId}
+            onChange={(e) => onEventChange(e.target.value)}
+            className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+          >
+            <option value="all">All Events</option>
+            {events.map(event => (
+              <option key={event.id} value={event.id}>{event.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -308,20 +352,26 @@ function VideoUploadSection({ dancerSession }: { dancerSession: DancerSession })
         </div>
       )}
 
-      {videoEntries.length === 0 ? (
+      {filteredVideoEntries.length === 0 ? (
         <div className="p-8 text-center">
           <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">📹</span>
           </div>
-          <p className="text-gray-400 mb-2">No video uploads required</p>
+          <p className="text-gray-400 mb-2">
+            {videoEntries.length === 0 
+              ? 'No video uploads required' 
+              : 'No video uploads required for selected event'}
+          </p>
           <p className="text-gray-500 text-sm">
-            All your virtual entries already have videos uploaded, or you don't have any virtual entries yet.
+            {videoEntries.length === 0 
+              ? 'All your virtual entries already have videos uploaded, or you don\'t have any virtual entries yet.'
+              : 'All entries for this event have videos uploaded, or change the event filter to see other events.'}
           </p>
         </div>
       ) : (
         <div className="p-6">
           <div className="space-y-6">
-            {videoEntries.map((entry) => {
+            {filteredVideoEntries.map((entry) => {
               const isGroupEntry = entry.participantIds && entry.participantIds.length > 1;
               const isOwner = entry.eodsaId === dancerSession.eodsaId;
               const performanceType = isGroupEntry 
@@ -412,7 +462,7 @@ function VideoUploadSection({ dancerSession }: { dancerSession: DancerSession })
 }
 
 // Scores & Feedback Section Component
-function ScoresFeedbackSection({ dancerSession }: { dancerSession: DancerSession }) {
+function ScoresFeedbackSection({ dancerSession, selectedEventId, events, onEventChange }: { dancerSession: DancerSession; selectedEventId: string; events: Array<{id: string; name: string}>; onEventChange: (eventId: string) => void }) {
   const [scores, setScores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -506,25 +556,37 @@ function ScoresFeedbackSection({ dancerSession }: { dancerSession: DancerSession
     <>
       <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
         <div className="p-6 border-b border-gray-700">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
             <div>
               <h3 className="text-xl font-bold text-white">
                 🏅 My Scores & Feedback
                 {!loading && (
                   <span className="text-sm font-normal text-gray-400 ml-2">
-                    ({scores.length})
+                    ({selectedEventId === 'all' ? scores.length : scores.filter(s => s.eventId === selectedEventId).length})
                   </span>
                 )}
               </h3>
               <p className="text-gray-400 text-sm mt-1">View your performance scores and judge feedback</p>
             </div>
-            <button
-              onClick={loadScores}
-              disabled={loading}
-              className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-            >
-              {loading ? '🔄' : '↻'} Refresh
-            </button>
+            <div className="flex gap-2">
+              <select
+                value={selectedEventId}
+                onChange={(e) => onEventChange(e.target.value)}
+                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value="all">All Events</option>
+                {events.map(event => (
+                  <option key={event.id} value={event.id}>{event.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={loadScores}
+                disabled={loading}
+                className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? '🔄' : '↻'} Refresh
+              </button>
+            </div>
           </div>
         </div>
 
@@ -534,35 +596,51 @@ function ScoresFeedbackSection({ dancerSession }: { dancerSession: DancerSession
           </div>
         )}
 
-        {scores.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">🏅</span>
-            </div>
-            <p className="text-gray-400 mb-2">No scores available yet</p>
-            <p className="text-gray-500 text-sm">
-              Scores will appear here after judges have scored your performances and they've been approved.
-            </p>
-          </div>
-        ) : (
-          <div className="p-6">
-            <div className="space-y-6">
-              {(() => {
-                // Group scores by performance
-                const groupedScores = scores.reduce((acc: any, score: any) => {
-                  const perfId = score.performanceId;
-                  if (!acc[perfId]) {
-                    acc[perfId] = {
-                      performanceId: perfId,
-                      performanceTitle: score.performanceTitle,
-                      scores: []
-                    };
-                  }
-                  acc[perfId].scores.push(score);
-                  return acc;
-                }, {});
+        {(() => {
+          // Filter scores by event
+          const filteredScores = selectedEventId === 'all' 
+            ? scores 
+            : scores.filter(score => score.eventId === selectedEventId);
+          
+          if (filteredScores.length === 0) {
+            return (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🏅</span>
+                </div>
+                <p className="text-gray-400 mb-2">
+                  {scores.length === 0 
+                    ? 'No scores available yet' 
+                    : 'No scores found for selected event'}
+                </p>
+                <p className="text-gray-500 text-sm">
+                  {scores.length === 0 
+                    ? 'Scores will appear here after judges have scored your performances and they\'ve been approved.'
+                    : 'Change the event filter to see scores from other events.'}
+                </p>
+              </div>
+            );
+          }
+          
+          return (
+            <div className="p-6">
+              <div className="space-y-6">
+                {(() => {
+                  // Group scores by performance
+                  const groupedScores = filteredScores.reduce((acc: any, score: any) => {
+                    const perfId = score.performanceId;
+                    if (!acc[perfId]) {
+                      acc[perfId] = {
+                        performanceId: perfId,
+                        performanceTitle: score.performanceTitle,
+                        scores: []
+                      };
+                    }
+                    acc[perfId].scores.push(score);
+                    return acc;
+                  }, {});
 
-                return Object.values(groupedScores).map((group: any) => {
+                  return Object.values(groupedScores).map((group: any) => {
                   // Calculate average score for this performance
                   const totalScores = group.scores.map((s: any) => calculateTotalScore(s));
                   const avgScore = totalScores.reduce((sum: number, score: number) => sum + score, 0) / totalScores.length;
@@ -653,11 +731,12 @@ function ScoresFeedbackSection({ dancerSession }: { dancerSession: DancerSession
                       </div>
                     </div>
                   );
-                });
-              })()}
+                  });
+                })()}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Score Details Modal */}
@@ -746,7 +825,7 @@ function ScoresFeedbackSection({ dancerSession }: { dancerSession: DancerSession
 }
 
 // Competition Entries Section Component
-function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSession }) {
+function CompetitionEntriesSection({ dancerSession, selectedEventId, events, onEventChange }: { dancerSession: DancerSession; selectedEventId: string; events: Array<{id: string; name: string}>; onEventChange: (eventId: string) => void }) {
   const [competitionEntries, setCompetitionEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -809,28 +888,45 @@ function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSes
     );
   }
 
+  // Filter entries by selected event
+  const filteredEntries = selectedEventId === 'all' 
+    ? competitionEntries 
+    : competitionEntries.filter(entry => entry.eventId === selectedEventId);
+
   return (
     <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
       <div className="p-6 border-b border-gray-700">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
           <div>
             <h3 className="text-xl font-bold text-white">
               🏆 My Competition Entries 
               {!loading && (
                 <span className="text-sm font-normal text-gray-400 ml-2">
-                  ({competitionEntries.length})
+                  ({filteredEntries.length}{selectedEventId !== 'all' ? ` of ${competitionEntries.length}` : ''})
                 </span>
               )}
             </h3>
             <p className="text-gray-400 text-sm mt-1">All your competition entries across different events</p>
           </div>
-          <button
-            onClick={loadCompetitionEntries}
-            disabled={loading}
-            className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-          >
-            {loading ? '🔄' : '↻'} Refresh
-          </button>
+          <div className="flex gap-2">
+            <select
+              value={selectedEventId}
+              onChange={(e) => onEventChange(e.target.value)}
+              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            >
+              <option value="all">All Events</option>
+              {events.map(event => (
+                <option key={event.id} value={event.id}>{event.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={loadCompetitionEntries}
+              disabled={loading}
+              className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+            >
+              {loading ? '🔄' : '↻'} Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -840,31 +936,41 @@ function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSes
         </div>
       )}
 
-      {competitionEntries.length === 0 ? (
+      {filteredEntries.length === 0 ? (
         <div className="p-8 text-center">
           <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🏆</span>
           </div>
-          <p className="text-gray-400 mb-2">No competition entries found</p>
-          <p className="text-gray-500 text-sm mb-4">
-            You haven't entered any competitions yet, or entries may still be processing.
+          <p className="text-gray-400 mb-2">
+            {competitionEntries.length === 0 
+              ? 'No competition entries found' 
+              : `No entries found for selected event${selectedEventId !== 'all' ? '. Try selecting "All Events".' : ''}`}
           </p>
-          <div className="space-y-2 text-xs text-gray-600">
-            <p>📋 Entries are typically created by your studio or coach</p>
-            <p>🔍 EODSA ID being searched: <span className="font-mono text-gray-400">{dancerSession.eodsaId}</span></p>
-            <p>📞 Contact your studio if you expect to see entries here</p>
-          </div>
-          <button
-            onClick={loadCompetitionEntries}
-            className="mt-4 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            🔄 Check Again
-          </button>
+          <p className="text-gray-500 text-sm mb-4">
+            {competitionEntries.length === 0 
+              ? 'You haven\'t entered any competitions yet, or entries may still be processing.'
+              : 'Change the event filter to see entries from other events.'}
+          </p>
+          {competitionEntries.length === 0 && (
+            <>
+              <div className="space-y-2 text-xs text-gray-600">
+                <p>📋 Entries are typically created by your studio or coach</p>
+                <p>🔍 EODSA ID being searched: <span className="font-mono text-gray-400">{dancerSession.eodsaId}</span></p>
+                <p>📞 Contact your studio if you expect to see entries here</p>
+              </div>
+              <button
+                onClick={loadCompetitionEntries}
+                className="mt-4 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                🔄 Check Again
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="p-6">
           <div className="space-y-6">
-            {competitionEntries.map((entry) => {
+            {filteredEntries.map((entry) => {
               const isGroupEntry = entry.participantIds && entry.participantIds.length > 1;
               const isOwner = entry.eodsaId === dancerSession.eodsaId;
               const performanceType = isGroupEntry 
@@ -995,7 +1101,7 @@ function CompetitionEntriesSection({ dancerSession }: { dancerSession: DancerSes
 }
 
 // Certificates Section Component
-function CertificatesSection({ dancerSession }: { dancerSession: DancerSession }) {
+function CertificatesSection({ dancerSession, selectedEventId, events, onEventChange }: { dancerSession: DancerSession; selectedEventId: string; events: Array<{id: string; name: string}>; onEventChange: (eventId: string) => void }) {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1055,11 +1161,35 @@ function CertificatesSection({ dancerSession }: { dancerSession: DancerSession }
     );
   }
 
+  // Filter certificates by event (certificates might have eventId or eventDate)
+  // For now, we'll filter by event date if eventId is not available
+  const filteredCertificates = selectedEventId === 'all' 
+    ? certificates 
+    : certificates.filter(cert => {
+        // Try to match by eventId if available, otherwise skip filtering
+        // Certificates API might not include eventId, so we'll show all if eventId is not in the data
+        return (cert as any).eventId === selectedEventId || !(cert as any).eventId;
+      });
+
   return (
     <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
       <div className="p-6 border-b border-gray-700">
-        <h3 className="text-xl font-bold text-white">🎖️ My Certificates</h3>
-        <p className="text-gray-400 text-sm mt-1">View and download your achievement certificates</p>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <div>
+            <h3 className="text-xl font-bold text-white">🎖️ My Certificates</h3>
+            <p className="text-gray-400 text-sm mt-1">View and download your achievement certificates</p>
+          </div>
+          <select
+            value={selectedEventId}
+            onChange={(e) => onEventChange(e.target.value)}
+            className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+          >
+            <option value="all">All Events</option>
+            {events.map(event => (
+              <option key={event.id} value={event.id}>{event.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -1068,19 +1198,25 @@ function CertificatesSection({ dancerSession }: { dancerSession: DancerSession }
         </div>
       )}
 
-      {certificates.length === 0 ? (
+      {filteredCertificates.length === 0 ? (
         <div className="p-8 text-center">
           <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">📜</span>
           </div>
-          <p className="text-gray-400 mb-2">No certificates yet</p>
+          <p className="text-gray-400 mb-2">
+            {certificates.length === 0 
+              ? 'No certificates yet' 
+              : 'No certificates found for selected event'}
+          </p>
           <p className="text-gray-500 text-sm">
-            Certificates will appear here once you've achieved a ranking position in competitions.
+            {certificates.length === 0 
+              ? 'Certificates will appear here once you\'ve achieved a ranking position in competitions.'
+              : 'Change the event filter to see certificates from other events.'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
-          {certificates.map((cert) => (
+          {filteredCertificates.map((cert) => (
             <div key={cert.id} className="bg-gray-900/50 rounded-xl border border-gray-700 overflow-hidden hover:border-purple-500/50 transition-all">
               <div
                 className="relative h-48 cursor-pointer"
@@ -1160,6 +1296,11 @@ export default function DancerDashboardPage() {
   const [dancerSession, setDancerSession] = useState<DancerSession | null>(null);
   const [applications, setApplications] = useState<StudioApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [profileHistory, setProfileHistory] = useState<any | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [events, setEvents] = useState<Array<{id: string; name: string}>>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -1173,10 +1314,28 @@ export default function DancerDashboardPage() {
       const parsedSession = JSON.parse(session);
       setDancerSession(parsedSession);
       loadDancerData(parsedSession.id);
+      // Load consolidated history for filters
+      loadDancerHistory(parsedSession.id);
+      // Load events list for filtering
+      loadEvents();
     } catch {
       router.push('/dancer-login');
     }
   }, [router]);
+
+  const loadEvents = async () => {
+    try {
+      const response = await fetch('/api/events');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setEvents(data.events.map((e: any) => ({ id: e.id, name: e.name })));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  };
 
   const loadDancerData = async (dancerId: string) => {
     try {
@@ -1190,6 +1349,21 @@ export default function DancerDashboardPage() {
       console.error('Error loading dancer data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadDancerHistory = async (dancerId: string) => {
+    try {
+      setHistoryLoading(true);
+      const res = await fetch(`/api/dancers/${dancerId}/profile`, { cache: 'no-store' });
+      const data = await res.json();
+      if (data?.success) {
+        setProfileHistory(data.profile);
+      }
+    } catch (e) {
+      console.error('Failed to load dancer history', e);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -1260,6 +1434,12 @@ export default function DancerDashboardPage() {
               <p className="text-gray-300 text-sm">
                 EODSA ID: {dancerSession.eodsaId} | Email: {dancerSession.email || 'Not provided'}
               </p>
+              {profileHistory?.studio && (
+                <p className="text-gray-400 text-xs mt-1">
+                  Studio: {profileHistory.studio.name}
+                  {profileHistory.studio.registrationNumber ? ` • Reg: ${profileHistory.studio.registrationNumber}` : ''}
+                </p>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               <Link
@@ -1280,14 +1460,131 @@ export default function DancerDashboardPage() {
       </div>
 
       <div className="container mx-auto p-4 space-y-6">
+        {/* History Filters + Timeline */}
+        {profileHistory && (
+          <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
+            <div className="p-6 border-b border-gray-700 flex flex-col md:flex-row md:items-end gap-4">
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white">Your Competition History</h3>
+                <p className="text-gray-400 text-sm mt-1">
+                  Filter by event and year to review performances, scores and certificates
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <select
+                  value={selectedEventId}
+                  onChange={(e) => setSelectedEventId(e.target.value)}
+                  className="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-100"
+                >
+                  <option value="all">All Events</option>
+                  {Array.from(
+                    new Map(
+                      profileHistory.performances.map((p: any) => [p.event.id, p.event.name])
+                    )
+                  ).map(([id, name]) => (
+                    <option key={id as string} value={id as string}>
+                      {name as string}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-100"
+                >
+                  <option value="all">All Years</option>
+                  {Array.from(
+                    new Set(
+                      profileHistory.performances
+                        .map((p: any) => (p.event.date ? new Date(p.event.date).getFullYear() : null))
+                        .filter(Boolean)
+                    )
+                  )
+                    .sort((a: any, b: any) => b - a)
+                    .map((year: any) => (
+                      <option key={year} value={String(year)}>
+                        {year}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-700">
+              {historyLoading ? (
+                <div className="p-6 text-gray-400 text-sm">Loading history…</div>
+              ) : (
+                profileHistory.performances
+                  .filter((p: any) => {
+                    const byEvent = selectedEventId === 'all' || p.event.id === selectedEventId;
+                    const yr = p.event.date ? new Date(p.event.date).getFullYear() : null;
+                    const byYear = selectedYear === 'all' || String(yr) === selectedYear;
+                    return byEvent && byYear;
+                  })
+                  .map((p: any) => (
+                    <div key={p.performanceId} className="p-6 grid md:grid-cols-12 gap-3 text-sm">
+                      <div className="md:col-span-4">
+                        <div className="font-semibold text-white">{p.title || 'Untitled'}</div>
+                        <div className="text-gray-400">
+                          {p.itemStyle} • {p.mastery} • {p.performanceType || '—'}
+                        </div>
+                      </div>
+                      <div className="md:col-span-4">
+                        <div className="text-white font-medium">{p.event.name}</div>
+                        <div className="text-gray-400">
+                          {p.event.region} • {p.event.ageCategory || 'All Ages'}
+                        </div>
+                        <div className="text-gray-500">{p.event.date?.slice(0, 10) || '—'}</div>
+                      </div>
+                      <div className="md:col-span-2">
+                        <div className="text-white font-semibold">
+                          {p.scoresPublished ? `${p.percentage}%` : 'Awaiting approval'}
+                        </div>
+                        <div className="text-gray-400">{p.judgeCount} judge(s)</div>
+                      </div>
+                      <div className="md:col-span-2">
+                        {p.certificate?.url ? (
+                          <a
+                            href={p.certificate.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white"
+                          >
+                            Download Certificate
+                          </a>
+                        ) : (
+                          <span className="text-gray-500">No certificate</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Scores & Feedback Section */}
-        <ScoresFeedbackSection dancerSession={dancerSession} />
+        <ScoresFeedbackSection 
+          dancerSession={dancerSession} 
+          selectedEventId={selectedEventId}
+          events={events}
+          onEventChange={setSelectedEventId}
+        />
 
         {/* Certificates Section */}
-        <CertificatesSection dancerSession={dancerSession} />
+        <CertificatesSection 
+          dancerSession={dancerSession}
+          selectedEventId={selectedEventId}
+          events={events}
+          onEventChange={setSelectedEventId}
+        />
 
         {/* Competition Entries Section */}
-        <CompetitionEntriesSection dancerSession={dancerSession} />
+        <CompetitionEntriesSection 
+          dancerSession={dancerSession}
+          selectedEventId={selectedEventId}
+          events={events}
+          onEventChange={setSelectedEventId}
+        />
 
         {/* Studio Applications Section */}
         <div className="bg-gray-800/80 rounded-2xl border border-gray-700/20 overflow-hidden">
@@ -1338,10 +1635,20 @@ export default function DancerDashboardPage() {
         </div>
 
         {/* Music Upload Section */}
-        <MusicUploadSection dancerSession={dancerSession} />
+        <MusicUploadSection 
+          dancerSession={dancerSession}
+          selectedEventId={selectedEventId}
+          events={events}
+          onEventChange={setSelectedEventId}
+        />
 
         {/* Video Upload Section */}
-        <VideoUploadSection dancerSession={dancerSession} />
+        <VideoUploadSection 
+          dancerSession={dancerSession}
+          selectedEventId={selectedEventId}
+          events={events}
+          onEventChange={setSelectedEventId}
+        />
 
       </div>
     </div>
