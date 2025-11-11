@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -54,26 +54,16 @@ interface StudioProfileResponse {
 export default function AdminStudioProfilePage({
   params,
 }: {
-  params: Promise<{ studioId: string }> | { studioId: string };
+  params: Promise<{ studioId: string }>;
 }) {
   const router = useRouter();
-  const [studioId, setStudioId] = useState<string>('');
+  // Use React's use() hook to handle Promise params in Next.js 15
+  const resolvedParams = use(params);
+  const studioId = resolvedParams.studioId;
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<StudioProfileResponse['profile'] | null>(null);
-
-  // Handle async params in Next.js 15
-  useEffect(() => {
-    if (params instanceof Promise) {
-      params.then((p) => setStudioId(p.studioId)).catch((err) => {
-        console.error('Error resolving params:', err);
-        setError('Invalid studio ID');
-        setLoading(false);
-      });
-    } else {
-      setStudioId(params.studioId);
-    }
-  }, [params]);
 
   useEffect(() => {
     // Only run on client side and when studioId is available
@@ -363,4 +353,5 @@ export default function AdminStudioProfilePage({
     </div>
   );
 }
+
 
