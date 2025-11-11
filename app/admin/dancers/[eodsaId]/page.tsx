@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -65,23 +65,13 @@ export default function AdminDancerProfilePage({
   params: Promise<{ eodsaId: string }> | { eodsaId: string };
 }) {
   const router = useRouter();
-  const [eodsaId, setEodsaId] = useState<string>('');
+  // Use React's use() hook to handle Promise params in Next.js 15
+  const resolvedParams = params instanceof Promise ? use(params) : params;
+  const eodsaId = resolvedParams.eodsaId;
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ProfileResponse['profile'] | null>(null);
-  
-  // Handle async params in Next.js 15 (params can be Promise or object)
-  useEffect(() => {
-    if (params instanceof Promise) {
-      params.then((p) => setEodsaId(p.eodsaId)).catch((err) => {
-        console.error('Error resolving params:', err);
-        setError('Invalid dancer ID');
-        setLoading(false);
-      });
-    } else {
-      setEodsaId(params.eodsaId);
-    }
-  }, [params]);
 
   useEffect(() => {
     // Only run on client side and when eodsaId is available
@@ -159,7 +149,7 @@ export default function AdminDancerProfilePage({
     };
   }, [eodsaId]);
 
-  if (loading || !eodsaId) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
