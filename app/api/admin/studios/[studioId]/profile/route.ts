@@ -5,8 +5,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ studioId: string }> }
 ) {
+  let studioId: string | undefined;
   try {
-    const { studioId } = await params;
+    const resolvedParams = await params;
+    studioId = resolvedParams.studioId;
     if (!studioId) {
       return NextResponse.json({ success: false, error: 'studioId is required' }, { status: 400 });
     }
