@@ -3,9 +3,10 @@ import { getSql } from "@/lib/database";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const sql = getSql();
 
     const events = await sql`
@@ -23,7 +24,7 @@ export async function GET(
       FROM performances p
       JOIN events e ON p.event_id = e.id
       LEFT JOIN rankings r ON p.id = r.performance_id
-      WHERE p.dancer_id = ${params.id}
+      WHERE p.dancer_id = ${id}
       ORDER BY e.year DESC, e.name ASC
     `;
 
