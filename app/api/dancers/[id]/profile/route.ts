@@ -115,7 +115,7 @@ export async function GET(
             registrationNumber: bio.studio_registration_number
           }
         : null,
-      performances: performances.map((row: any) => {
+      performances: (performances.rows || []).map((row: any) => {
         const maxPossible = Math.max(1, Number(row.judge_count)) * 100;
         const percentage =
           maxPossible > 0 ? Math.round((Number(row.average_total) / maxPossible) * 1000) / 10 : 0;
