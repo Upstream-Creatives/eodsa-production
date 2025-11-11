@@ -5,13 +5,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ studioId: string }> }
 ) {
-  let studioId: string | undefined;
+  // Destructure and define studioId from params at the very beginning
+  const resolvedParams = await params;
+  const { studioId } = resolvedParams;
+  
+  if (!studioId) {
+    return NextResponse.json({ success: false, error: 'studioId is required' }, { status: 400 });
+  }
+
   try {
-    const resolvedParams = await params;
-    studioId = resolvedParams.studioId;
-    if (!studioId) {
-      return NextResponse.json({ success: false, error: 'studioId is required' }, { status: 400 });
-    }
 
     const sql = getSql();
 
