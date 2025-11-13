@@ -51,6 +51,9 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_reference TEXT`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS payment_date TEXT`;
     await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS virtual_item_number INTEGER`;
+    // Add rankings API required columns
+    await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS performance_type TEXT`;
+    await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS age_category TEXT`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_end_date TEXT`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS item_number INTEGER`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS performance_order INTEGER`;
@@ -1392,9 +1395,16 @@ export const db = {
 
       // If no results, return empty array
       if (result.length === 0) {
-        console.log('No rankings found for the given criteria');
+        console.log('⚠️ No rankings found for the given criteria');
+        console.log('⚠️ Query filters:', { region, ageCategory, performanceType, eventIds });
+        console.log('⚠️ This means either:');
+        console.log('   1. No performances have scores_published = true');
+        console.log('   2. No performances have scores in the scores table');
+        console.log('   3. No performances match the filter criteria');
         return [];
       }
+      
+      console.log('✅ Found', result.length, 'rankings');
     
       // Calculate age categories for all results first
       const { calculateAgeCategoryForEntry } = await import('./age-category-calculator');
@@ -1503,9 +1513,61 @@ export const db = {
           }
         }
         
-        // Add studio information if available
+        // Get studio information - try multiple sources
+        // First try from contestant (for group/studio entries)
         if (row.contestant_type === 'studio' && row.studio_name) {
           studioInfo = row.studio_name;
+        } else if (row.studio_name) {
+          // Sometimes studio_name might be set even if contestant_type is not 'studio'
+          studioInfo = row.studio_name;
+        } else {
+          // For solo/individual performances, get studio from dancer's studio association
+          // Check if we have participant_ids to look up dancer studio associations
+          if (row.participant_ids) {
+            try {
+              const participantIds = typeof row.participant_ids === 'string' 
+                ? JSON.parse(row.participant_ids) 
+                : row.participant_ids;
+              
+              if (Array.isArray(participantIds) && participantIds.length > 0) {
+                // Fetch studio name from dancer's studio applications
+                // For solo performances, check the first (and only) participant's studio
+                // For group performances, check the first participant's studio (all should be from same studio)
+                const firstParticipantId = participantIds[0];
+                
+                try {
+                  // First, find the dancer by EODSA ID or internal ID
+                  // participant_ids might contain either EODSA IDs (like "E123456") or internal IDs
+                  const dancerInfo = await sqlClient`
+                    SELECT id, eodsa_id FROM dancers 
+                    WHERE eodsa_id = ${firstParticipantId} OR id = ${firstParticipantId}
+                    LIMIT 1
+                  ` as any[];
+                  
+                  if (dancerInfo.length > 0) {
+                    const dancerId = dancerInfo[0].id;
+                    
+                    // Now look up the studio association using the dancer's internal ID
+                    const studioResult = await sqlClient`
+                      SELECT s.name as studio_name
+                      FROM studio_applications sa
+                      JOIN studios s ON sa.studio_id = s.id
+                      WHERE sa.dancer_id = ${dancerId} AND sa.status = 'accepted'
+                      LIMIT 1
+                    ` as any[];
+                    
+                    if (studioResult.length > 0) {
+                      studioInfo = studioResult[0].studio_name;
+                    }
+                  }
+                } catch (error) {
+                  console.warn('Error fetching studio name from dancer associations:', error);
+                }
+              }
+            } catch (error) {
+              console.warn('Error parsing participant_ids for studio lookup:', error);
+            }
+          }
         }
         
         return {

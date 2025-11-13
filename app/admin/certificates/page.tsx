@@ -58,15 +58,16 @@ export default function AdminCertificatesPage() {
   const [percentageTop, setPercentageTop] = useState(65.5);
   const [percentageLeft, setPercentageLeft] = useState(15.5);
   const [percentageFontSize, setPercentageFontSize] = useState(76);
+  // Standardized font sizes (26px) for style, title, and medallion to ensure text always fits
   const [styleTop, setStyleTop] = useState(67);
   const [styleLeft, setStyleLeft] = useState(77.5);
-  const [styleFontSize, setStyleFontSize] = useState(33);
+  const [styleFontSize, setStyleFontSize] = useState(26); // Standardized to 26px
   const [titleTop, setTitleTop] = useState(74);
   const [titleLeft, setTitleLeft] = useState(74);
-  const [titleFontSize, setTitleFontSize] = useState(29);
+  const [titleFontSize, setTitleFontSize] = useState(26); // Standardized to 26px
   const [medallionTop, setMedallionTop] = useState(80.5);
   const [medallionLeft, setMedallionLeft] = useState(72);
-  const [medallionFontSize, setMedallionFontSize] = useState(46);
+  const [medallionFontSize, setMedallionFontSize] = useState(26); // Standardized to 26px
   const [dateTop, setDateTop] = useState(90);
   const [dateLeft, setDateLeft] = useState(66.5);
   const [dateFontSize, setDateFontSize] = useState(39);
@@ -188,9 +189,16 @@ export default function AdminCertificatesPage() {
     const percentage = Math.round(ranking.averageScore);
     // Hard-coded event date for Nationals 2025
     const eventDate = 'October 11, 2025';
+    
+    // For groups, duos, and trios, use studio name instead of dancer names
+    const isGroupPerformance = ranking.performanceType && ['Duet', 'Trio', 'Group'].includes(ranking.performanceType);
+    const displayName = isGroupPerformance && ranking.studioName 
+      ? ranking.studioName 
+      : (ranking.contestantName || 'Unknown');
+    
     const baseUrl = `/api/certificates/adjust/image?`;
     const params = new URLSearchParams({
-      name: ranking.contestantName || 'Unknown',
+      name: displayName,
       percentage: percentage.toString(),
       style: ranking.itemStyle || 'Contemporary',
       title: ranking.title || 'Performance',
@@ -326,6 +334,8 @@ export default function AdminCertificatesPage() {
               eodsaId: eodsaId, // Include EODSA ID for lookup
               email: email, // Include email for sending
               performanceId: winner.performanceId,
+              performanceType: winner.performanceType, // Include performance type for group/duo/trio detection
+              studioName: winner.studioName || null, // Include studio name for group performances
               percentage: percentage,
               style: winner.itemStyle,
               title: winner.title,
@@ -573,6 +583,9 @@ export default function AdminCertificatesPage() {
                           Dancer
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Studio Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Title
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -605,7 +618,9 @@ export default function AdminCertificatesPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{ranking.contestantName}</div>
-                            {ranking.studioName && <div className="text-xs text-gray-500">{ranking.studioName}</div>}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {ranking.studioName || (ranking.performanceType === 'Solo' ? 'Independent' : 'N/A')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {ranking.title}

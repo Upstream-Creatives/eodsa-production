@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/database';
+import { db, getSql } from '@/lib/database';
 import { getMedalFromPercentage, formatCertificateDate } from '@/lib/certificate-generator';
 import { generateCertificateImage } from '@/lib/certificate-image-generator';
 
@@ -64,9 +64,44 @@ export async function GET(
       );
     }
 
+    // Get performance type and studio name from event entry
+    const sqlClient = getSql();
+    let performanceType: string | null = null;
+    let studioName: string | null = null;
+    
+    if (performance.eventEntryId) {
+      try {
+        const entryResult = await sqlClient`
+          SELECT 
+            COALESCE(ee.performance_type, e.performance_type) as performance_type,
+            c.studio_name,
+            c.type as contestant_type
+          FROM event_entries ee
+          LEFT JOIN events e ON ee.event_id = e.id
+          LEFT JOIN contestants c ON ee.contestant_id = c.id
+          WHERE ee.id = ${performance.eventEntryId}
+        ` as any[];
+        
+        if (entryResult.length > 0) {
+          performanceType = entryResult[0].performance_type;
+          if (entryResult[0].contestant_type === 'studio' && entryResult[0].studio_name) {
+            studioName = entryResult[0].studio_name;
+          }
+        }
+      } catch (error) {
+        console.warn('Error fetching event entry details:', error);
+      }
+    }
+
+    // For groups, duos, and trios (non-solo performances), use studio name instead of dancer names
+    const isGroupPerformance = performanceType && ['Duet', 'Trio', 'Group'].includes(performanceType);
+    const displayName = isGroupPerformance && studioName 
+      ? studioName.toUpperCase() 
+      : performance.participantNames.join(', ').toUpperCase();
+
     // Generate certificate image
     const certificateBuffer = await generateCertificateImage({
-      dancerName: performance.participantNames.join(', ').toUpperCase(),
+      dancerName: displayName,
       percentage: averagePercentage,
       style: performance.itemStyle.toUpperCase(),
       title: performance.title.toUpperCase(),

@@ -16,6 +16,8 @@ interface CertificateData {
   email?: string;
   performanceId?: string;
   eventEntryId?: string;
+  performanceType?: string;
+  studioName?: string;
   percentage: number;
   style: string;
   title: string;
@@ -34,6 +36,8 @@ export async function POST(request: NextRequest) {
       email,
       performanceId,
       eventEntryId,
+      performanceType,
+      studioName,
       percentage,
       style,
       title,
@@ -65,18 +69,26 @@ export async function POST(request: NextRequest) {
     const percentageTop = pos?.percentage_top || 65.5;
     const percentageLeft = pos?.percentage_left || 15.5;
     const percentageFontSize = pos?.percentage_font_size || 76;
+    // For style, title, and medallion - use standardized font size (26px) to ensure text always fits
     const styleTop = pos?.style_top || 67;
     const styleLeft = pos?.style_left || 77.5;
-    const styleFontSize = pos?.style_font_size || 33;
+    const styleFontSize = pos?.style_font_size || 26; // Standardized to 26px
     const titleTop = pos?.title_top || 74;
     const titleLeft = pos?.title_left || 74;
-    const titleFontSize = pos?.title_font_size || 29;
+    const titleFontSize = pos?.title_font_size || 26; // Standardized to 26px
     const medallionTop = pos?.medallion_top || 80.5;
     const medallionLeft = pos?.medallion_left || 72;
-    const medallionFontSize = pos?.medallion_font_size || 46;
+    const medallionFontSize = pos?.medallion_font_size || 26; // Standardized to 26px
     const dateTop = pos?.date_top || 90;
     const dateLeft = pos?.date_left || 66.5;
     const dateFontSize = pos?.date_font_size || 39;
+
+    // For groups, duos, and trios (non-solo performances), use studio name instead of dancer names
+    // This prevents unreadable certificates with long lists of participant names
+    const isGroupPerformance = performanceType && ['Duet', 'Trio', 'Group'].includes(performanceType);
+    const displayName = isGroupPerformance && studioName 
+      ? studioName.toUpperCase() 
+      : dancerName.toUpperCase();
 
     // Generate certificate using Cloudinary with custom or default positioning
     const certificateUrl = cloudinary.url('Template_syz7di', {
@@ -86,7 +98,7 @@ export async function POST(request: NextRequest) {
             font_family: 'Montserrat',
             font_size: nameFontSize,
             font_weight: 'bold',
-            text: dancerName.toUpperCase(),
+            text: displayName,
             letter_spacing: 2
           },
           color: 'white',

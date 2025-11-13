@@ -51,6 +51,7 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
     const height = metadata.height || 1280;
 
     // Use custom positions if provided, otherwise use defaults
+    // Standardized font sizes (26px) for style, title, and medallion to ensure text always fits
     const pos = data.positions || {
       nameTop: 48.5,
       nameLeft: 50,
@@ -60,13 +61,13 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
       percentageFontSize: 76,
       styleTop: 67.5,
       styleLeft: 62.5,
-      styleFontSize: 33,
+      styleFontSize: 26, // Standardized to 26px
       titleTop: 74,
       titleLeft: 60,
-      titleFontSize: 29,
+      titleFontSize: 26, // Standardized to 26px
       medallionTop: 80.5,
       medallionLeft: 65.5,
-      medallionFontSize: 46,
+      medallionFontSize: 26, // Standardized to 26px
       dateTop: 90.5,
       dateLeft: 52,
       dateFontSize: 39,
