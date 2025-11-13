@@ -27,10 +27,50 @@ export default function VideoPlayer({
         // Handle Vimeo URLs
         const videoId = extractVimeoId(url);
         return videoId ? `https://player.vimeo.com/video/${videoId}` : null;
+      } else if (type === 'other' || url.includes('drive.google.com')) {
+        // Handle Google Drive URLs - convert /view to /preview for embedding
+        const googleDriveUrl = convertGoogleDriveToPreview(url);
+        if (googleDriveUrl) {
+          return googleDriveUrl;
+        }
       }
       return null;
     } catch (error) {
       console.error('Error creating embed URL:', error);
+      return null;
+    }
+  };
+
+  // Convert Google Drive URLs to preview format for embedding
+  const convertGoogleDriveToPreview = (url: string): string | null => {
+    try {
+      // Pattern 1: https://drive.google.com/file/d/FILE_ID/view
+      // Pattern 2: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+      const fileIdPattern = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
+      const match = url.match(fileIdPattern);
+      
+      if (match && match[1]) {
+        const fileId = match[1];
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+      
+      // Pattern 3: https://drive.google.com/open?id=FILE_ID
+      const openPattern = /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/;
+      const openMatch = url.match(openPattern);
+      
+      if (openMatch && openMatch[1]) {
+        const fileId = openMatch[1];
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+      
+      // Pattern 4: Already in preview format
+      if (url.includes('/preview')) {
+        return url;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error converting Google Drive URL:', error);
       return null;
     }
   };
@@ -73,7 +113,7 @@ export default function VideoPlayer({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-black flex items-center">
           <span className="mr-2">📹</span>
-          Performance Video ({videoType?.toUpperCase()})
+          Performance Video {videoUrl.includes('drive.google.com') ? '(GOOGLE DRIVE)' : `(${videoType?.toUpperCase()})`}
         </h3>
         <a
           href={videoUrl}
@@ -110,6 +150,8 @@ export default function VideoPlayer({
                 <p className="text-xs text-yellow-700 mb-3">
                   {videoType === 'youtube' 
                     ? 'YouTube video ID could not be extracted. Please check the URL format.' 
+                    : videoUrl.includes('drive.google.com')
+                    ? 'Google Drive file ID could not be extracted. Please check the URL format. Make sure the file is shared with "Anyone with the link" permission.'
                     : 'This video type requires opening in a new tab.'}
                 </p>
                 <div className="bg-white rounded border border-yellow-300 p-2 mb-3">
