@@ -875,13 +875,37 @@ export const db = {
     if (result.length === 0) return null;
     
     const row = result[0];
+    
+    // Safely parse participant_names - handle both JSON and plain string/array
+    let participantNames: string[] = [];
+    try {
+      if (row.participant_names) {
+        if (typeof row.participant_names === 'string') {
+          // Try to parse as JSON first
+          try {
+            participantNames = JSON.parse(row.participant_names);
+          } catch {
+            // If not JSON, treat as a single string or comma-separated
+            participantNames = row.participant_names.includes(',') 
+              ? row.participant_names.split(',').map((n: string) => n.trim())
+              : [row.participant_names];
+          }
+        } else if (Array.isArray(row.participant_names)) {
+          participantNames = row.participant_names;
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing participant_names:', error, row.participant_names);
+      participantNames = [];
+    }
+    
     return {
       id: row.id,
       eventId: row.event_id,
       eventEntryId: row.event_entry_id,
       contestantId: row.contestant_id,
       title: row.title,
-      participantNames: JSON.parse(row.participant_names),
+      participantNames,
       duration: row.duration,
       itemNumber: row.item_number,
       withdrawnFromJudging: row.withdrawn_from_judging || false,
@@ -2010,27 +2034,45 @@ export const db = {
 
   async getScoresByPerformance(performanceId: string) {
     const sqlClient = getSql();
-    const result = await sqlClient`
-      SELECT s.*, j.name as judge_name
-      FROM scores s
-      JOIN judges j ON s.judge_id = j.id
-      WHERE s.performance_id = ${performanceId}
-      ORDER BY s.submitted_at
-    ` as any[];
+    try {
+      const result = await sqlClient`
+        SELECT 
+          s.id,
+          s.judge_id,
+          s.performance_id,
+          s.technical_score,
+          s.musical_score,
+          s.performance_score,
+          s.styling_score,
+          s.overall_impression_score,
+          s.comments,
+          s.submitted_at,
+          j.name as judge_name,
+          j.email as judge_email
+        FROM scores s
+        INNER JOIN judges j ON s.judge_id = j.id
+        WHERE s.performance_id = ${performanceId}
+        ORDER BY s.submitted_at
+      ` as any[];
 
-    return result.map((row: any) => ({
-      id: row.id,
-      judgeId: row.judge_id,
-      performanceId: row.performance_id,
-      technicalScore: parseFloat(row.technical_score),
-      musicalScore: parseFloat(row.musical_score || 0),
-      performanceScore: parseFloat(row.performance_score || 0),
-      stylingScore: parseFloat(row.styling_score || 0),
-      overallImpressionScore: parseFloat(row.overall_impression_score || 0),
-      comments: row.comments,
-      submittedAt: row.submitted_at,
-      judgeName: row.judge_name
-    })) as (Score & { judgeName: string })[];
+      return result.map((row: any) => ({
+        id: row.id,
+        judgeId: row.judge_id,
+        performanceId: row.performance_id,
+        technicalScore: parseFloat(row.technical_score || 0),
+        musicalScore: parseFloat(row.musical_score || 0),
+        performanceScore: parseFloat(row.performance_score || 0),
+        stylingScore: parseFloat(row.styling_score || 0),
+        overallImpressionScore: parseFloat(row.overall_impression_score || 0),
+        comments: row.comments || '',
+        submittedAt: row.submitted_at,
+        judgeName: row.judge_name || 'Unknown Judge',
+        judgeEmail: row.judge_email || ''
+      })) as (Score & { judgeName: string; judgeEmail: string })[];
+    } catch (error) {
+      console.error('Error in getScoresByPerformance:', error);
+      throw new Error(`Database query failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   },
 
   // Get published scores for a dancer by their EODSA ID

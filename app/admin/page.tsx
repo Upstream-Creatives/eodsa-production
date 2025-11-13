@@ -1492,27 +1492,27 @@ function AdminDashboard() {
           <div className="relative mb-8">
             {/* Modern Spinner */}
             <div className="w-16 h-16 mx-auto">
-              <div className="absolute inset-0 rounded-full border-4 border-indigo-100"></div>
+              <div className={`absolute inset-0 rounded-full border-4 ${themeClasses.loadingSpinner}`}></div>
             </div>
             {/* Floating Dots */}
-            <div className="absolute -top-6 -left-6 w-3 h-3 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
-            <div className="absolute -top-6 -right-6 w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-            <div className="absolute -bottom-6 -left-6 w-3 h-3 bg-pink-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
-            <div className="absolute -bottom-6 -right-6 w-3 h-3 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.6s'}}></div>
+            <div className="absolute -top-6 -left-6 w-3 h-3 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
+            <div className="absolute -top-6 -right-6 w-3 h-3 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            <div className="absolute -bottom-6 -left-6 w-3 h-3 bg-pink-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+            <div className="absolute -bottom-6 -right-6 w-3 h-3 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '0.6s'}}></div>
           </div>
           
           {/* Loading Text */}
           <div className="space-y-3">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h2 className={`text-2xl font-bold ${themeClasses.accentGradientText}`}>
               Loading Avalon Admin Dashboard
             </h2>
             <p className={`${themeClasses.loadingText} font-medium animate-pulse`}>Preparing your dashboard...</p>
             
             {/* Progress Dots */}
             <div className="flex justify-center space-x-2 mt-6">
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" style={{animationDelay: '0s'}}></div>
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
-              <div className="w-2 h-2 bg-pink-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
+              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" style={{animationDelay: '0s'}}></div>
+              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+              <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
             </div>
           </div>
         </div>
@@ -1527,75 +1527,53 @@ function AdminDashboard() {
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:py-8 gap-4">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center flex-shrink-0 shadow-lg`}>
                 <span className="text-white text-lg sm:text-xl font-bold">A</span>
             </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent leading-tight">
+                <h1 className={`text-xl sm:text-2xl lg:text-3xl font-black ${themeClasses.accentGradientText} leading-tight`}>
                   Avalon Admin Dashboard
                 </h1>
                 <p className={`${themeClasses.textSecondary} text-xs sm:text-sm lg:text-base font-medium`}>Competition Management System</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className={`hidden md:flex items-center space-x-3 px-3 sm:px-4 py-2 ${themeClasses.systemOnlineBg} rounded-xl`}>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {/* System Status */}
+              <div className={`hidden md:flex items-center space-x-2 px-3 py-1.5 ${themeClasses.metricCardBg} ${themeClasses.cardRadius} border ${themeClasses.metricCardBorder} backdrop-blur-sm`}>
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className={`text-xs sm:text-sm font-medium ${themeClasses.textSecondary}`}>System Online</span>
+                <span className={`text-xs font-medium ${themeClasses.textSecondary}`}>System Online</span>
               </div>
-              {/* Email testing disabled for Phase 1 */}
-              {/* <button
-                onClick={() => setShowEmailTestModal(true)}
-                className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg sm:rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
-              >
-                <span className="text-sm sm:text-base">📧</span>
-                <span className="font-medium">Email Test</span>
-              </button> */}
 
-              <button
-                onClick={handleCleanDatabase}
-                disabled={isCleaningDatabase}
-                style={{ display: 'none' }}
-                className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg sm:rounded-xl hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
-              >
-                {isCleaningDatabase ? (
-                  <>
-                    <div className="relative w-5 h-5">
-                      <div className="absolute inset-0 border-2 border-white/30 rounded-full"></div>
-                    </div>
-                    <span className="font-medium">Cleaning...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-sm sm:text-base">🗑️</span>
-                    <span className="font-medium">Clean DB</span>
-                  </>
-                )}
-              </button>
-              <ThemeToggle />
-              
-              <Link 
-                href="/admin/rankings"
-                className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg sm:rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
-              >
-                <span className="text-sm sm:text-base">📊</span>
-                <span className="font-medium">Rankings</span>
-              </Link>
+              {/* Action Buttons Group */}
+              <div className={`flex items-center gap-2 px-2 py-1 ${theme === 'dark' ? 'bg-gray-800/50' : 'bg-gray-100/50'} ${themeClasses.cardRadius} border ${themeClasses.cardBorder} backdrop-blur-sm`}>
+                <Link 
+                  href="/admin/rankings"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${themeClasses.buttonPrimary} rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 hover:shadow-md`}
+                >
+                  <span>📊</span>
+                  <span className="hidden sm:inline">Rankings</span>
+                </Link>
 
-              <Link 
-                href="/admin/scoring-approval"
-                className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg sm:rounded-xl hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
-              >
-                <span className="text-sm sm:text-base">⚖️</span>
-                <span className="font-medium">Score Approval</span>
-              </Link>
+                <Link 
+                  href="/admin/scoring-approval"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${themeClasses.buttonSuccess} rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 hover:shadow-md`}
+                >
+                  <span>⚖️</span>
+                  <span className="hidden sm:inline">Score Approval</span>
+                </Link>
 
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg sm:rounded-xl hover:from-red-600 hover:to-pink-700 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
-              >
-                <span className="text-sm sm:text-base">🚪</span>
-                <span className="font-medium">Logout</span>
-              </button>
+                <div className={`w-px h-6 ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
+
+                <ThemeToggle />
+
+                <button
+                  onClick={handleLogout}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${themeClasses.buttonDanger} rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 hover:shadow-md`}
+                >
+                  <span>🚪</span>
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1635,9 +1613,9 @@ function AdminDashboard() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center justify-center space-x-2 sm:space-x-3 px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base transform ${
-                    activeTab === tab.id
-                    ? `bg-gradient-to-r from-${tab.color}-500 to-${tab.color === 'indigo' ? 'blue' : tab.color === 'purple' ? 'pink' : 'rose'}-600 text-white shadow-lg scale-105`
-                    : `${themeClasses.textSecondary} hover:bg-white/80 hover:shadow-md hover:scale-102`
+                  activeTab === tab.id
+                  ? `bg-gradient-to-r from-${tab.color}-500 to-${tab.color === 'indigo' ? 'blue' : tab.color === 'purple' ? 'pink' : 'rose'}-600 text-white shadow-lg scale-105`
+                  : `${themeClasses.textSecondary} ${theme === 'dark' ? 'hover:bg-gray-700/50 hover:shadow-md' : 'hover:bg-white/80 hover:shadow-md'} hover:scale-102`
                 }`}
               >
                 <span className="text-lg sm:text-xl">{tab.icon}</span>
@@ -2372,7 +2350,7 @@ function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => setShowCreateEventModal(false)}
-                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
+                  className={`${themeClasses.textMuted} ${theme === 'dark' ? 'hover:text-white hover:bg-gray-700/50' : 'hover:text-gray-900 hover:bg-gray-100/50'} p-2 rounded-lg transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2629,7 +2607,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowCreateEventModal(false)}
-                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
+                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} rounded-xl transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -2676,7 +2654,7 @@ function AdminDashboard() {
                     setEditingEvent(null);
                     setUpdateEventMessage('');
                   }}
-                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
+                  className={`${themeClasses.textMuted} ${theme === 'dark' ? 'hover:text-white hover:bg-gray-700/50' : 'hover:text-gray-900 hover:bg-gray-100/50'} p-2 rounded-lg transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -2925,7 +2903,7 @@ function AdminDashboard() {
                     setEditingEvent(null);
                     setUpdateEventMessage('');
                   }}
-                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
+                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} rounded-xl transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -2969,7 +2947,7 @@ function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => setShowCreateJudgeModal(false)}
-                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
+                  className={`${themeClasses.textMuted} ${theme === 'dark' ? 'hover:text-white hover:bg-gray-700/50' : 'hover:text-gray-900 hover:bg-gray-100/50'} p-2 rounded-lg transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -3020,7 +2998,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => setShowJudgePassword(v => !v)}
-                      className="absolute inset-y-0 right-2 my-1 px-3 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                      className={`absolute inset-y-0 right-2 my-1 px-3 rounded-lg ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
                       aria-label="Toggle password visibility"
                     >
                       {showJudgePassword ? '🙈' : '👁️'}
@@ -3061,7 +3039,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowCreateJudgeModal(false)}
-                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
+                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} rounded-xl transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -3210,7 +3188,7 @@ function AdminDashboard() {
                   </div>
                 <button
                   onClick={() => setShowEmailTestModal(false)}
-                  className={`${themeClasses.textMuted} hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100/50 transition-colors`}
+                  className={`${themeClasses.textMuted} ${theme === 'dark' ? 'hover:text-white hover:bg-gray-700/50' : 'hover:text-gray-900 hover:bg-gray-100/50'} p-2 rounded-lg transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -3232,7 +3210,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowEmailTestModal(false)}
-                  className={`px-6 py-3 border border-gray-300 ${themeClasses.textSecondary} rounded-xl hover:bg-gray-50 transition-colors font-medium`}
+                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} rounded-xl transition-colors font-medium`}
                 >
                   Cancel
                 </button>
@@ -3307,7 +3285,7 @@ function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => setShowFinancialModal(false)}
-                  className="text-gray-400 hover:${themeClasses.textSecondary} p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className={`${themeClasses.textMuted} ${theme === 'dark' ? 'hover:text-white hover:bg-gray-700/50' : 'hover:text-gray-900 hover:bg-gray-100'} p-2 rounded-lg transition-colors`}
                 >
                   <span className="text-2xl">×</span>
                 </button>
@@ -4058,7 +4036,7 @@ function AdminDashboard() {
                     </thead>
                     <tbody className={`divide-y ${themeClasses.cardBorder}`}>
                       {clients.map((client) => (
-                        <tr key={client.id} className="hover:bg-gray-50/50">
+                        <tr key={client.id} className={themeClasses.tableRowHover}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>

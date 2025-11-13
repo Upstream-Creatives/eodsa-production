@@ -3,6 +3,8 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface StudioProfileResponse {
   success: boolean;
@@ -51,12 +53,14 @@ interface StudioProfileResponse {
   error?: string;
 }
 
-export default function AdminStudioProfilePage({
+function AdminStudioProfilePageContent({
   params,
 }: {
   params: Promise<{ studioId: string }>;
 }) {
   const router = useRouter();
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
   // Use React's use() hook to handle Promise params in Next.js 15
   const resolvedParams = use(params);
   const studioId = resolvedParams.studioId;
@@ -143,10 +147,10 @@ export default function AdminStudioProfilePage({
 
   if (loading || !studioId) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading studio profile...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-indigo-500' : 'border-indigo-600'} mx-auto mb-4`}></div>
+          <p className={themeClasses.loadingText}>Loading studio profile...</p>
         </div>
       </div>
     );
@@ -154,13 +158,13 @@ export default function AdminStudioProfilePage({
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.mainBg} flex items-center justify-center`}>
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Error</h1>
-          <p className="text-gray-400">{error || 'Studio profile could not be loaded.'}</p>
+          <h1 className={`${themeClasses.heading2} mb-2`}>Error</h1>
+          <p className={themeClasses.textMuted}>{error || 'Studio profile could not be loaded.'}</p>
           <div className="mt-4">
             <button
-              className="px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700"
+              className={`${themeClasses.buttonBase} ${themeClasses.buttonSecondary}`}
               onClick={() => router.back()}
             >
               Go Back
@@ -174,58 +178,64 @@ export default function AdminStudioProfilePage({
   const { studio, dancers, financial, performance } = data;
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <Link href="/admin" className="text-sm text-gray-400 hover:text-gray-200">
+        <div className="flex items-center justify-between">
+          <Link 
+            href="/admin" 
+            className={`text-sm ${themeClasses.textMuted} transition-colors ${
+              theme === 'dark' ? 'hover:text-white' : 'hover:text-gray-900'
+            }`}
+          >
             ← Back to Admin
           </Link>
+          <ThemeToggle />
         </div>
 
         {/* Studio Overview Card */}
-        <div className="rounded-2xl border border-gray-800 p-6 bg-gradient-to-br from-gray-900/70 to-gray-800/40">
+        <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} border ${themeClasses.cardBorder} ${themeClasses.cardPadding}`}>
           <div className="flex items-start justify-between gap-6">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-2">🏢 {studio.name}</h1>
+              <h1 className={`${themeClasses.heading1} mb-2`}>🏢 {studio.name}</h1>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
-                  <div className="text-gray-400 text-sm mb-1">Registration Number</div>
-                  <div className="text-white font-medium">{studio.registrationNumber}</div>
+                  <div className={`${themeClasses.label} mb-1`}>Registration Number</div>
+                  <div className={`${themeClasses.textPrimary} font-medium`}>{studio.registrationNumber}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400 text-sm mb-1">Contact Person</div>
-                  <div className="text-white font-medium">{studio.contactPerson}</div>
+                  <div className={`${themeClasses.label} mb-1`}>Contact Person</div>
+                  <div className={`${themeClasses.textPrimary} font-medium`}>{studio.contactPerson}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400 text-sm mb-1">Email</div>
-                  <div className="text-white">{studio.email}</div>
+                  <div className={`${themeClasses.label} mb-1`}>Email</div>
+                  <div className={themeClasses.textPrimary}>{studio.email}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400 text-sm mb-1">Phone</div>
-                  <div className="text-white">{studio.phone || '—'}</div>
+                  <div className={`${themeClasses.label} mb-1`}>Phone</div>
+                  <div className={themeClasses.textPrimary}>{studio.phone || '—'}</div>
                 </div>
                 {studio.address && (
                   <div className="md:col-span-2">
-                    <div className="text-gray-400 text-sm mb-1">Address</div>
-                    <div className="text-white">{studio.address}</div>
+                    <div className={`${themeClasses.label} mb-1`}>Address</div>
+                    <div className={themeClasses.textPrimary}>{studio.address}</div>
                   </div>
                 )}
               </div>
             </div>
             <div className="text-right">
               <div
-                className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+                className={`${themeClasses.badgeBase} border ${
                   studio.approved
-                    ? 'bg-emerald-900/60 text-emerald-200'
+                    ? themeClasses.badgeGreen
                     : studio.rejectionReason
-                    ? 'bg-red-900/60 text-red-200'
-                    : 'bg-yellow-900/60 text-yellow-200'
+                    ? themeClasses.badgeRed
+                    : themeClasses.badgeYellow
                 }`}
               >
                 {studio.approved ? '✅ Approved' : studio.rejectionReason ? '❌ Rejected' : '⏳ Pending'}
               </div>
               {studio.approvedAt && (
-                <div className="text-gray-400 text-xs mt-2">
+                <div className={`${themeClasses.textMuted} text-xs mt-2`}>
                   Approved: {new Date(studio.approvedAt).toLocaleDateString()}
                 </div>
               )}
@@ -236,108 +246,108 @@ export default function AdminStudioProfilePage({
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Financial Metrics */}
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Total Entries</div>
-            <div className="text-2xl font-bold text-white">{financial.totalEntries}</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Total Entries</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>{financial.totalEntries}</div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Total Fees Invoiced</div>
-            <div className="text-2xl font-bold text-white">R{financial.totalFeesInvoiced.toLocaleString()}</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Total Fees Invoiced</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>R{financial.totalFeesInvoiced.toLocaleString()}</div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Total Paid</div>
-            <div className="text-2xl font-bold text-green-400">R{financial.totalPaid.toLocaleString()}</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Total Paid</div>
+            <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>R{financial.totalPaid.toLocaleString()}</div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Outstanding</div>
-            <div className="text-2xl font-bold text-yellow-400">R{financial.totalOutstanding.toLocaleString()}</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Outstanding</div>
+            <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}`}>R{financial.totalOutstanding.toLocaleString()}</div>
           </div>
         </div>
 
         {/* Performance Analytics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Total Solos</div>
-            <div className="text-2xl font-bold text-white">{performance.totalSolos}</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Total Solos</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>{performance.totalSolos}</div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Group Entries</div>
-            <div className="text-2xl font-bold text-white">{performance.totalGroupEntries}</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Group Entries</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>{performance.totalGroupEntries}</div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Average Score</div>
-            <div className="text-2xl font-bold text-white">{performance.averageScore}%</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Average Score</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>{performance.averageScore}%</div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Medals</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Medals</div>
             <div className="flex gap-2 mt-2">
-              <span className="text-yellow-400">🥇 {performance.medalBreakdown.gold}</span>
-              <span className="text-gray-300">🥈 {performance.medalBreakdown.silver}</span>
-              <span className="text-amber-600">🥉 {performance.medalBreakdown.bronze}</span>
+              <span className={theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}>🥇 {performance.medalBreakdown.gold}</span>
+              <span className={themeClasses.textSecondary}>🥈 {performance.medalBreakdown.silver}</span>
+              <span className={theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}>🥉 {performance.medalBreakdown.bronze}</span>
             </div>
           </div>
         </div>
 
         {/* Registered Dancers (Children) */}
-        <div className="rounded-2xl border border-gray-800 overflow-hidden">
-          <div className="px-6 py-4 bg-gray-900/70 border-b border-gray-800">
-            <h2 className="text-lg font-semibold">Registered Dancers ({dancers.length})</h2>
-            <div className="text-gray-400 text-sm">All children/dancers affiliated with this studio</div>
+        <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} overflow-hidden border ${themeClasses.cardBorder}`}>
+          <div className={`${themeClasses.sectionHeaderBg} px-6 py-4 border-b ${themeClasses.sectionHeaderBorder}`}>
+            <h2 className={`${themeClasses.heading3}`}>Registered Dancers ({dancers.length})</h2>
+            <div className={`${themeClasses.textMuted} text-sm`}>All children/dancers affiliated with this studio</div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-800">
-              <thead className="bg-gray-900/50">
+            <table className={`min-w-full ${themeClasses.tableBorder}`}>
+              <thead className={themeClasses.tableHeader}>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <th className={`${themeClasses.tableCellPadding} text-left text-xs font-semibold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <th className={`${themeClasses.tableCellPadding} text-left text-xs font-semibold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                     EODSA ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <th className={`${themeClasses.tableCellPadding} text-left text-xs font-semibold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                     Age
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <th className={`${themeClasses.tableCellPadding} text-left text-xs font-semibold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                     Mastery Level
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <th className={`${themeClasses.tableCellPadding} text-left text-xs font-semibold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className={`${themeClasses.tableRow} ${themeClasses.tableBorder}`}>
                 {dancers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-6 text-center text-gray-400 text-sm">
+                    <td colSpan={5} className={`${themeClasses.tableCellPadding} text-center ${themeClasses.emptyStateText} text-sm`}>
                       No registered dancers found.
                     </td>
                   </tr>
                 ) : (
                   dancers.map((dancer) => (
-                    <tr key={dancer.id} className="hover:bg-gray-900/40">
-                      <td className="px-6 py-3 text-sm text-gray-200 font-medium">{dancer.name}</td>
-                      <td className="px-6 py-3 text-sm text-gray-300 font-mono">{dancer.eodsaId}</td>
-                      <td className="px-6 py-3 text-sm text-gray-300">{dancer.age ?? '—'}</td>
-                      <td className="px-6 py-3 text-sm">
+                    <tr key={dancer.id} className={themeClasses.tableRowHover}>
+                      <td className={`${themeClasses.tableCellPadding} text-sm ${themeClasses.textPrimary} font-medium`}>{dancer.name}</td>
+                      <td className={`${themeClasses.tableCellPadding} text-sm ${themeClasses.textSecondary} font-mono`}>{dancer.eodsaId}</td>
+                      <td className={`${themeClasses.tableCellPadding} text-sm ${themeClasses.textSecondary}`}>{dancer.age ?? '—'}</td>
+                      <td className={themeClasses.tableCellPadding}>
                         {dancer.masteryLevel ? (
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          <span className={`${themeClasses.badgeBase} ${
                             dancer.masteryLevel.toLowerCase().includes('water')
-                              ? 'bg-blue-900/60 text-blue-200'
+                              ? themeClasses.badgeBlue
                               : dancer.masteryLevel.toLowerCase().includes('fire')
-                              ? 'bg-orange-900/60 text-orange-200'
-                              : 'bg-gray-700 text-gray-300'
+                              ? themeClasses.badgeOrange
+                              : themeClasses.badgeGray
                           }`}>
                             {dancer.masteryLevel}
                           </span>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className={themeClasses.textMuted}>—</span>
                         )}
                       </td>
-                      <td className="px-6 py-3 text-sm">
+                      <td className={themeClasses.tableCellPadding}>
                         <Link
                           href={`/admin/dancers/${dancer.eodsaId}`}
-                          className="text-blue-400 hover:text-blue-300 underline text-xs"
+                          className={`${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} underline text-xs transition-colors`}
                         >
                           View Profile →
                         </Link>
@@ -351,6 +361,18 @@ export default function AdminStudioProfilePage({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminStudioProfilePage({
+  params,
+}: {
+  params: Promise<{ studioId: string }>;
+}) {
+  return (
+    <ThemeProvider>
+      <AdminStudioProfilePageContent params={params} />
+    </ThemeProvider>
   );
 }
 

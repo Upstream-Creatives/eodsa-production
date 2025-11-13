@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { getMedalFromPercentage } from '@/lib/types';
+import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface RankingData {
   performanceId: string;
@@ -38,7 +40,9 @@ interface Certificate {
   createdAt: string;
 }
 
-export default function AdminCertificatesPage() {
+function AdminCertificatesPageContent() {
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
   const [rankings, setRankings] = useState<RankingData[]>([]);
   const [filteredRankings, setFilteredRankings] = useState<RankingData[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -398,13 +402,29 @@ export default function AdminCertificatesPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
+        <div className="text-center">
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-indigo-500' : 'border-indigo-600'} mx-auto mb-4`}></div>
+          <p className={themeClasses.loadingText}>Loading certificates...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">📜 Certificate Manager</h1>
-          <p className="text-gray-600">Generate and manage certificates for winners</p>
+        <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} ${themeClasses.cardPadding} mb-6 border ${themeClasses.cardBorder}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className={`${themeClasses.heading1} mb-2`}>📜 Certificate Manager</h1>
+              <p className={themeClasses.textSecondary}>Generate and manage certificates for winners</p>
+            </div>
+            <ThemeToggle />
+          </div>
         </div>
 
         {/* View Toggle */}
@@ -413,8 +433,8 @@ export default function AdminCertificatesPage() {
             onClick={() => setViewMode('rankings')}
             className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
               viewMode === 'rankings'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
+                ? themeClasses.filterButtonActive
+                : themeClasses.filterButtonInactive
             }`}
           >
             🏆 Select Winners
@@ -423,8 +443,8 @@ export default function AdminCertificatesPage() {
             onClick={() => setViewMode('certificates')}
             className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
               viewMode === 'certificates'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
+                ? themeClasses.filterButtonActive
+                : themeClasses.filterButtonInactive
             }`}
           >
             📋 View Certificates
@@ -433,12 +453,12 @@ export default function AdminCertificatesPage() {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-6">
+          <div className={`${themeClasses.badgeRed} px-4 py-3 ${themeClasses.cardRadius} mb-6`}>
             {error}
           </div>
         )}
         {success && (
-          <div className="bg-green-50 border border-green-300 text-green-800 px-4 py-3 rounded-lg mb-6">
+          <div className={`${themeClasses.badgeGreen} px-4 py-3 ${themeClasses.cardRadius} mb-6`}>
             {success}
           </div>
         )}
@@ -908,6 +928,14 @@ export default function AdminCertificatesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AdminCertificatesPage() {
+  return (
+    <ThemeProvider>
+      <AdminCertificatesPageContent />
+    </ThemeProvider>
   );
 }
 

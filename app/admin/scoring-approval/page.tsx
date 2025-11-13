@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/simple-toast';
+import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface JudgeScore {
   judgeId: string;
@@ -32,8 +34,10 @@ interface PerformanceApproval {
   scoresPublished: boolean;
 }
 
-export default function ScoringApprovalPage() {
+function ScoringApprovalPageContent() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
   const { success, error } = useToast();
   const [user, setUser] = useState<any>(null);
   const [approvals, setApprovals] = useState<PerformanceApproval[]>([]);
@@ -203,40 +207,41 @@ export default function ScoringApprovalPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-black">Loading scoring approvals...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-indigo-500' : 'border-indigo-600'} mx-auto`}></div>
+          <p className={`mt-4 ${themeClasses.loadingText}`}>Loading scoring approvals...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className={`${themeClasses.headerBg} shadow`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:py-6 gap-4">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center flex-shrink-0`}>
                 <span className="text-white text-lg sm:text-xl">⚖️</span>
               </div>
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-black">Score Approval Dashboard</h1>
-                <p className="text-xs sm:text-sm text-gray-700 hidden sm:block">Review & publish aggregated performance scores</p>
+                <h1 className={`text-lg sm:text-2xl font-bold ${themeClasses.textPrimary}`}>Score Approval Dashboard</h1>
+                <p className={`text-xs sm:text-sm ${themeClasses.textSecondary} hidden sm:block`}>Review & publish aggregated performance scores</p>
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
+              <ThemeToggle />
               <button
                 onClick={() => router.push('/admin')}
-                className="flex-1 sm:flex-none px-3 py-2 sm:px-4 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className={`flex-1 sm:flex-none px-3 py-2 sm:px-4 text-xs sm:text-sm ${themeClasses.buttonBase} ${themeClasses.buttonSecondary}`}
               >
                 ← Back
               </button>
               <button
                 onClick={fetchApprovals}
-                className="flex-1 sm:flex-none px-3 py-2 sm:px-4 text-xs sm:text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className={`flex-1 sm:flex-none px-3 py-2 sm:px-4 text-xs sm:text-sm ${themeClasses.buttonBase} ${themeClasses.buttonPrimary}`}
               >
                 🔄 Refresh
               </button>
@@ -248,48 +253,48 @@ export default function ScoringApprovalPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} p-3 sm:p-6 border ${themeClasses.metricCardBorder}`}>
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
-                <span className="text-blue-600 text-sm sm:text-base">📋</span>
+              <div className={`w-8 h-8 ${themeClasses.badgeBlue} ${themeClasses.cardRadius} flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0`}>
+                <span className={`text-sm sm:text-base ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>📋</span>
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-black truncate">Total</p>
-                <p className="text-xl sm:text-2xl font-semibold text-black">{approvals.length}</p>
+                <p className={`text-xs sm:text-sm font-medium ${themeClasses.textSecondary} truncate`}>Total</p>
+                <p className={`text-xl sm:text-2xl font-semibold ${themeClasses.textPrimary}`}>{approvals.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} p-3 sm:p-6 border ${themeClasses.metricCardBorder}`}>
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
-                <span className="text-yellow-600 text-sm sm:text-base">⏳</span>
+              <div className={`w-8 h-8 ${themeClasses.badgeYellow} ${themeClasses.cardRadius} flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0`}>
+                <span className={`text-sm sm:text-base ${theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}`}>⏳</span>
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-black truncate">Pending</p>
-                <p className="text-xl sm:text-2xl font-semibold text-black">{pendingCount}</p>
+                <p className={`text-xs sm:text-sm font-medium ${themeClasses.textSecondary} truncate`}>Pending</p>
+                <p className={`text-xl sm:text-2xl font-semibold ${themeClasses.textPrimary}`}>{pendingCount}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-3 sm:p-6">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} p-3 sm:p-6 border ${themeClasses.metricCardBorder}`}>
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
-                <span className="text-green-600 text-sm sm:text-base">✅</span>
+              <div className={`w-8 h-8 ${themeClasses.badgeGreen} ${themeClasses.cardRadius} flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0`}>
+                <span className={`text-sm sm:text-base ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>✅</span>
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-black truncate">Published</p>
-                <p className="text-xl sm:text-2xl font-semibold text-black">{publishedCount}</p>
+                <p className={`text-xs sm:text-sm font-medium ${themeClasses.textSecondary} truncate`}>Published</p>
+                <p className={`text-xl sm:text-2xl font-semibold ${themeClasses.textPrimary}`}>{publishedCount}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6 sm:mb-8">
+        <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} p-4 sm:p-6 mb-6 sm:mb-8 border ${themeClasses.cardBorder}`}>
           <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
             <div className="flex-1">
-              <label className="block text-xs sm:text-sm font-medium text-black mb-2">Search</label>
+              <label className={`block text-xs sm:text-sm font-medium ${themeClasses.label} mb-2`}>Search</label>
               <input
                 type="text"
                 value={searchTerm}
@@ -551,5 +556,13 @@ export default function ScoringApprovalPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ScoringApprovalPage() {
+  return (
+    <ThemeProvider>
+      <ScoringApprovalPageContent />
+    </ThemeProvider>
   );
 }

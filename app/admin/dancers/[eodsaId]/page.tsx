@@ -3,6 +3,8 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface ProfileResponse {
   success: boolean;
@@ -59,12 +61,14 @@ interface ProfileResponse {
   error?: string;
 }
 
-export default function AdminDancerProfilePage({
+function AdminDancerProfilePageContent({
   params,
 }: {
   params: Promise<{ eodsaId: string }>;
 }) {
   const router = useRouter();
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
   // Use React's use() hook to handle Promise params in Next.js 15
   const resolvedParams = use(params);
   const eodsaId = resolvedParams.eodsaId;
@@ -151,10 +155,10 @@ export default function AdminDancerProfilePage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading dancer profile...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-indigo-500' : 'border-indigo-600'} mx-auto mb-4`}></div>
+          <p className={themeClasses.loadingText}>Loading dancer profile...</p>
         </div>
       </div>
     );
@@ -162,13 +166,13 @@ export default function AdminDancerProfilePage({
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.mainBg} flex items-center justify-center`}>
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Error</h1>
-          <p className="text-gray-400">{error || 'Dancer profile could not be loaded.'}</p>
+          <h1 className={`${themeClasses.heading2} mb-2`}>Error</h1>
+          <p className={themeClasses.textMuted}>{error || 'Dancer profile could not be loaded.'}</p>
           <div className="mt-4">
             <button
-              className="px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700"
+              className={`${themeClasses.buttonBase} ${themeClasses.buttonSecondary}`}
               onClick={() => router.back()}
             >
               Go Back
@@ -182,51 +186,57 @@ export default function AdminDancerProfilePage({
   const { dancer, studio, history } = data;
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <Link href="/admin" className="text-sm text-gray-400 hover:text-gray-200">
+        <div className="flex items-center justify-between">
+          <Link 
+            href="/admin" 
+            className={`text-sm ${themeClasses.textMuted} transition-colors ${
+              theme === 'dark' ? 'hover:text-white' : 'hover:text-gray-900'
+            }`}
+          >
             ← Back to Admin
           </Link>
+          <ThemeToggle />
         </div>
 
         {/* Header Card - Clean Profile Overview */}
-        <div className="rounded-2xl border border-gray-800 p-8 bg-gradient-to-br from-gray-900/70 to-gray-800/40">
+        <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} border ${themeClasses.cardBorder} p-8`}>
           <div className="flex items-start justify-between gap-6 mb-6">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-white mb-2">{dancer.name}</h1>
+              <h1 className={`${themeClasses.heading1} mb-2`}>{dancer.name}</h1>
               <div className="flex flex-wrap items-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">EODSA ID:</span>
-                  <span className="font-mono text-gray-200">{dancer.eodsaId}</span>
+                  <span className={themeClasses.textMuted}>EODSA ID:</span>
+                  <span className={`font-mono ${themeClasses.textSecondary}`}>{dancer.eodsaId}</span>
                 </div>
                 {dancer.age !== null && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Age:</span>
-                    <span className="text-gray-200 font-medium">{dancer.age}</span>
+                    <span className={themeClasses.textMuted}>Age:</span>
+                    <span className={`${themeClasses.textSecondary} font-medium`}>{dancer.age}</span>
                   </div>
                 )}
                 {dancer.ageCategory && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Age Group:</span>
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-900/60 text-blue-200">
+                    <span className={themeClasses.textMuted}>Age Group:</span>
+                    <span className={`${themeClasses.badgeBase} ${themeClasses.badgeBlue}`}>
                       {dancer.ageCategory}
                     </span>
                   </div>
                 )}
                 {dancer.registrationFeeMasteryLevel && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Mastery Level:</span>
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                    <span className={themeClasses.textMuted}>Mastery Level:</span>
+                    <span className={`${themeClasses.badgeBase} ${
                       dancer.registrationFeeMasteryLevel.toLowerCase().includes('water')
-                        ? 'bg-blue-900/60 text-blue-200'
+                        ? themeClasses.badgeBlue
                         : dancer.registrationFeeMasteryLevel.toLowerCase().includes('fire')
-                        ? 'bg-orange-900/60 text-orange-200'
+                        ? themeClasses.badgeOrange
                         : dancer.registrationFeeMasteryLevel.toLowerCase().includes('earth')
-                        ? 'bg-green-900/60 text-green-200'
+                        ? themeClasses.badgeGreen
                         : dancer.registrationFeeMasteryLevel.toLowerCase().includes('air')
-                        ? 'bg-purple-900/60 text-purple-200'
-                        : 'bg-gray-700 text-gray-300'
+                        ? themeClasses.badgePurple
+                        : themeClasses.badgeGray
                     }`}>
                       {dancer.registrationFeeMasteryLevel}
                     </span>
@@ -236,8 +246,8 @@ export default function AdminDancerProfilePage({
             </div>
             <div className="text-right">
               <div
-                className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-                  dancer.approved ? 'bg-emerald-900/60 text-emerald-200' : 'bg-yellow-900/60 text-yellow-200'
+                className={`${themeClasses.badgeBase} border ${
+                  dancer.approved ? themeClasses.badgeGreen : themeClasses.badgeYellow
                 }`}
               >
                 {dancer.approved ? '✓ Approved' : '⏳ Pending'}
@@ -247,19 +257,19 @@ export default function AdminDancerProfilePage({
           
           {/* Studio/Parent Information */}
           {studio && (studio.name || studio.registrationNumber) ? (
-            <div className="mt-4 pt-4 border-t border-gray-700">
+            <div className={`mt-4 pt-4 border-t ${themeClasses.cardBorder}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-gray-400 mb-1">Studio (Parent)</div>
-                  <div className="text-gray-200 font-medium">{studio.name || '—'}</div>
+                  <div className={`${themeClasses.label} mb-1`}>Studio (Parent)</div>
+                  <div className={`${themeClasses.textPrimary} font-medium`}>{studio.name || '—'}</div>
                   {studio.registrationNumber && (
-                    <div className="text-xs text-gray-400 mt-1">Reg. #{studio.registrationNumber}</div>
+                    <div className={`${themeClasses.textMuted} text-xs mt-1`}>Reg. #{studio.registrationNumber}</div>
                   )}
                 </div>
                 {studio.id && (
                   <Link
                     href={`/admin/studios/${studio.id}`}
-                    className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+                    className={`inline-flex items-center px-3 py-1.5 ${themeClasses.buttonBase} ${themeClasses.buttonPrimary} text-xs`}
                   >
                     View Studio →
                   </Link>
@@ -267,27 +277,27 @@ export default function AdminDancerProfilePage({
               </div>
             </div>
           ) : (
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <div className="text-xs text-gray-400 mb-1">Studio (Parent)</div>
-              <div className="text-gray-400 text-sm">Independent Dancer (Not affiliated with any studio)</div>
+            <div className={`mt-4 pt-4 border-t ${themeClasses.cardBorder}`}>
+              <div className={`${themeClasses.label} mb-1`}>Studio (Parent)</div>
+              <div className={`${themeClasses.textMuted} text-sm`}>Independent Dancer (Not affiliated with any studio)</div>
             </div>
           )}
         </div>
 
         {/* Results Summary */}
         {history.filter(h => h.ranking && h.ranking.score !== null).length > 0 && (
-          <div className="rounded-2xl border border-gray-800 p-6 bg-gradient-to-br from-purple-900/20 to-blue-900/20">
-            <h2 className="text-lg font-semibold text-white mb-4">Competition Results Summary</h2>
+          <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} border ${themeClasses.cardBorder} p-6`}>
+            <h2 className={`${themeClasses.heading3} mb-4`}>Competition Results Summary</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-900/60 rounded-lg p-4 border border-gray-800">
-                <div className="text-gray-400 text-sm mb-1">Total Performances Scored</div>
-                <div className="text-2xl font-bold text-white">
+              <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                <div className={`${themeClasses.textMuted} text-sm mb-1`}>Total Performances Scored</div>
+                <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
                   {history.filter(h => h.ranking && h.ranking.score !== null).length}
                 </div>
               </div>
-              <div className="bg-gray-900/60 rounded-lg p-4 border border-gray-800">
-                <div className="text-gray-400 text-sm mb-1">Average Score</div>
-                <div className="text-2xl font-bold text-white">
+              <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                <div className={`${themeClasses.textMuted} text-sm mb-1`}>Average Score</div>
+                <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
                   {(() => {
                     const scores = history
                       .filter(h => h.ranking && h.ranking.score !== null)
@@ -299,9 +309,9 @@ export default function AdminDancerProfilePage({
                   })()}
                 </div>
               </div>
-              <div className="bg-gray-900/60 rounded-lg p-4 border border-gray-800">
-                <div className="text-gray-400 text-sm mb-1">Best Medal</div>
-                <div className="text-2xl font-bold text-white">
+              <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                <div className={`${themeClasses.textMuted} text-sm mb-1`}>Best Medal</div>
+                <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
                   {(() => {
                     const medals = history
                       .filter(h => h.ranking && h.ranking.medal)
@@ -324,68 +334,68 @@ export default function AdminDancerProfilePage({
 
         {/* Competition Summary */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Total Entries</div>
-            <div className="text-2xl font-bold text-white">{history.length}</div>
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Total Entries</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>{history.length}</div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Live Entries</div>
-            <div className="text-2xl font-bold text-white">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Live Entries</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
               {history.filter(h => h.entryType === 'live').length}
             </div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Virtual Entries</div>
-            <div className="text-2xl font-bold text-white">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Virtual Entries</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
               {history.filter(h => h.entryType === 'virtual').length}
             </div>
           </div>
-          <div className="rounded-xl border border-gray-800 p-4 bg-gray-900/60">
-            <div className="text-gray-400 text-sm mb-1">Total Fees</div>
-            <div className="text-2xl font-bold text-white">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+            <div className={`${themeClasses.textMuted} text-sm mb-1`}>Total Fees</div>
+            <div className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
               R{history.reduce((sum, h) => sum + (h.calculatedFee || 0), 0).toFixed(2)}
             </div>
           </div>
         </div>
 
         {/* Event History - Clean List View */}
-        <div className="rounded-2xl border border-gray-800 overflow-hidden">
-          <div className="px-6 py-4 bg-gray-900/70 border-b border-gray-800">
-            <h2 className="text-lg font-semibold text-white">Competition History</h2>
-            <div className="text-gray-400 text-sm">All events this dancer has entered</div>
+        <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} overflow-hidden border ${themeClasses.cardBorder}`}>
+          <div className={`${themeClasses.sectionHeaderBg} px-6 py-4 border-b ${themeClasses.sectionHeaderBorder}`}>
+            <h2 className={`${themeClasses.heading3}`}>Competition History</h2>
+            <div className={`${themeClasses.textMuted} text-sm`}>All events this dancer has entered</div>
           </div>
 
-          <div className="divide-y divide-gray-800">
+          <div className={themeClasses.tableBorder}>
             {history.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-400 text-sm">
+              <div className={`px-6 py-12 text-center ${themeClasses.emptyStateText} text-sm`}>
                 No competition entries found.
               </div>
             ) : (
               history.map((h) => (
-                <div key={h.id} className="px-6 py-4 hover:bg-gray-900/40 transition-colors">
+                <div key={h.id} className={`px-6 py-4 ${themeClasses.tableRowHover} transition-colors`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-base font-semibold text-white">{h.itemName || 'Untitled Performance'}</h3>
+                        <h3 className={`text-base font-semibold ${themeClasses.textPrimary}`}>{h.itemName || 'Untitled Performance'}</h3>
                         {h.ranking && h.ranking.medal && (
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                            h.ranking.medal === 'Elite' ? 'bg-yellow-900/60 text-yellow-200' :
-                            h.ranking.medal === 'Opus' ? 'bg-purple-900/60 text-purple-200' :
-                            h.ranking.medal === 'Legend' ? 'bg-blue-900/60 text-blue-200' :
-                            h.ranking.medal === 'Gold' ? 'bg-amber-900/60 text-amber-200' :
-                            h.ranking.medal === 'Silver+' ? 'bg-gray-700 text-gray-200' :
-                            h.ranking.medal === 'Silver' ? 'bg-gray-600 text-gray-200' :
-                            'bg-orange-900/60 text-orange-200'
+                          <span className={`${themeClasses.badgeBase} ${
+                            h.ranking.medal === 'Elite' ? themeClasses.badgeYellow :
+                            h.ranking.medal === 'Opus' ? themeClasses.badgePurple :
+                            h.ranking.medal === 'Legend' ? themeClasses.badgeBlue :
+                            h.ranking.medal === 'Gold' ? (theme === 'dark' ? 'bg-amber-900/60 text-amber-200 border-amber-700/50' : 'bg-amber-100 text-amber-800 border-amber-300') :
+                            h.ranking.medal === 'Silver+' ? themeClasses.badgeGray :
+                            h.ranking.medal === 'Silver' ? themeClasses.badgeGray :
+                            themeClasses.badgeOrange
                           }`}>
                             {h.ranking.medal === 'Elite' ? '🏆' : h.ranking.medal === 'Opus' ? '🎖️' : h.ranking.medal === 'Legend' ? '🏅' : h.ranking.medal === 'Gold' ? '🥇' : h.ranking.medal === 'Silver+' ? '🥈+' : h.ranking.medal === 'Silver' ? '🥈' : '🥉'} {h.ranking.medal}
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-2">
+                      <div className={`flex flex-wrap items-center gap-4 text-sm ${themeClasses.textMuted} mb-2`}>
                         <div className="flex items-center gap-1">
-                          <span className="font-medium text-gray-300">{h.event.name || '—'}</span>
+                          <span className={`font-medium ${themeClasses.textSecondary}`}>{h.event.name || '—'}</span>
                           {h.event.year && (
-                            <span className="text-gray-500">({h.event.year})</span>
+                            <span className={themeClasses.textMuted}>({h.event.year})</span>
                           )}
                         </div>
                         {h.event.date && (
@@ -402,28 +412,28 @@ export default function AdminDancerProfilePage({
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                        <span className={`${themeClasses.badgeBase} ${
                           h.entryType === 'live' 
-                            ? 'bg-green-900/60 text-green-200' 
+                            ? themeClasses.badgeGreen
                             : h.entryType === 'virtual'
-                            ? 'bg-purple-900/60 text-purple-200'
-                            : 'bg-gray-700 text-gray-300'
+                            ? themeClasses.badgePurple
+                            : themeClasses.badgeGray
                         }`}>
                           {h.entryType === 'live' ? '🎭 Live' : h.entryType === 'virtual' ? '📹 Virtual' : '—'}
                         </span>
                         {h.performanceType && (
-                          <span className="text-gray-400">{h.performanceType}</span>
+                          <span className={themeClasses.textMuted}>{h.performanceType}</span>
                         )}
                         {h.mastery && (
-                          <span className="text-gray-400">• {h.mastery}</span>
+                          <span className={themeClasses.textMuted}>• {h.mastery}</span>
                         )}
                         {h.paymentStatus && (
-                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                          <span className={`${themeClasses.badgeBase} ${
                             h.paymentStatus === 'paid'
-                              ? 'bg-green-900/60 text-green-200'
+                              ? themeClasses.badgeGreen
                               : h.paymentStatus === 'pending'
-                              ? 'bg-yellow-900/60 text-yellow-200'
-                              : 'bg-gray-700 text-gray-300'
+                              ? themeClasses.badgeYellow
+                              : themeClasses.badgeGray
                           }`}>
                             {h.paymentStatus === 'paid' ? '✅ Paid' : h.paymentStatus === 'pending' ? '⏳ Pending' : h.paymentStatus}
                           </span>
@@ -434,14 +444,14 @@ export default function AdminDancerProfilePage({
                       {h.ranking && h.ranking.score !== null ? (
                         <div className="space-y-1">
                           {h.ranking.rank !== null && (
-                            <div className="text-lg font-bold text-white">#{h.ranking.rank}</div>
+                            <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>#{h.ranking.rank}</div>
                           )}
-                          <div className="text-sm text-gray-300">{h.ranking.score.toFixed(1)}%</div>
+                          <div className={`text-sm ${themeClasses.textSecondary}`}>{h.ranking.score.toFixed(1)}%</div>
                         </div>
                       ) : h.performance && h.performance.scoresPublished ? (
-                        <div className="text-xs text-gray-400">Scores Published</div>
+                        <div className={`text-xs ${themeClasses.textMuted}`}>Scores Published</div>
                       ) : (
-                        <div className="text-xs text-gray-500">No Results</div>
+                        <div className={`text-xs ${themeClasses.textMuted}`}>No Results</div>
                       )}
                     </div>
                   </div>
@@ -452,6 +462,18 @@ export default function AdminDancerProfilePage({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminDancerProfilePage({
+  params,
+}: {
+  params: Promise<{ eodsaId: string }>;
+}) {
+  return (
+    <ThemeProvider>
+      <AdminDancerProfilePageContent params={params} />
+    </ThemeProvider>
   );
 }
 

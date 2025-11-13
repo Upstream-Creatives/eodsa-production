@@ -463,10 +463,10 @@ function AdminRankingsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading rankings...</p>
+          <div className={`w-16 h-16 border-4 ${theme === 'dark' ? 'border-indigo-500/30 border-t-indigo-500' : 'border-indigo-600/30 border-t-indigo-600'} rounded-full animate-spin mx-auto mb-4`}></div>
+          <p className={themeClasses.loadingText}>Loading rankings...</p>
         </div>
       </div>
     );
@@ -474,13 +474,13 @@ function AdminRankingsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.mainBg} flex items-center justify-center`}>
         <div className="text-center">
           <div className="text-6xl mb-4">⚠️</div>
-          <p className="text-red-400 text-lg mb-4">{error}</p>
+          <p className={`${theme === 'dark' ? 'text-red-400' : 'text-red-600'} text-lg mb-4`}>{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            className={`${themeClasses.buttonBase} ${themeClasses.buttonPrimary}`}
           >
             Retry
           </button>
@@ -496,25 +496,27 @@ function AdminRankingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+              <div className={`w-10 h-10 ${themeClasses.iconContainer} rounded-full flex items-center justify-center`}>
                 <span className="text-white text-xl">🏆</span>
               </div>
               <div>
-                <h1 className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Nationals Rankings</h1>
+                <h1 className={`${themeClasses.heading2}`}>Nationals Rankings</h1>
                 <p className={`text-sm ${themeClasses.textSecondary}`}>View and analyze nationals performance rankings</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={exportToCSV}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+                className={`${themeClasses.buttonBase} ${themeClasses.buttonSuccess} flex items-center space-x-2`}
               >
                 <span>📊</span>
                 <span>Export CSV</span>
               </button>
               <button
                 onClick={() => window.location.href = '/admin'}
-                className="px-4 py-2 text-gray-400 hover:text-white font-medium"
+                className={`px-4 py-2 ${themeClasses.textMuted} transition-colors ${
+                  theme === 'dark' ? 'hover:text-white' : 'hover:text-gray-900'
+                } font-medium`}
               >
                 Back to Admin
               </button>
@@ -526,36 +528,36 @@ function AdminRankingsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-blue-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-6 ${themeClasses.cardShadow} border ${themeClasses.metricCardBorder} hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
                 {filteredRankings.length}
               </div>
-              <div className="text-sm text-gray-300 font-medium">Total Performances</div>
+              <div className={`text-sm ${themeClasses.textSecondary} font-medium`}>Total Performances</div>
             </div>
           </div>
-          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-green-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-6 ${themeClasses.cardShadow} border ${themeClasses.metricCardBorder} hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
+              <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
                 {new Set(filteredRankings.map(r => r.studioName)).size}
               </div>
-              <div className="text-sm text-gray-300 font-medium">Studios</div>
+              <div className={`text-sm ${themeClasses.textSecondary} font-medium`}>Studios</div>
             </div>
           </div>
-          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-purple-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-6 ${themeClasses.cardShadow} border ${themeClasses.metricCardBorder} hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`}>
                 {new Set(filteredRankings.map(r => r.ageCategory)).size}
               </div>
-              <div className="text-sm text-gray-300 font-medium">Age Categories</div>
+              <div className={`text-sm ${themeClasses.textSecondary} font-medium`}>Age Categories</div>
             </div>
           </div>
-          <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-teal-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+          <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-6 ${themeClasses.cardShadow} border ${themeClasses.metricCardBorder} hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}>
             <div className="text-center">
-              <div className="text-2xl font-bold text-teal-600">
+              <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-teal-400' : 'text-teal-600'}`}>
                 {new Set(filteredRankings.map(r => r.itemStyle)).size}
               </div>
-              <div className="text-sm text-gray-300 font-medium">Dance Styles</div>
+              <div className={`text-sm ${themeClasses.textSecondary} font-medium`}>Dance Styles</div>
             </div>
           </div>
         </div>

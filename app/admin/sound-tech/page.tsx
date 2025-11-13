@@ -286,10 +286,10 @@ function SoundTechPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-black">Loading sound tech dashboard...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-indigo-500' : 'border-indigo-600'} mx-auto`}></div>
+          <p className={`mt-4 ${themeClasses.loadingText}`}>Loading sound tech dashboard...</p>
         </div>
       </div>
     );
@@ -367,31 +367,32 @@ function SoundTechPage() {
         }
       }}
     >
-    <div className="min-h-screen bg-white">
+    <div className={`min-h-screen ${themeClasses.mainBg}`}>
       {/* Header */}
-      <div className="bg-white shadow border-b border-gray-200">
+      <div className={`${themeClasses.headerBg} shadow border-b ${themeClasses.headerBorder}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+              <div className={`w-12 h-12 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center`}>
                 <span className="text-white text-xl">🎵</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-black">Sound Tech Dashboard</h1>
-                <p className="text-gray-600">Manage music files for live performances</p>
+                <h1 className={`${themeClasses.heading2}`}>Sound Tech Dashboard</h1>
+                <p className={themeClasses.textSecondary}>Manage music files for live performances</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <ThemeToggle />
               <button
                 onClick={() => router.push('/admin')}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className={`px-4 py-2 ${themeClasses.buttonBase} ${themeClasses.buttonSecondary}`}
               >
                 ← Back to Admin
               </button>
               {liveEntries.length > 0 && (
                 <button
                   onClick={downloadAllMusic}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                  className={`px-4 py-2 ${themeClasses.buttonBase} ${themeClasses.buttonPrimary} flex items-center space-x-2`}
                 >
                   <span>⬇️</span>
                   <span>Download All Music ({liveEntries.length})</span>
@@ -533,9 +534,9 @@ function SoundTechPage() {
 
         {/* Music Files List */}
         {entryTypeFilter === 'live' || entryTypeFilter === 'all' ? (
-          <div className="bg-white border border-gray-200 rounded-lg shadow mb-8">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-black flex items-center">
+        <div className={`${themeClasses.cardBg} border ${themeClasses.cardBorder} ${themeClasses.cardRadius} ${themeClasses.cardShadow} mb-8`}>
+          <div className={`px-6 py-4 border-b ${themeClasses.cardBorder}`}>
+            <h2 className={`${themeClasses.heading3} flex items-center`}>
                 <span className="mr-2">🎵</span>
                 Live Performances - Music Files ({liveEntries.length})
               </h2>

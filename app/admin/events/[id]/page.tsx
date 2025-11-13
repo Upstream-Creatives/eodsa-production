@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
@@ -79,6 +79,12 @@ interface Performance {
   status: string;
   contestantName?: string;
   withdrawnFromJudging?: boolean;
+  entryType?: 'live' | 'virtual';
+  ageCategory?: string;
+  eodsaId?: string;
+  studioName?: string;
+  studioId?: string;
+  hasScores?: boolean; // Track if performance has been scored
 }
 
 function EventParticipantsPage() {
@@ -109,6 +115,19 @@ function EventParticipantsPage() {
   const [selectedPerformanceScores, setSelectedPerformanceScores] = useState<any>(null);
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [loadingScores, setLoadingScores] = useState(false);
+  const [performanceFilter, setPerformanceFilter] = useState<'all' | 'not_scored' | 'scored'>('all');
+  const [performanceStats, setPerformanceStats] = useState({
+    total: 0,
+    live: 0,
+    virtual: 0,
+    judged: 0,
+    notScored: 0
+  });
+  const performancesSectionRef = useRef<HTMLDivElement>(null);
+  
+  const scrollToPerformances = () => {
+    performancesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
   const [paymentReference, setPaymentReference] = useState('');
@@ -130,14 +149,14 @@ function EventParticipantsPage() {
     return 'Unknown';
   };
 
-  // Get performance type color
+  // Get performance type color - uses theme classes
   const getPerformanceTypeColor = (type: string) => {
     switch (type) {
-      case 'Solo': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Duet': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Trio': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Group': return 'bg-orange-100 text-orange-800 border-orange-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'Solo': return themeClasses.badgePurple;
+      case 'Duet': return themeClasses.badgeBlue;
+      case 'Trio': return themeClasses.badgeGreen;
+      case 'Group': return themeClasses.badgeOrange;
+      default: return themeClasses.badgeGray;
     }
   };
 
@@ -155,6 +174,14 @@ function EventParticipantsPage() {
       (paymentFilter === 'pending' && entry.paymentStatus === 'pending') ||
       (paymentFilter === 'unpaid' && (entry.paymentStatus === 'unpaid' || entry.paymentStatus === 'unpaid_invoice'));
     return performanceTypeMatch && entryTypeMatch && paymentMatch;
+  });
+
+  // Filter performances by scoring status
+  const filteredPerformances = performances.filter(performance => {
+    if (performanceFilter === 'all') return true;
+    if (performanceFilter === 'not_scored') return !performance.hasScores && !performance.withdrawnFromJudging;
+    if (performanceFilter === 'scored') return performance.hasScores;
+    return true;
   });
 
   // Get performance type statistics
@@ -209,7 +236,58 @@ function EventParticipantsPage() {
       const performancesResponse = await fetch(`/api/events/${eventId}/performances`);
       if (performancesResponse.ok) {
         const performancesData = await performancesResponse.json();
-        setPerformances(performancesData.performances || []);
+        const loadedPerformances = performancesData.performances || [];
+        
+        // Fetch scoring status for all performances and enrich with entry data
+        const performancesWithScores = await Promise.all(
+          loadedPerformances.map(async (perf: Performance) => {
+            try {
+              // Get entry data for eodsaId and studioName
+              const entry = entries.find(e => e.id === perf.eventEntryId);
+              
+              const scoreResponse = await fetch(`/api/scores/performance/${perf.id}`);
+              if (scoreResponse.ok) {
+                const scoreData = await scoreResponse.json();
+                return {
+                  ...perf,
+                  hasScores: scoreData.scoringStatus?.scoredJudges > 0,
+                  eodsaId: entry?.eodsaId,
+                  studioName: entry?.studioName,
+                  studioId: entry?.studioId
+                };
+              }
+              return { 
+                ...perf, 
+                hasScores: false,
+                eodsaId: entry?.eodsaId,
+                studioName: entry?.studioName,
+                studioId: entry?.studioId
+              };
+            } catch (error) {
+              console.error(`Error fetching scores for performance ${perf.id}:`, error);
+              const entry = entries.find(e => e.id === perf.eventEntryId);
+              return { 
+                ...perf, 
+                hasScores: false,
+                eodsaId: entry?.eodsaId,
+                studioName: entry?.studioName,
+                studioId: entry?.studioId
+              };
+            }
+          })
+        );
+        
+        setPerformances(performancesWithScores);
+        
+        // Calculate statistics
+        const stats = {
+          total: performancesWithScores.length,
+          live: performancesWithScores.filter((p: Performance) => (p.entryType || 'live') === 'live').length,
+          virtual: performancesWithScores.filter((p: Performance) => p.entryType === 'virtual').length,
+          judged: performancesWithScores.filter((p: Performance) => p.hasScores).length,
+          notScored: performancesWithScores.filter((p: Performance) => !p.hasScores && !p.withdrawnFromJudging).length
+        };
+        setPerformanceStats(stats);
       }
     } catch (error) {
       console.error('Error loading event data:', error);
@@ -448,9 +526,13 @@ function EventParticipantsPage() {
 
   const getStatusBadge = (status: string) => {
     const badges = {
-      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      paid: 'bg-green-100 text-green-800 border-green-200',
-      failed: 'bg-red-100 text-red-800 border-red-200'
+      pending: themeClasses.badgeYellow,
+      paid: themeClasses.badgeGreen,
+      failed: themeClasses.badgeRed,
+      unpaid: themeClasses.badgeRed,
+      unpaid_invoice: themeClasses.badgeRed,
+      approved: themeClasses.badgeGreen,
+      rejected: themeClasses.badgeRed
     };
     return badges[status as keyof typeof badges] || badges.pending;
   };
@@ -867,23 +949,49 @@ function EventParticipantsPage() {
     try {
       // Get scoring status for this performance
       const response = await fetch(`/api/scores/performance/${performanceId}`);
-      if (response.ok) {
-        const data = await response.json();
+      
+      // Check content type before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        showAlert('Server returned invalid response. Please check the console.', 'error');
+        setShowScoresModal(false);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
         setSelectedPerformanceScores({
           performanceId,
           performanceTitle,
           ...data.scoringStatus
         });
-      } else if (response.status === 404) {
-        showAlert('Performance not found or no scoring data available', 'warning');
-        setShowScoresModal(false);
       } else {
-        showAlert('Failed to load performance scores', 'error');
+        // Handle error response
+        const errorMessage = data.error || 'Failed to load performance scores';
+        console.error('Error loading scores:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorMessage,
+          data
+        });
+        
+        if (response.status === 404) {
+          showAlert('Performance not found or no scoring data available', 'warning');
+        } else {
+          showAlert(`Failed to load performance scores: ${errorMessage}`, 'error');
+        }
         setShowScoresModal(false);
       }
     } catch (error) {
       console.error('Error loading scores:', error);
-      showAlert('Network error loading performance scores', 'error');
+      if (error instanceof SyntaxError) {
+        showAlert('Invalid response from server. Please check the console for details.', 'error');
+      } else {
+        showAlert('Network error loading performance scores. Please check the console for details.', 'error');
+      }
       setShowScoresModal(false);
     } finally {
       setLoadingScores(false);
@@ -1002,33 +1110,34 @@ function EventParticipantsPage() {
   };
 
   if (isLoading) {
+    const themeClasses = getThemeClasses(theme);
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.loadingBg} flex items-center justify-center`}>
         <div className="text-center">
           <div className="relative mb-8">
             {/* Modern Spinner */}
             <div className="w-16 h-16 mx-auto">
-              <div className="absolute inset-0 rounded-full border-4 border-indigo-100"></div>
+              <div className={`absolute inset-0 rounded-full border-4 ${themeClasses.loadingSpinner}`}></div>
             </div>
             {/* Floating Dots */}
-            <div className="absolute -top-6 -left-6 w-3 h-3 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
-            <div className="absolute -top-6 -right-6 w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-            <div className="absolute -bottom-6 -left-6 w-3 h-3 bg-pink-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
-            <div className="absolute -bottom-6 -right-6 w-3 h-3 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.6s'}}></div>
+            <div className="absolute -top-6 -left-6 w-3 h-3 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
+            <div className="absolute -top-6 -right-6 w-3 h-3 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            <div className="absolute -bottom-6 -left-6 w-3 h-3 bg-pink-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+            <div className="absolute -bottom-6 -right-6 w-3 h-3 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '0.6s'}}></div>
           </div>
           
           {/* Loading Text */}
           <div className="space-y-3">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h2 className={`text-2xl font-bold ${themeClasses.accentGradientText}`}>
               Loading Event Details
             </h2>
-            <p className="text-gray-400 font-medium animate-pulse">Preparing participant data...</p>
+            <p className={`${themeClasses.loadingText} font-medium animate-pulse`}>Preparing participant data...</p>
             
             {/* Progress Dots */}
             <div className="flex justify-center space-x-2 mt-6">
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" style={{animationDelay: '0s'}}></div>
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
-              <div className="w-2 h-2 bg-pink-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
+              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" style={{animationDelay: '0s'}}></div>
+              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+              <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
             </div>
           </div>
         </div>
@@ -1042,138 +1151,128 @@ function EventParticipantsPage() {
       
       {/* Scores Management Modal */}
       {showScoresModal && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-gray-700">
+      <div className={`fixed inset-0 ${themeClasses.modalOverlay} flex items-center justify-center p-4 z-50`}>
+        <div className={`${themeClasses.modalBg} ${themeClasses.cardRadius} shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${themeClasses.modalBorder}`}>
+          <div className={`p-6 border-b ${themeClasses.modalBorder}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <div className={`w-10 h-10 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center`}>
                   <span className="text-white text-lg">🎯</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Performance Scores</h2>
-                  <p className="text-gray-400">{selectedPerformanceScores?.performanceTitle}</p>
+                  <h2 className={`${themeClasses.heading3}`}>Performance Scores</h2>
+                  <p className={`${themeClasses.textMuted} text-lg font-semibold mt-1`}>{selectedPerformanceScores?.performanceTitle}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowScoresModal(false)}
-                className="text-gray-400 hover:text-gray-400 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className={`${themeClasses.textMuted} hover:${themeClasses.textPrimary} p-2 rounded-lg hover:${themeClasses.tableHeader} transition-colors text-2xl`}
               >
-                <span className="text-2xl">×</span>
+                ×
               </button>
             </div>
           </div>
           
-          <div className="p-6">
+          <div className={themeClasses.cardPadding}>
             {loadingScores ? (
               <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-400">Loading scores...</p>
+                <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-indigo-500' : 'border-indigo-600'} mx-auto mb-4`}></div>
+                <p className={themeClasses.loadingText}>Loading scores...</p>
               </div>
             ) : selectedPerformanceScores ? (
               <div className="space-y-6">
                 {/* Scoring Overview */}
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-6`}>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
                     <div>
-                      <div className="text-2xl font-bold text-blue-600">{selectedPerformanceScores.totalJudges}</div>
-                      <div className="text-sm text-gray-400">Total Judges</div>
+                      <div className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'} mb-2`}>{selectedPerformanceScores.totalJudges || 0}</div>
+                      <div className={`text-sm font-medium ${themeClasses.textSecondary}`}>Total Judges</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-green-600">{selectedPerformanceScores.scoredJudges}</div>
-                      <div className="text-sm text-gray-400">Scored</div>
+                      <div className={`text-3xl font-bold ${theme === 'dark' ? 'text-green-400' : 'text-green-600'} mb-2`}>{selectedPerformanceScores.scoredJudges || 0}</div>
+                      <div className={`text-sm font-medium ${themeClasses.textSecondary}`}>Scored</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-orange-600">{selectedPerformanceScores.pendingJudgeIds?.length || 0}</div>
-                      <div className="text-sm text-gray-400">Pending</div>
+                      <div className={`text-3xl font-bold ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'} mb-2`}>{selectedPerformanceScores.pendingJudgeIds?.length || 0}</div>
+                      <div className={`text-sm font-medium ${themeClasses.textSecondary}`}>Pending</div>
                     </div>
                     <div>
-                      <div className={`text-2xl font-bold ${selectedPerformanceScores.isFullyScored ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className={`text-3xl font-bold mb-2 ${selectedPerformanceScores.isFullyScored ? (theme === 'dark' ? 'text-green-400' : 'text-green-600') : (theme === 'dark' ? 'text-red-400' : 'text-red-600')}`}>
                         {selectedPerformanceScores.isFullyScored ? '✓' : '✗'}
                       </div>
-                      <div className="text-sm text-gray-400">Complete</div>
+                      <div className={`text-sm font-medium ${themeClasses.textSecondary}`}>Complete</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Individual Scores */}
-                {selectedPerformanceScores.scores && selectedPerformanceScores.scores.length > 0 ? (
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Individual Judge Scores</h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-600">
-                        <thead className="bg-gray-700">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Judge</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Score</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Percentage</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Submitted</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                {/* Individual Judge Scores - Combined scored and pending */}
+                <div>
+                  <h3 className={`${themeClasses.heading3} mb-4`}>Individual Judge Scores</h3>
+                  <div className="overflow-x-auto">
+                    <table className={`min-w-full ${themeClasses.tableBorder}`}>
+                      <thead className={themeClasses.tableHeader}>
+                        <tr>
+                          <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Judge</th>
+                          <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Total Score</th>
+                          <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Submitted</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`${themeClasses.tableRow} ${themeClasses.tableBorder}`}>
+                        {/* Scored Judges */}
+                        {selectedPerformanceScores.scores && selectedPerformanceScores.scores.map((score: any) => (
+                          <tr key={score.judgeId} className={themeClasses.tableRowHover}>
+                            <td className={`${themeClasses.tableCellPadding} whitespace-nowrap`}>
+                              <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{score.judgeName || 'Unknown Judge'}</div>
+                              {score.judgeEmail && (
+                                <div className={`text-xs ${themeClasses.textMuted} mt-1`}>{score.judgeEmail}</div>
+                              )}
+                            </td>
+                            <td className={`${themeClasses.tableCellPadding} whitespace-nowrap`}>
+                              <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{score.totalScore.toFixed(1)}/100</div>
+                            </td>
+                            <td className={`${themeClasses.tableCellPadding} whitespace-nowrap`}>
+                              <div className={`text-sm ${themeClasses.textSecondary}`}>
+                                {score.submittedAt 
+                                  ? `${new Date(score.submittedAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} ${new Date(score.submittedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`
+                                  : 'N/A'
+                                }
+                              </div>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-600">
-                          {selectedPerformanceScores.scores.map((score: any) => (
-                            <tr key={score.judgeId} className="hover:bg-gray-700">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-white">{score.judgeName}</div>
-                                <div className="text-sm text-gray-400">ID: {score.judgeId}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-lg font-bold text-white">{score.totalScore.toFixed(1)}/100</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-white">{((score.totalScore / 100) * 100).toFixed(1)}%</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-400">
-                                  {new Date(score.submittedAt).toLocaleDateString()} {new Date(score.submittedAt).toLocaleTimeString()}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleEditScore(selectedPerformanceScores.performanceId, score.judgeId, score.judgeName)}
-                                    className="px-3 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-colors"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteScore(selectedPerformanceScores.performanceId, score.judgeId, score.judgeName)}
-                                    className="px-3 py-1 text-xs font-medium rounded-lg bg-red-100 text-red-800 hover:bg-red-200 border border-red-200 transition-colors"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-gray-400 text-4xl mb-4">📝</div>
-                    <p className="text-gray-400">No scores submitted yet</p>
-                  </div>
-                )}
-
-                {/* Pending Judges */}
-                {selectedPerformanceScores.pendingJudgeIds && selectedPerformanceScores.pendingJudgeIds.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Pending Judges</h3>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <p className="text-yellow-800 text-sm mb-2">The following judges have not submitted scores yet:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedPerformanceScores.pendingJudgeIds.map((judgeId: string) => (
-                          <span key={judgeId} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Judge ID: {judgeId}
-                          </span>
                         ))}
-                      </div>
-                    </div>
+                        
+                        {/* Pending Judges */}
+                        {selectedPerformanceScores.pendingJudges && selectedPerformanceScores.pendingJudges.map((pending: any) => (
+                          <tr key={pending.judgeId} className={`${themeClasses.tableRowHover} opacity-75`}>
+                            <td className={`${themeClasses.tableCellPadding} whitespace-nowrap`}>
+                              <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>{pending.judgeName || 'Unknown Judge'}</div>
+                              {pending.judgeEmail && (
+                                <div className={`text-xs ${themeClasses.textMuted} mt-1`}>{pending.judgeEmail}</div>
+                              )}
+                            </td>
+                            <td className={`${themeClasses.tableCellPadding} whitespace-nowrap`}>
+                              <div className={`text-sm font-medium ${themeClasses.textMuted} italic`}>Not yet scored</div>
+                            </td>
+                            <td className={`${themeClasses.tableCellPadding} whitespace-nowrap`}>
+                              <div className={`text-sm ${themeClasses.textMuted}`}>-</div>
+                            </td>
+                          </tr>
+                        ))}
+                        
+                        {/* Show message if no judges at all */}
+                        {(!selectedPerformanceScores.scores || selectedPerformanceScores.scores.length === 0) && 
+                         (!selectedPerformanceScores.pendingJudges || selectedPerformanceScores.pendingJudges.length === 0) && (
+                          <tr>
+                            <td colSpan={3} className={`${themeClasses.tableCellPadding} text-center`}>
+                              <div className={`${themeClasses.emptyStateText} text-4xl mb-4`}>📝</div>
+                              <p className={themeClasses.emptyStateText}>No judges assigned or scores submitted yet</p>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                )}
+                </div>
               </div>
             ) : (
               <div className="text-center py-8">
@@ -1193,11 +1292,11 @@ function EventParticipantsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-8">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <span className={`${themeClasses.textPrimary} text-xl`}>👥</span>
+              <div className={`w-12 h-12 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center shadow-lg`}>
+                <span className="text-white text-xl">👥</span>
               </div>
               <div>
-                <h1 className="text-3xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h1 className={`text-3xl font-black ${themeClasses.accentGradientText}`}>
                   Event Participants
                 </h1>
                 <p className={`${themeClasses.textSecondary} font-medium`}>{event?.name || 'Loading...'}</p>
@@ -1208,7 +1307,7 @@ function EventParticipantsPage() {
               
               <Link
                 href="/admin"
-                className="inline-flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-gray-500 to-gray-700 text-white rounded-xl hover:from-gray-600 hover:to-gray-800 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
+                className={`inline-flex items-center space-x-2 ${themeClasses.buttonBase} ${themeClasses.buttonSecondary}`}
               >
                 <span>←</span>
                 <span>Back to Admin</span>
@@ -1219,227 +1318,330 @@ function EventParticipantsPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Event Details Card */}
+        {/* Event Details Card - Cleaned Up */}
         {event && (
-          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border ${themeClasses.cardBorder}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className={`${themeClasses.textPrimary} text-sm`}>🏆</span>
-                </div>
-                <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Event Details</h2>
-              </div>
-              
-              {/* Excel Export Button */}
-              <button
-                onClick={exportToExcel}
-                disabled={isExporting || entries.length === 0}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-lg font-medium"
-              >
-                <span>📊</span>
-                <span>{isExporting ? 'Exporting...' : 'Download to Excel'}</span>
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className={`font-semibold ${themeClasses.textSecondary}`}>Date</p>
-                <p className={`${themeClasses.textSecondary}`}>{new Date(event.eventDate).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className={`font-semibold ${themeClasses.textSecondary}`}>Venue</p>
-                <p className={`${themeClasses.textSecondary}`}>{event.venue}</p>
-              </div>
-              <div>
-                <p className={`font-semibold ${themeClasses.textSecondary}`}>Entries</p>
-                <p className={`${themeClasses.textSecondary}`}>{entries.length} total</p>
-                {entries.length > 0 && (
-                  <div className="space-y-1">
-                    <div className={`text-xs ${themeClasses.textMuted}`}>
-                      {getPerformanceStats().solo > 0 && `${getPerformanceStats().solo} Solo`}
-                      {getPerformanceStats().duet > 0 && (getPerformanceStats().solo > 0 ? `, ${getPerformanceStats().duet} Duet` : `${getPerformanceStats().duet} Duet`)}
-                      {getPerformanceStats().trio > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 ? `, ${getPerformanceStats().trio} Trio` : `${getPerformanceStats().trio} Trio`)}
-                      {getPerformanceStats().group > 0 && (getPerformanceStats().solo > 0 || getPerformanceStats().duet > 0 || getPerformanceStats().trio > 0 ? `, ${getPerformanceStats().group} Group` : `${getPerformanceStats().group} Group`)}
-                    </div>
-                    <div className="text-xs text-emerald-600 font-medium">
-                      🎵 {getPerformanceStats().live} Live • 📹 {getPerformanceStats().virtual} Virtual
-                    </div>
+          <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} overflow-hidden border ${themeClasses.cardBorder} mb-8`}>
+            <div className={`${themeClasses.sectionHeaderBg} px-6 py-5 border-b ${themeClasses.sectionHeaderBorder}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-12 h-12 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center shadow-lg`}>
+                    <span className="text-white text-xl">🏆</span>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Performance Type Filter Tabs */}
-        {entries.length > 0 && (
-          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl border ${themeClasses.cardBorder} mb-6`}>
-            <div className="px-6 py-4">
-              <h3 className={`text-lg font-semibold ${themeClasses.textPrimary} mb-4`}>Filter Entries</h3>
-              
-              {/* Performance Type Filters */}
-              <div className="mb-4">
-                <h4 className={`text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Performance Type:</h4>
-                <div className="flex flex-wrap gap-2">
+                  <div>
+                    <h2 className={`${themeClasses.heading2} mb-1`}>{event.name}</h2>
+                    <p className={`${themeClasses.body} ${themeClasses.textSecondary}`}>Event Information</p>
+                  </div>
+                </div>
+                
+                {/* Excel Export Button */}
                 <button
-                  onClick={() => setPerformanceTypeFilter('all')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    performanceTypeFilter === 'all'
-                      ? 'bg-indigo-600 text-white shadow-lg'
-                      : `bg-gray-100 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} hover:bg-gray-200`
-                  }`}
+                  onClick={exportToExcel}
+                  disabled={isExporting || entries.length === 0}
+                  className={`inline-flex items-center space-x-2 ${themeClasses.buttonBase} ${themeClasses.buttonSuccess} ${isExporting || entries.length === 0 ? themeClasses.buttonDisabled : ''}`}
                 >
-                  All Entries ({entries.length})
+                  <span>📊</span>
+                  <span>{isExporting ? 'Exporting...' : 'Export to Excel'}</span>
                 </button>
-                {getPerformanceStats().solo > 0 && (
-                  <button
-                    onClick={() => setPerformanceTypeFilter('solo')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      performanceTypeFilter === 'solo'
-                        ? 'bg-purple-600 text-white shadow-lg'
-                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                    }`}
-                  >
-                    Solo ({getPerformanceStats().solo})
-                  </button>
-                )}
-                {getPerformanceStats().duet > 0 && (
-                  <button
-                    onClick={() => setPerformanceTypeFilter('duet')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      performanceTypeFilter === 'duet'
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    }`}
-                  >
-                    Duet ({getPerformanceStats().duet})
-                  </button>
-                )}
-                {getPerformanceStats().trio > 0 && (
-                  <button
-                    onClick={() => setPerformanceTypeFilter('trio')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      performanceTypeFilter === 'trio'
-                        ? 'bg-green-600 text-white shadow-lg'
-                        : 'bg-green-100 text-green-700 hover:bg-green-200'
-                    }`}
-                  >
-                    Trio ({getPerformanceStats().trio})
-                  </button>
-                )}
-                                  {getPerformanceStats().group > 0 && (
-                  <button
-                    onClick={() => setPerformanceTypeFilter('group')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      performanceTypeFilter === 'group'
-                        ? 'bg-orange-600 text-white shadow-lg'
-                        : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                    }`}
-                  >
-                    Group ({getPerformanceStats().group})
-                  </button>
-                )}
-                </div>
               </div>
-              
-              {/* Entry Type Filters */}
-              <div>
-                <h4 className={`text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Entry Type:</h4>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setEntryTypeFilter('all')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      entryTypeFilter === 'all'
-                        ? 'bg-indigo-600 text-white shadow-lg'
-                        : `bg-gray-100 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} hover:bg-gray-200`
-                    }`}
-                  >
-                    All Types ({entries.length})
-                  </button>
-                  {getPerformanceStats().live > 0 && (
-                    <button
-                      onClick={() => setEntryTypeFilter('live')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                        entryTypeFilter === 'live'
-                          ? 'bg-emerald-600 text-white shadow-lg'
-                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                      }`}
-                    >
-                      🎵 Live ({getPerformanceStats().live})
-                    </button>
-                  )}
-                  {getPerformanceStats().virtual > 0 && (
-                    <button
-                      onClick={() => setEntryTypeFilter('virtual')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                        entryTypeFilter === 'virtual'
-                          ? 'bg-blue-600 text-white shadow-lg'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                      }`}
-                    >
-                      📹 Virtual ({getPerformanceStats().virtual})
-                    </button>
-                  )}
+            </div>
+            
+            <div className={themeClasses.cardPadding}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex items-start space-x-3">
+                  <div className={`w-10 h-10 ${themeClasses.badgeBlue} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-lg">📅</span>
+                  </div>
+                  <div>
+                    <p className={`${themeClasses.label} mb-1`}>Event Date</p>
+                    <p className={`text-base font-medium ${themeClasses.textPrimary}`}>
+                      {new Date(event.eventDate).toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <div className={`w-10 h-10 ${themeClasses.badgePurple} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-lg">📍</span>
+                  </div>
+                  <div>
+                    <p className={`${themeClasses.label} mb-1`}>Venue</p>
+                    <p className={`text-base font-medium ${themeClasses.textPrimary}`}>{event.venue}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <div className={`w-10 h-10 ${themeClasses.badgeGreen} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-lg">📝</span>
+                  </div>
+                  <div>
+                    <p className={`${themeClasses.label} mb-1`}>Total Entries</p>
+                    <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>{entries.length}</p>
+                    {entries.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className={`${themeClasses.badgeBase} ${themeClasses.badgePurple}`}>
+                          {getPerformanceStats().solo} Solo
+                        </span>
+                        <span className={`${themeClasses.badgeBase} ${themeClasses.badgeBlue}`}>
+                          {getPerformanceStats().duet} Duet
+                        </span>
+                        {getPerformanceStats().trio > 0 && (
+                          <span className={`${themeClasses.badgeBase} ${themeClasses.badgeGreen}`}>
+                            {getPerformanceStats().trio} Trio
+                          </span>
+                        )}
+                        {getPerformanceStats().group > 0 && (
+                          <span className={`${themeClasses.badgeBase} ${themeClasses.badgeOrange}`}>
+                            {getPerformanceStats().group} Group
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Participants List */}
-        <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder} mb-8`}>
-          <div className={`px-6 py-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b ${themeClasses.cardBorder}`}>
-            <div className="flex items-center justify-between">
-              <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>
-                {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
-                  ? 'All Participants & Entries'
-                  : `${performanceTypeFilter === 'all' ? 'All' : performanceTypeFilter.charAt(0).toUpperCase() + performanceTypeFilter.slice(1)} ${entryTypeFilter === 'all' ? '' : entryTypeFilter.charAt(0).toUpperCase() + entryTypeFilter.slice(1)} Entries`
-                }
-              </h2>
-              <div className="flex items-center space-x-3">
-                <div className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
-                  {filteredEntries.length} entries
-                </div>
-                {filteredEntries.length > 0 && (
-                  <div className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-medium">
-                    {filteredEntries.filter(e => e.qualifiedForNationals).length} qualified
+        {/* Performance Summary Card */}
+        {performances.length > 0 && (
+          <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} border ${themeClasses.cardBorder} mb-8`}>
+            <div className={`${themeClasses.sectionHeaderBg} px-6 py-5 border-b ${themeClasses.sectionHeaderBorder}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-12 h-12 ${themeClasses.iconContainerSecondary} ${themeClasses.cardRadius} flex items-center justify-center shadow-lg`}>
+                    <span className="text-white text-xl">🎭</span>
                   </div>
-                )}
-                {/* Payment filter */}
-                <div className="hidden md:flex items-center space-x-1">
-                  <button
-                    onClick={() => setPaymentFilter('all')}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='all' ? (theme === 'dark' ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-100 text-gray-900 border-gray-300') : (theme === 'dark' ? 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')}`}
-                  >All</button>
-                  <button
-                    onClick={() => setPaymentFilter('paid')}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='paid'?'bg-green-600 text-white border-green-600':'bg-white text-green-700 border-green-300 hover:bg-green-50'}`}
-                  >Paid</button>
-                  <button
-                    onClick={() => setPaymentFilter('pending')}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='pending'?'bg-yellow-600 text-white border-yellow-600':'bg-white text-yellow-700 border-yellow-300 hover:bg-yellow-50'}`}
-                  >Pending</button>
-                  <button
-                    onClick={() => setPaymentFilter('unpaid')}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border ${paymentFilter==='unpaid'?'bg-red-600 text-white border-red-600':'bg-white text-red-700 border-red-300 hover:bg-red-50'}`}
-                  >Unpaid</button>
+                  <div>
+                    <h2 className={`${themeClasses.heading2} mb-1`}>Performance Summary</h2>
+                    <p className={`${themeClasses.body} ${themeClasses.textSecondary}`}>Scoring Overview & Statistics</p>
+                  </div>
+                </div>
+                <button
+                  onClick={scrollToPerformances}
+                  className={`inline-flex items-center space-x-2 ${themeClasses.buttonBase} ${themeClasses.buttonSuccess}`}
+                >
+                  <span>View Performances</span>
+                  <span>↓</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className={themeClasses.cardPadding}>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-5 border ${themeClasses.metricCardBorder}`}>
+                  <div className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'} mb-2`}>{performanceStats.total}</div>
+                  <div className={`text-sm font-medium ${themeClasses.textSecondary} mb-1`}>Total Performances</div>
+                  <div className={`text-xs ${themeClasses.textMuted}`}>
+                    {performanceStats.live} Live • {performanceStats.virtual} Virtual
+                  </div>
+                </div>
+                <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-5 border ${themeClasses.metricCardBorder}`}>
+                  <div className={`text-3xl font-bold ${theme === 'dark' ? 'text-green-400' : 'text-green-600'} mb-2`}>{performanceStats.judged}</div>
+                  <div className={`text-sm font-medium ${themeClasses.textSecondary} mb-1`}>Total Judged</div>
+                  <div className={`text-xs ${themeClasses.textMuted}`}>Items with scores</div>
+                </div>
+                <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-5 border ${themeClasses.metricCardBorder}`}>
+                  <div className={`text-3xl font-bold ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'} mb-2`}>{performanceStats.notScored}</div>
+                  <div className={`text-sm font-medium ${themeClasses.textSecondary} mb-1`}>Not Yet Scored</div>
+                  <div className={`text-xs ${themeClasses.textMuted}`}>Items missing scores</div>
+                </div>
+                <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-5 border ${themeClasses.metricCardBorder}`}>
+                  <div className={`text-3xl font-bold ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'} mb-2`}>
+                    {performanceStats.total > 0 ? Math.round((performanceStats.judged / performanceStats.total) * 100) : 0}%
+                  </div>
+                  <div className={`text-sm font-medium ${themeClasses.textSecondary} mb-1`}>Completion Rate</div>
+                  <div className={`text-xs ${themeClasses.textMuted}`}>Scoring progress</div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Participants List with Integrated Filters */}
+        <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} overflow-hidden border ${themeClasses.cardBorder} mb-8`}>
+          <div className={`${themeClasses.sectionHeaderBg} px-6 py-4 border-b ${themeClasses.sectionHeaderBorder}`}>
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className={`${themeClasses.heading3}`}>
+                  All Participants & Entries
+                </h2>
+                <div className="flex items-center space-x-3">
+                  <div className={`${themeClasses.badgeBase} ${themeClasses.badgePurple}`}>
+                    {filteredEntries.length} entries
+                  </div>
+                  {filteredEntries.length > 0 && (
+                    <div className={`${themeClasses.badgeBase} ${themeClasses.badgeGreen}`}>
+                      {filteredEntries.filter(e => e.qualifiedForNationals).length} qualified
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Integrated Filters */}
+              {entries.length > 0 && (
+                <div className={`flex flex-wrap items-center gap-3 pt-2 border-t ${themeClasses.cardBorder}`}>
+                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Filters:</span>
+                  
+                  {/* Performance Type Filters */}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setPerformanceTypeFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        performanceTypeFilter === 'all'
+                          ? themeClasses.filterButtonActive
+                          : themeClasses.filterButtonInactive
+                      }`}
+                    >
+                      All ({entries.length})
+                    </button>
+                    {getPerformanceStats().solo > 0 && (
+                      <button
+                        onClick={() => setPerformanceTypeFilter('solo')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          performanceTypeFilter === 'solo'
+                            ? 'bg-purple-600 text-white shadow-lg'
+                            : theme === 'dark' ? 'bg-purple-900/40 text-purple-300 hover:bg-purple-800/40' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                        }`}
+                      >
+                        Solo ({getPerformanceStats().solo})
+                      </button>
+                    )}
+                    {getPerformanceStats().duet > 0 && (
+                      <button
+                        onClick={() => setPerformanceTypeFilter('duet')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          performanceTypeFilter === 'duet'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : theme === 'dark' ? 'bg-blue-900/40 text-blue-300 hover:bg-blue-800/40' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}
+                      >
+                        Duet ({getPerformanceStats().duet})
+                      </button>
+                    )}
+                    {getPerformanceStats().trio > 0 && (
+                      <button
+                        onClick={() => setPerformanceTypeFilter('trio')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          performanceTypeFilter === 'trio'
+                            ? 'bg-green-600 text-white shadow-lg'
+                            : theme === 'dark' ? 'bg-green-900/40 text-green-300 hover:bg-green-800/40' : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                      >
+                        Trio ({getPerformanceStats().trio})
+                      </button>
+                    )}
+                    {getPerformanceStats().group > 0 && (
+                      <button
+                        onClick={() => setPerformanceTypeFilter('group')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          performanceTypeFilter === 'group'
+                            ? 'bg-orange-600 text-white shadow-lg'
+                            : theme === 'dark' ? 'bg-orange-900/40 text-orange-300 hover:bg-orange-800/40' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                        }`}
+                      >
+                        Group ({getPerformanceStats().group})
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Entry Type Filters */}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setEntryTypeFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        entryTypeFilter === 'all'
+                          ? themeClasses.filterButtonActive
+                          : themeClasses.filterButtonInactive
+                      }`}
+                    >
+                      All Types
+                    </button>
+                    {getPerformanceStats().live > 0 && (
+                      <button
+                        onClick={() => setEntryTypeFilter('live')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          entryTypeFilter === 'live'
+                            ? 'bg-emerald-600 text-white shadow-lg'
+                            : theme === 'dark' ? 'bg-emerald-900/40 text-emerald-300 hover:bg-emerald-800/40' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                        }`}
+                      >
+                        🎵 Live ({getPerformanceStats().live})
+                      </button>
+                    )}
+                    {getPerformanceStats().virtual > 0 && (
+                      <button
+                        onClick={() => setEntryTypeFilter('virtual')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          entryTypeFilter === 'virtual'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : theme === 'dark' ? 'bg-blue-900/40 text-blue-300 hover:bg-blue-800/40' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}
+                      >
+                        📹 Virtual ({getPerformanceStats().virtual})
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Payment filter */}
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className={`text-xs font-medium ${themeClasses.textMuted}`}>Payment:</span>
+                    <button
+                      onClick={() => setPaymentFilter('all')}
+                      className={`${themeClasses.badgeBase} border ${
+                        paymentFilter === 'all'
+                          ? theme === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-gray-200 text-gray-900 border-gray-300'
+                          : theme === 'dark' ? 'bg-gray-800/50 text-gray-300 border-gray-700 hover:bg-gray-700/50' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >All</button>
+                    <button
+                      onClick={() => setPaymentFilter('paid')}
+                      className={`${themeClasses.badgeBase} border ${
+                        paymentFilter === 'paid'
+                          ? themeClasses.badgeGreen
+                          : theme === 'dark' ? 'bg-gray-800/50 text-green-300 border-green-700/50 hover:bg-gray-700/50' : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+                      }`}
+                    >Paid</button>
+                    <button
+                      onClick={() => setPaymentFilter('pending')}
+                      className={`${themeClasses.badgeBase} border ${
+                        paymentFilter === 'pending'
+                          ? themeClasses.badgeYellow
+                          : theme === 'dark' ? 'bg-gray-800/50 text-yellow-300 border-yellow-700/50 hover:bg-gray-700/50' : 'bg-white text-yellow-700 border-yellow-300 hover:bg-yellow-50'
+                      }`}
+                    >Pending</button>
+                    <button
+                      onClick={() => setPaymentFilter('unpaid')}
+                      className={`${themeClasses.badgeBase} border ${
+                        paymentFilter === 'unpaid'
+                          ? themeClasses.badgeRed
+                          : theme === 'dark' ? 'bg-gray-800/50 text-red-300 border-red-700/50 hover:bg-gray-700/50' : 'bg-white text-red-700 border-red-300 hover:bg-red-50'
+                      }`}
+                    >Unpaid</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Table with Item Number column */}
           {filteredEntries.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <div className={`text-center py-12 ${themeClasses.emptyStateText}`}>
+              <div className={`w-16 h-16 mx-auto mb-4 ${themeClasses.emptyStateBg} rounded-full flex items-center justify-center`}>
                 <span className="text-2xl">📝</span>
               </div>
-              <h3 className="text-lg font-medium mb-2">
+              <h3 className={`text-lg font-medium mb-2 ${themeClasses.textPrimary}`}>
                 {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
                   ? 'No entries yet' 
                   : `No ${performanceTypeFilter === 'all' ? '' : performanceTypeFilter + ' '}${entryTypeFilter === 'all' ? '' : entryTypeFilter + ' '}entries found`
                 }
               </h3>
-              <p className="text-sm">
+              <p className={themeClasses.body}>
                 {performanceTypeFilter === 'all' && entryTypeFilter === 'all'
                   ? 'Participants will appear here once they register for this event.'
                   : 'Try adjusting your filters to see more entries.'
@@ -1448,19 +1650,19 @@ function EventParticipantsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-600">
-                <thead className="bg-gray-700">
+              <table className={`min-w-full ${themeClasses.tableBorder}`}>
+                <thead className={themeClasses.tableHeader}>
                   <tr>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-24">Item #</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Performance</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Payment</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden md:table-cell">Submitted</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                    <th className={`px-3 py-3 text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider w-24`}>Item #</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Performance</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Type</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Payment</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider hidden md:table-cell`}>Submitted</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Status</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-medium ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-gray-800 divide-y divide-gray-600">
+                <tbody className={`${themeClasses.tableRow} ${themeClasses.tableBorder}`}>
                   {filteredEntries.map((entry) => {
                     const performanceType = getPerformanceType(entry.participantIds);
                     return (
@@ -1551,10 +1753,10 @@ function EventParticipantsPage() {
                             {performanceType.toUpperCase()}
                           </span>
                           <div className="flex items-center space-x-2">
-                            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${
+                            <span className={`${themeClasses.badgeBase} border ${
                               entry.entryType === 'live' 
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
-                                : 'bg-blue-100 text-blue-800 border-blue-200'
+                                ? themeClasses.badgeGreen
+                                : themeClasses.badgeBlue
                             }`}>
                               {entry.entryType === 'live' ? '🎵 LIVE' : '📹 VIRTUAL'}
                             </span>
@@ -1565,35 +1767,35 @@ function EventParticipantsPage() {
                         </div>
                       </td>
                       
-                      <td className="px-6 py-4">
+                      <td className={themeClasses.tableCellPadding}>
                         <div className="space-y-1">
                             <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>R{entry.calculatedFee.toFixed(2)}</div>
-                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entry.paymentStatus)}`}>
+                            <span className={`${themeClasses.badgeBase} border ${getStatusBadge(entry.paymentStatus)}`}>
                               {entry.paymentStatus.toUpperCase()}
                             </span>
                         </div>
                       </td>
-                      <td className={`px-6 py-4 text-sm ${themeClasses.textSecondary} hidden md:table-cell`}>
+                      <td className={`${themeClasses.tableCellPadding} text-sm ${themeClasses.textSecondary} hidden md:table-cell`}>
                         {new Date(entry.submittedAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className={`${themeClasses.tableCellPadding} whitespace-nowrap`}>
                         <div className="flex flex-col space-y-1">
-                          <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${
-                            entry.approved ? 'bg-green-100 text-green-800 border-green-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                          <span className={`${themeClasses.badgeBase} border ${
+                            entry.approved ? themeClasses.badgeGreen : themeClasses.badgeYellow
                           }`}>
                             {entry.approved ? 'APPROVED' : 'PENDING'}
                           </span>
                           {entry.qualifiedForNationals && (
-                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                            <span className={`${themeClasses.badgeBase} border ${themeClasses.badgePurple}`}>
                               QUALIFIED FOR NATIONALS
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className={`${themeClasses.tableCellPadding} whitespace-nowrap text-sm font-medium`}>
                             <button
                           onClick={() => { setEntryModal(entry); setEntryModalTab('overview'); setShowEntryModal(true); }}
-                          className="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-indigo-600 text-white hover:bg-indigo-700"
+                          className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${themeClasses.buttonPrimary}`}
                             >
                           View Details
                             </button>
@@ -1608,73 +1810,126 @@ function EventParticipantsPage() {
         </div>
 
         {/* Performances Section */}
-        <div className="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-gray-700 mt-8">
-          <div className="px-6 py-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-b border-green-100">
+        <div ref={performancesSectionRef} className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} overflow-hidden border ${themeClasses.cardBorder} mt-8`}>
+          <div className={`${themeClasses.sectionHeaderBg} px-6 py-4 border-b ${themeClasses.sectionHeaderBorder}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                <div className={`w-8 h-8 ${themeClasses.iconContainerSecondary} rounded-lg flex items-center justify-center`}>
                   <span className="text-white text-sm">🎭</span>
                 </div>
-                <h2 className="text-xl font-bold text-white">Performances</h2>
+                <h2 className={`${themeClasses.heading3}`}>Performances</h2>
               </div>
-              <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+              <div className={`${themeClasses.badgeBase} ${themeClasses.badgeGreen}`}>
                 {performances.length} performances
               </div>
             </div>
           </div>
 
           {performances.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <div className={`text-center py-12 ${themeClasses.emptyStateText}`}>
+              <div className={`w-16 h-16 mx-auto mb-4 ${themeClasses.emptyStateBg} rounded-full flex items-center justify-center`}>
                 <span className="text-2xl">🎭</span>
               </div>
-              <h3 className="text-lg font-medium mb-2">No performances yet</h3>
-              <p className="text-sm">Performances are automatically created when entries are approved.</p>
+              <h3 className={`text-lg font-medium mb-2 ${themeClasses.textPrimary}`}>No performances yet</h3>
+              <p className={themeClasses.body}>Performances are automatically created when entries are approved.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-600">
-                <thead className="bg-gray-700/80">
+              {/* Filter Buttons */}
+              <div className={`${themeClasses.sectionHeaderBg} px-6 py-3 border-b ${themeClasses.sectionHeaderBorder} flex flex-wrap gap-2`}>
+                <button
+                  onClick={() => setPerformanceFilter('all')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    performanceFilter === 'all'
+                      ? themeClasses.filterButtonActive
+                      : themeClasses.filterButtonInactive
+                  }`}
+                >
+                  All Performances
+                </button>
+                <button
+                  onClick={() => setPerformanceFilter('not_scored')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    performanceFilter === 'not_scored'
+                      ? 'bg-orange-600 text-white shadow-lg'
+                      : themeClasses.filterButtonInactive
+                  }`}
+                >
+                  Items Not Scored ({performanceStats.notScored})
+                </button>
+                <button
+                  onClick={() => setPerformanceFilter('scored')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    performanceFilter === 'scored'
+                      ? 'bg-green-600 text-white shadow-lg'
+                      : themeClasses.filterButtonInactive
+                  }`}
+                >
+                  Items Scored ({performanceStats.judged})
+                </button>
+              </div>
+              
+              <table className={`min-w-full ${themeClasses.tableBorder}`}>
+                <thead className={themeClasses.tableHeader}>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Performance</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider hidden sm:table-cell">Participants</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Duration</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider hidden md:table-cell">Choreographer</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Actions</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">Scores</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Performance</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden sm:table-cell`}>Participants</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Age</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Status</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
+                    <th className={`${themeClasses.tableCellPadding} text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Scores</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white/50 divide-y divide-gray-600">
-                  {performances.map((performance) => (
-                    <tr key={performance.id} className="hover:bg-green-50/50 transition-colors duration-200">
-                      <td className="px-6 py-4">
+                <tbody className={`${themeClasses.tableRow} ${themeClasses.tableBorder}`}>
+                  {filteredPerformances.map((performance) => {
+                    const entry = entries.find(e => e.id === performance.eventEntryId);
+                    return (
+                    <tr key={performance.id} className={themeClasses.tableRowHover}>
+                      <td className={themeClasses.tableCellPadding}>
                         <div>
-                          <div className="text-sm font-bold text-white">{performance.title}</div>
-                          <div className="text-sm text-gray-300">{performance.contestantName}</div>
-                          <div className="text-xs text-gray-400">{performance.mastery} • {performance.itemStyle}</div>
+                          <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{performance.title}</div>
+                          <div className={`text-sm ${themeClasses.textSecondary}`}>
+                            {performance.contestantName || 'Unknown'}
+                            {performance.eodsaId && (
+                              <span className={`text-xs ${themeClasses.textMuted} ml-2`}>({performance.eodsaId})</span>
+                            )}
+                          </div>
+                          {performance.studioName && (
+                            <div className={`text-xs ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'} mt-1`}>
+                              {performance.studioId ? (
+                                <Link 
+                                  href={`/admin/studios/${performance.studioId}`}
+                                  className="hover:underline"
+                                >
+                                  {performance.studioName}
+                                </Link>
+                              ) : (
+                                performance.studioName
+                              )}
+                            </div>
+                          )}
+                          <div className={`text-xs ${themeClasses.textMuted} mt-1`}>{performance.mastery} • {performance.itemStyle}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 hidden sm:table-cell">
-                        <div className="text-sm text-gray-300">
+                      <td className={`${themeClasses.tableCellPadding} hidden sm:table-cell`}>
+                        <div className={`text-sm ${themeClasses.textSecondary}`}>
                           {performance.participantNames.join(', ')}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-white">{performance.duration} min</div>
+                      <td className={themeClasses.tableCellPadding}>
+                        <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>
+                          {performance.ageCategory || 'N/A'}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300 hidden md:table-cell">
-                        {performance.choreographer}
-                      </td>
-                      <td className="px-6 py-4">
+                      <td className={themeClasses.tableCellPadding}>
                         <div className="flex flex-col space-y-1">
-                          <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full border ${
+                          <span className={`${themeClasses.badgeBase} border ${
                             performance.withdrawnFromJudging 
-                              ? 'bg-red-100 text-red-800 border-red-200'
-                              : performance.status === 'scheduled' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                                performance.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                                performance.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
-                                'bg-gray-100 text-gray-800 border-gray-200'
+                              ? themeClasses.badgeRed
+                              : performance.status === 'scheduled' ? themeClasses.badgeBlue :
+                                performance.status === 'in_progress' ? themeClasses.badgeYellow :
+                                performance.status === 'completed' ? themeClasses.badgeGreen :
+                                themeClasses.badgeGray
                           }`}>
                             {performance.withdrawnFromJudging 
                               ? 'WITHDRAWN' 
@@ -1682,23 +1937,23 @@ function EventParticipantsPage() {
                             }
                           </span>
                           {performance.withdrawnFromJudging && (
-                            <span className="text-xs text-gray-400">
+                            <span className={`text-xs ${themeClasses.textMuted}`}>
                               (Shows as unscored)
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className={themeClasses.tableCellPadding}>
                         <button
                           onClick={() => handleWithdrawPerformance(performance.id, performance.title)}
                           disabled={withdrawingPerformances.has(performance.id)}
-                          className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                          className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors border ${
                             performance.withdrawnFromJudging
-                              ? 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-200'
-                              : 'bg-red-100 text-red-800 hover:bg-red-200 border border-red-200'
+                              ? themeClasses.badgeGreen
+                              : themeClasses.badgeRed
                           } ${
                             withdrawingPerformances.has(performance.id)
-                              ? 'opacity-50 cursor-not-allowed'
+                              ? themeClasses.buttonDisabled
                               : 'hover:shadow-sm'
                           }`}
                         >
@@ -1710,16 +1965,17 @@ function EventParticipantsPage() {
                           }
                         </button>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className={themeClasses.tableCellPadding}>
                         <button
                           onClick={() => handleViewScores(performance.id, performance.title)}
-                          className="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 hover:shadow-sm"
+                          className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors border ${themeClasses.badgeBlue} hover:shadow-sm`}
                         >
                           View Scores
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1758,201 +2014,59 @@ function EventParticipantsPage() {
         </div>
       </div>
     )}
-    {/* Scores Management Modal */}
-    {showScoresModal && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <span className="text-white text-lg">🎯</span>
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Performance Scores</h2>
-                  <p className="text-gray-400">{selectedPerformanceScores?.performanceTitle}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowScoresModal(false)}
-                className="text-gray-400 hover:text-gray-400 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <span className="text-2xl">×</span>
-              </button>
-            </div>
-          </div>
-          
-          <div className="p-6">
-            {loadingScores ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-400">Loading scores...</p>
-              </div>
-            ) : selectedPerformanceScores ? (
-              <div className="space-y-6">
-                {/* Scoring Overview */}
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-blue-600">{selectedPerformanceScores.totalJudges}</div>
-                      <div className="text-sm text-gray-400">Total Judges</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-600">{selectedPerformanceScores.scoredJudges}</div>
-                      <div className="text-sm text-gray-400">Scored</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-orange-600">{selectedPerformanceScores.pendingJudgeIds?.length || 0}</div>
-                      <div className="text-sm text-gray-400">Pending</div>
-                    </div>
-                    <div>
-                      <div className={`text-2xl font-bold ${selectedPerformanceScores.isFullyScored ? 'text-green-600' : 'text-red-600'}`}>
-                        {selectedPerformanceScores.isFullyScored ? '✓' : '✗'}
-                      </div>
-                      <div className="text-sm text-gray-400">Complete</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Individual Scores */}
-                {selectedPerformanceScores.scores && selectedPerformanceScores.scores.length > 0 ? (
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Individual Judge Scores</h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-600">
-                        <thead className="bg-gray-700">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Judge</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Score</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Percentage</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Submitted</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-600">
-                          {selectedPerformanceScores.scores.map((score: any) => (
-                            <tr key={score.judgeId} className="hover:bg-gray-700">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-white">{score.judgeName}</div>
-                                <div className="text-sm text-gray-400">ID: {score.judgeId}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-lg font-bold text-white">{score.totalScore.toFixed(1)}/100</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-white">{((score.totalScore / 100) * 100).toFixed(1)}%</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-400">
-                                  {new Date(score.submittedAt).toLocaleDateString()} {new Date(score.submittedAt).toLocaleTimeString()}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleEditScore(selectedPerformanceScores.performanceId, score.judgeId, score.judgeName)}
-                                    className="px-3 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-colors"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteScore(selectedPerformanceScores.performanceId, score.judgeId, score.judgeName)}
-                                    className="px-3 py-1 text-xs font-medium rounded-lg bg-red-100 text-red-800 hover:bg-red-200 border border-red-200 transition-colors"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-gray-400 text-4xl mb-4">📝</div>
-                    <p className="text-gray-400">No scores submitted yet</p>
-                  </div>
-                )}
-
-                {/* Pending Judges */}
-                {selectedPerformanceScores.pendingJudgeIds && selectedPerformanceScores.pendingJudgeIds.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Pending Judges</h3>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <p className="text-yellow-800 text-sm mb-2">The following judges have not submitted scores yet:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedPerformanceScores.pendingJudgeIds.map((judgeId: string) => (
-                          <span key={judgeId} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Judge ID: {judgeId}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="text-red-400 text-4xl mb-4">⚠️</div>
-                <p className="text-gray-400">Failed to load scores</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
 
     {/* Payment Management Modal */}
     {showPaymentModal && selectedEntry && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full">
-          <div className="p-6 border-b border-gray-700">
+      <div className={`fixed inset-0 ${themeClasses.modalOverlay} flex items-center justify-center p-4 z-50`}>
+        <div className={`${themeClasses.modalBg} ${themeClasses.cardRadius} shadow-2xl max-w-lg w-full border ${themeClasses.modalBorder}`}>
+          {/* Header */}
+          <div className={`p-6 border-b ${themeClasses.modalBorder}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                  <span className="text-white text-lg">💳</span>
+                <div className={`w-12 h-12 ${themeClasses.iconContainerSecondary} ${themeClasses.cardRadius} flex items-center justify-center shadow-lg`}>
+                  <span className="text-white text-xl">💳</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-black">Payment Management</h2>
-                  <p className="text-black text-sm font-bold">{selectedEntry.itemName}</p>
+                  <h2 className={`${themeClasses.heading3}`}>Payment Management</h2>
+                  <p className={`${themeClasses.textMuted} text-sm font-medium mt-0.5`}>{selectedEntry.itemName}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="text-black hover:text-black p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className={`${themeClasses.textMuted} hover:${themeClasses.textPrimary} p-2 rounded-lg hover:${themeClasses.tableHeader} transition-colors`}
               >
                 <span className="text-2xl">×</span>
               </button>
             </div>
           </div>
           
-          <div className="p-6 space-y-6">
-            {/* Current Payment Info */}
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="text-sm font-bold text-black mb-3">Current Status</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm font-bold text-black">Entry Fee:</span>
-                  <span className="text-sm font-bold text-black">R{selectedEntry.calculatedFee.toFixed(2)}</span>
+          <div className={`${themeClasses.cardPadding} space-y-6`}>
+            {/* Current Payment Status Card */}
+            <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-5 border ${themeClasses.metricCardBorder}`}>
+              <h3 className={`${themeClasses.heading3} mb-4`}>Current Status</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Entry Fee:</span>
+                  <span className={`text-base font-bold ${themeClasses.textPrimary}`}>R{selectedEntry.calculatedFee.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-bold text-black">Status:</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(selectedEntry.paymentStatus)}`}>
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Status:</span>
+                  <span className={`${themeClasses.badgeBase} border ${getStatusBadge(selectedEntry.paymentStatus)}`}>
                     {selectedEntry.paymentStatus.toUpperCase()}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-bold text-black">Outstanding:</span>
-                  <span className={`text-sm font-bold ${getOutstandingBalance(selectedEntry) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Outstanding:</span>
+                  <span className={`text-base font-bold ${getOutstandingBalance(selectedEntry) > 0 ? (theme === 'dark' ? 'text-red-400' : 'text-red-600') : (theme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
                     R{getOutstandingBalance(selectedEntry).toFixed(2)}
                   </span>
                 </div>
                 {selectedEntry.paymentReference && (
-                  <div className="flex justify-between">
-                    <span className="text-sm font-bold text-black">Reference:</span>
-                    <span className="text-sm font-bold text-black">{selectedEntry.paymentReference}</span>
+                  <div className={`flex justify-between items-center pt-2 border-t ${themeClasses.cardBorder}`}>
+                    <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Reference:</span>
+                    <span className={`text-sm font-medium ${themeClasses.textPrimary} break-all text-right ml-4`}>
+                      {selectedEntry.paymentReference}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1961,11 +2075,11 @@ function EventParticipantsPage() {
             {/* Payment Form */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-black mb-2">Payment Method</label>
+                <label className={`block ${themeClasses.label} mb-2`}>Payment Method</label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className={`w-full p-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                 >
                   <option value="bank_transfer">Bank Transfer</option>
                   <option value="credit_card">Credit Card</option>
@@ -1974,24 +2088,26 @@ function EventParticipantsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-black mb-2">Payment Reference</label>
+                <label className={`block ${themeClasses.label} mb-2`}>Payment Reference</label>
                 <input
                   type="text"
                   value={paymentReference}
                   onChange={(e) => setPaymentReference(e.target.value)}
                   placeholder="Transaction ID, Check number, etc."
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className={`w-full p-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted}`}
                 />
-                <p className="text-xs text-black mt-1">Enter payment reference when marking as paid</p>
+                <p className={`text-xs ${themeClasses.textMuted} mt-2`}>
+                  Enter payment reference when marking as paid
+                </p>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col space-y-3">
+            <div className="space-y-3">
               <button
                 onClick={() => updatePaymentStatus('paid')}
                 disabled={updatingPayment}
-                className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium"
+                className={`w-full ${themeClasses.buttonBase} ${themeClasses.buttonSuccess} ${updatingPayment ? themeClasses.buttonDisabled : ''}`}
               >
                 {updatingPayment ? 'Updating...' : 'Mark as Paid'}
               </button>
@@ -2000,7 +2116,7 @@ function EventParticipantsPage() {
                 <button
                   onClick={() => updatePaymentStatus('pending')}
                   disabled={updatingPayment}
-                  className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${themeClasses.badgeYellow} hover:shadow-md ${updatingPayment ? themeClasses.buttonDisabled : ''}`}
                 >
                   Mark Pending
                 </button>
@@ -2008,17 +2124,18 @@ function EventParticipantsPage() {
                 <button
                   onClick={() => updatePaymentStatus('failed')}
                   disabled={updatingPayment}
-                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${themeClasses.badgeRed} hover:shadow-md ${updatingPayment ? themeClasses.buttonDisabled : ''}`}
                 >
                   Mark Failed
                 </button>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-200">
+            {/* Cancel Button */}
+            <div className={`pt-4 border-t ${themeClasses.modalBorder}`}>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="w-full px-4 py-2 text-black hover:text-black transition-colors font-bold"
+                className={`w-full px-4 py-2 ${themeClasses.textSecondary} hover:${themeClasses.textPrimary} transition-colors font-medium`}
               >
                 Cancel
               </button>
@@ -2030,14 +2147,19 @@ function EventParticipantsPage() {
 
     {/* Entry Details Modal - simplified view to reduce on-page clutter */}
     {showEntryModal && entryModal && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+      <div className={`fixed inset-0 ${themeClasses.modalOverlay} flex items-center justify-center p-4 z-50`}>
+        <div className={`${themeClasses.modalBg} ${themeClasses.cardRadius} shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border ${themeClasses.modalBorder}`}>
+          <div className={`p-6 border-b ${themeClasses.modalBorder} flex items-center justify-between`}>
             <div className="space-y-1">
-              <h2 className="text-xl font-bold text-white">Entry Details</h2>
-              <p className="text-gray-400 text-sm">{entryModal.itemName}</p>
+              <h2 className={`${themeClasses.heading3}`}>Entry Details</h2>
+              <p className={`${themeClasses.textMuted} text-sm`}>{entryModal.itemName}</p>
             </div>
-            <button onClick={() => setShowEntryModal(false)} className="text-gray-400 hover:text-gray-400 p-2 rounded-lg hover:bg-gray-100">×</button>
+            <button 
+              onClick={() => setShowEntryModal(false)} 
+              className={`${themeClasses.textMuted} hover:${themeClasses.textPrimary} p-2 rounded-lg hover:${themeClasses.tableHeader} transition-colors`}
+            >
+              ×
+            </button>
           </div>
 
           {/* Tabs */}
@@ -2045,39 +2167,57 @@ function EventParticipantsPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setEntryModalTab('overview')}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='overview'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-300 hover:bg-gray-700'}`}
-              >Overview</button>
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  entryModalTab === 'overview'
+                    ? `${themeClasses.filterButtonActive} shadow-lg`
+                    : themeClasses.filterButtonInactive
+                }`}
+              >
+                Overview
+              </button>
               <button
                 onClick={() => setEntryModalTab('dancers')}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='dancers'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-300 hover:bg-gray-700'}`}
-              >Dancers</button>
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  entryModalTab === 'dancers'
+                    ? `${themeClasses.filterButtonActive} shadow-lg`
+                    : themeClasses.filterButtonInactive
+                }`}
+              >
+                Dancers
+              </button>
               <button
                 onClick={() => setEntryModalTab('payment')}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${entryModalTab==='payment'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-gray-300 hover:bg-gray-700'}`}
-              >Payment</button>
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  entryModalTab === 'payment'
+                    ? `${themeClasses.filterButtonActive} shadow-lg`
+                    : themeClasses.filterButtonInactive
+                }`}
+              >
+                Payment
+              </button>
             </div>
           </div>
 
           {/* Tab Content */}
-          <div className="p-6">
+          <div className={themeClasses.cardPadding}>
             {entryModalTab === 'overview' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="text-sm text-gray-400">Item #</div>
-                    <div className="text-lg font-bold text-white">{entryModal.itemNumber ?? 'Not assigned'}</div>
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Item #</div>
+                    <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{entryModal.itemNumber ?? 'Not assigned'}</div>
                   </div>
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="text-sm text-gray-400">Type</div>
-                    <div className="text-lg font-bold text-white">{getPerformanceType(entryModal.participantIds)} • {entryModal.entryType.toUpperCase()}</div>
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Type</div>
+                    <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{getPerformanceType(entryModal.participantIds)} • {entryModal.entryType.toUpperCase()}</div>
                   </div>
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="text-sm text-gray-400">Mastery / Style</div>
-                    <div className="text-lg font-bold text-white">{entryModal.mastery} • {entryModal.itemStyle}</div>
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Mastery / Style</div>
+                    <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{entryModal.mastery} • {entryModal.itemStyle}</div>
                   </div>
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="text-sm text-gray-400">Submitted</div>
-                    <div className="text-lg font-bold text-white">{new Date(entryModal.submittedAt).toLocaleDateString()}</div>
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Submitted</div>
+                    <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{new Date(entryModal.submittedAt).toLocaleDateString()}</div>
                   </div>
                 </div>
 
@@ -2086,21 +2226,31 @@ function EventParticipantsPage() {
                     <button
                       onClick={() => approveEntry(entryModal.id)}
                       disabled={approvingEntries.has(entryModal.id)}
-                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                    >{approvingEntries.has(entryModal.id)?'Approving...':'Approve'}</button>
+                      className={`${themeClasses.buttonBase} ${themeClasses.buttonSuccess} ${approvingEntries.has(entryModal.id) ? themeClasses.buttonDisabled : ''}`}
+                    >
+                      {approvingEntries.has(entryModal.id) ? 'Approving...' : 'Approve'}
+                    </button>
                   )}
                   {entryModal.approved && (
                     <button
                       onClick={() => toggleQualification(entryModal.id, entryModal.qualifiedForNationals)}
                       disabled={qualifyingEntries.has(entryModal.id)}
-                      className={`px-3 py-2 rounded-lg ${entryModal.qualifiedForNationals?'bg-purple-600 text-white hover:bg-purple-700':'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
-                    >{qualifyingEntries.has(entryModal.id)?'Updating...':(entryModal.qualifiedForNationals?'Qualified ✓':'Qualify for Nationals')}</button>
+                      className={`px-3 py-2 rounded-lg transition-colors ${
+                        entryModal.qualifiedForNationals
+                          ? `${themeClasses.buttonBase} bg-purple-600 text-white hover:bg-purple-700`
+                          : `${themeClasses.buttonSecondary}`
+                      } ${qualifyingEntries.has(entryModal.id) ? themeClasses.buttonDisabled : ''}`}
+                    >
+                      {qualifyingEntries.has(entryModal.id) ? 'Updating...' : (entryModal.qualifiedForNationals ? 'Qualified ✓' : 'Qualify for Nationals')}
+                    </button>
                   )}
                   <button
                     onClick={() => deleteEntry(entryModal.id, entryModal.itemName)}
                     disabled={deletingEntries.has(entryModal.id)}
-                    className="px-3 py-2 bg-red-100 text-red-800 border border-red-200 rounded-lg hover:bg-red-200"
-                  >{deletingEntries.has(entryModal.id)?'Deleting...':'Delete Entry'}</button>
+                    className={`px-3 py-2 ${themeClasses.badgeRed} rounded-lg hover:shadow-sm transition-all ${deletingEntries.has(entryModal.id) ? themeClasses.buttonDisabled : ''}`}
+                  >
+                    {deletingEntries.has(entryModal.id) ? 'Deleting...' : 'Delete Entry'}
+                  </button>
                 </div>
               </div>
             )}
@@ -2108,9 +2258,11 @@ function EventParticipantsPage() {
             {entryModalTab === 'dancers' && (
               <div className="space-y-3">
                 {(entryModal.participantNames && entryModal.participantNames.length>0 ? entryModal.participantNames : (entryModal.participantIds||[]).map((_,i)=>`Participant ${i+1}`)).map((n, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm bg-gray-700 rounded p-3">
-                    <div className="font-medium text-white">{n}</div>
-                    <div className="text-blue-700 text-xs bg-blue-50 px-2 py-1 rounded">{entryModal.participantStudios?.[i] || entryModal.studioName || 'Independent'}</div>
+                  <div key={i} className={`flex items-center justify-between text-sm ${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-3 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`font-medium ${themeClasses.textPrimary}`}>{n}</div>
+                    <div className={`${themeClasses.badgeBase} ${themeClasses.badgeBlue}`}>
+                      {entryModal.participantStudios?.[i] || entryModal.studioName || 'Independent'}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2119,24 +2271,30 @@ function EventParticipantsPage() {
             {entryModalTab === 'payment' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="text-sm text-gray-400">Total Fee</div>
-                    <div className="text-lg font-bold text-white">R{entryModal.calculatedFee.toFixed(2)}</div>
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Total Fee</div>
+                    <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>R{entryModal.calculatedFee.toFixed(2)}</div>
                   </div>
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="text-sm text-gray-400">Status</div>
-                    <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(entryModal.paymentStatus)}`}>{entryModal.paymentStatus.toUpperCase()}</div>
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Status</div>
+                    <div className={`${themeClasses.badgeBase} border ${getStatusBadge(entryModal.paymentStatus)}`}>
+                      {entryModal.paymentStatus.toUpperCase()}
+                    </div>
                   </div>
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="text-sm text-gray-400">Outstanding</div>
-                    <div className={`text-lg font-bold ${getOutstandingBalance(entryModal)>0?'text-red-600':'text-green-600'}`}>R{getOutstandingBalance(entryModal).toFixed(2)}</div>
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Outstanding</div>
+                    <div className={`text-lg font-bold ${getOutstandingBalance(entryModal) > 0 ? (theme === 'dark' ? 'text-red-400' : 'text-red-600') : (theme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
+                      R{getOutstandingBalance(entryModal).toFixed(2)}
+                    </div>
                   </div>
                 </div>
 
                 <button
                   onClick={() => { setShowEntryModal(false); handlePaymentUpdate(entryModal); }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >Manage Payment</button>
+                  className={`${themeClasses.buttonBase} ${themeClasses.buttonPrimary}`}
+                >
+                  Manage Payment
+                </button>
               </div>
             )}
           </div>
