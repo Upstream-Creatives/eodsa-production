@@ -11,8 +11,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ performanceId: string }> }
 ) {
+  let performanceId: string | undefined;
   try {
-    const { performanceId } = await params;
+    const resolvedParams = await params;
+    performanceId = resolvedParams.performanceId;
+
+    if (!performanceId) {
+      return NextResponse.json(
+        { error: 'Performance ID is required' },
+        { status: 400 }
+      );
+    }
 
     // Get performance details
     const allPerformances = await db.getAllPerformances();
