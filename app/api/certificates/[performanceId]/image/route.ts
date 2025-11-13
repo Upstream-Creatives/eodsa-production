@@ -52,12 +52,16 @@ export async function GET(
       );
     }
 
-    // Calculate average percentage from all judge scores
+    // Calculate average percentage using total judges assigned to event (not just scores submitted)
+    const { getTotalJudgesForEvent } = await import('@/lib/database');
+    const totalJudgesAssigned = await getTotalJudgesForEvent(performance.eventId, performanceId);
+    
     const totalPercentage = scores.reduce((sum, score) => {
       const scoreTotal = score.technicalScore + score.musicalScore + score.performanceScore + score.stylingScore + score.overallImpressionScore;
       return sum + scoreTotal;
     }, 0);
-    const averagePercentage = Math.round(totalPercentage / scores.length);
+    // Use total judges assigned, with fallback to scores.length if judges not assigned yet
+    const averagePercentage = Math.round(totalPercentage / (totalJudgesAssigned > 0 ? totalJudgesAssigned : scores.length));
 
     // Get medallion
     const medallion = getMedalFromPercentage(averagePercentage);

@@ -390,7 +390,50 @@ export const cleanDatabase = async () => {
   }
 };
 
+// Helper function to get total judges assigned to an event
+// Returns the count of judges assigned, or falls back to the number of scores submitted if no judges assigned
+export async function getTotalJudgesForEvent(eventId: string, performanceId?: string): Promise<number> {
+  const sqlClient = getSql();
+  
+  try {
+    // First, try to get count from judge_event_assignments
+    const judgeCountResult = await sqlClient`
+      SELECT COUNT(DISTINCT judge_id) as total_judges
+      FROM judge_event_assignments
+      WHERE event_id = ${eventId}
+    ` as any[];
+    
+    const totalJudges = parseInt(judgeCountResult[0]?.total_judges || '0');
+    
+    // If judges are assigned, return that count
+    if (totalJudges > 0) {
+      return totalJudges;
+    }
+    
+    // Fallback: if no judges assigned yet, use count of scores submitted for this performance
+    // This prevents division by zero and handles edge cases
+    if (performanceId) {
+      const scoreCountResult = await sqlClient`
+        SELECT COUNT(DISTINCT judge_id) as scored_judges
+        FROM scores
+        WHERE performance_id = ${performanceId}
+      ` as any[];
+      
+      const scoredJudges = parseInt(scoreCountResult[0]?.scored_judges || '0');
+      return scoredJudges > 0 ? scoredJudges : 1; // Minimum 1 to avoid division by zero
+    }
+    
+    // If no performance ID provided and no judges assigned, default to 1
+    return 1;
+  } catch (error) {
+    console.error('Error getting total judges for event:', error);
+    // Safe fallback: return 1 to avoid division by zero
+    return 1;
+  }
+}
+
 // Database operations
+
 export const db = {
   // Contestants
   async createContestant(contestant: Omit<Contestant, 'id' | 'eodsaId' | 'registrationDate' | 'eventEntries'>) {
@@ -1243,13 +1286,14 @@ export const db = {
               ee.participant_ids,
               ee.entry_type,
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
-              AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
+              COUNT(DISTINCT jea.judge_id) as total_judges_assigned,
               COUNT(s.id) as judge_count
             FROM performances p
             JOIN events e ON p.event_id = e.id
             LEFT JOIN contestants c ON p.contestant_id = c.id
             LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
             LEFT JOIN scores s ON p.id = s.performance_id
+            LEFT JOIN judge_event_assignments jea ON jea.event_id = e.id
             WHERE e.id = ${eventId} AND p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, ee.performance_type, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
@@ -1289,13 +1333,14 @@ export const db = {
                 ee.participant_ids,
                 ee.entry_type,
                 SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
-                AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
+                COUNT(DISTINCT jea.judge_id) as total_judges_assigned,
                 COUNT(s.id) as judge_count
               FROM performances p
               JOIN events e ON p.event_id = e.id
               JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
               LEFT JOIN scores s ON p.id = s.performance_id
+              LEFT JOIN judge_event_assignments jea ON jea.event_id = e.id
               WHERE e.id = ${eventId} AND p.scores_published = true
               GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, ee.performance_type, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
               HAVING COUNT(s.id) > 0
@@ -1329,13 +1374,14 @@ export const db = {
               ee.participant_ids,
               ee.entry_type,
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
-              AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
+              COUNT(DISTINCT jea.judge_id) as total_judges_assigned,
               COUNT(s.id) as judge_count
               FROM performances p
               JOIN events e ON p.event_id = e.id
               LEFT JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
               LEFT JOIN scores s ON p.id = s.performance_id
+              LEFT JOIN judge_event_assignments jea ON jea.event_id = e.id
               WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND e.performance_type = ${performanceType} AND p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
@@ -1363,13 +1409,14 @@ export const db = {
               ee.participant_ids,
               ee.entry_type,
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
-              AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
+              COUNT(DISTINCT jea.judge_id) as total_judges_assigned,
               COUNT(s.id) as judge_count
               FROM performances p
               JOIN events e ON p.event_id = e.id
               LEFT JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
               LEFT JOIN scores s ON p.id = s.performance_id
+              LEFT JOIN judge_event_assignments jea ON jea.event_id = e.id
               WHERE e.region = ${region} AND e.age_category = ${ageCategory} AND p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
@@ -1397,13 +1444,14 @@ export const db = {
               ee.participant_ids,
               ee.entry_type,
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
-              AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
+              COUNT(DISTINCT jea.judge_id) as total_judges_assigned,
               COUNT(s.id) as judge_count
               FROM performances p
               JOIN events e ON p.event_id = e.id
               LEFT JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
               LEFT JOIN scores s ON p.id = s.performance_id
+              LEFT JOIN judge_event_assignments jea ON jea.event_id = e.id
               WHERE e.region = ${region} AND p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
@@ -1440,13 +1488,14 @@ export const db = {
               ee.participant_ids,
               ee.entry_type,
               SUM(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as total_score,
-              AVG(s.technical_score + s.musical_score + s.performance_score + s.styling_score + s.overall_impression_score) as average_score,
+              COUNT(DISTINCT jea.judge_id) as total_judges_assigned,
               COUNT(s.id) as judge_count
               FROM performances p
               JOIN events e ON p.event_id = e.id
               LEFT JOIN contestants c ON p.contestant_id = c.id
               LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
               LEFT JOIN scores s ON p.id = s.performance_id
+              LEFT JOIN judge_event_assignments jea ON jea.event_id = e.id
               WHERE p.scores_published = true
             GROUP BY p.id, p.item_number, p.mastery, p.event_entry_id, e.id, e.name, e.region, e.age_category, ee.performance_type, e.performance_type, e.event_date, p.title, p.item_style, p.participant_names, c.name, c.type, c.studio_name, ee.participant_ids, ee.entry_type
             HAVING COUNT(s.id) > 0
@@ -1654,7 +1703,13 @@ export const db = {
           participantNames: participantNames, // Keep original participant names for reference
           studioName: studioInfo, // Studio information for display
           totalScore: parseFloat(row.total_score) || 0,
-          averageScore: parseFloat(row.average_score) || 0,
+          // Calculate average using total judges assigned (not just scores submitted)
+          totalJudgesAssigned: parseInt(row.total_judges_assigned) || parseInt(row.judge_count) || 1,
+          averageScore: (() => {
+            const totalScore = parseFloat(row.total_score) || 0;
+            const totalJudges = parseInt(row.total_judges_assigned) || parseInt(row.judge_count) || 1;
+            return totalJudges > 0 ? totalScore / totalJudges : 0;
+          })(),
           rank: 0, // Rank is calculated on the frontend based on view mode
           judgeCount: parseInt(row.judge_count) || 0,
           itemNumber: row.item_number,
@@ -3850,9 +3905,11 @@ export const db = {
         submittedAt: score.submitted_at
       }));
 
-      // Calculate average
+      // Calculate average using total judges assigned to event (not just scores submitted)
       const totalSum = judgeScores.reduce((sum, js) => sum + js.total, 0);
-      const average = totalSum / judgeScores.length;
+      const totalJudgesAssigned = perf.total_judges || judgeScores.length;
+      // Use total judges assigned, with fallback to scores.length if judges not assigned yet
+      const average = totalJudgesAssigned > 0 ? totalSum / totalJudgesAssigned : 0;
       const percentage = average; // Already out of 100
 
       // Get medal from existing function

@@ -2338,15 +2338,15 @@ function AdminDashboard() {
       {/* Modal Components */}
       {/* Create Event Modal */}
       {showCreateEventModal && (
-        <div className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/30">
-            <div className="p-6 border-b border-gray-200/50">
+        <div className={`fixed inset-0 ${themeClasses.modalOverlay} flex items-center justify-center p-4 z-50`}>
+          <div className={`${themeClasses.modalBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${themeClasses.modalBorder}`}>
+            <div className={`${themeClasses.cardPadding} border-b ${themeClasses.modalBorder}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <div className={`w-10 h-10 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center`}>
                     <span className="text-white text-lg">🎭</span>
                   </div>
-                  <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Create New Event</h2>
+                  <h2 className={`${themeClasses.heading3}`}>Create New Event</h2>
                 </div>
                 <button
                   onClick={() => setShowCreateEventModal(false)}
@@ -2357,38 +2357,38 @@ function AdminDashboard() {
               </div>
             </div>
             
-            <form onSubmit={handleCreateEvent} className="p-6">
+            <form onSubmit={handleCreateEvent} className={themeClasses.cardPadding}>
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Event Name</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Event Name</label>
                     <input
                       type="text"
                     value={newEvent.name}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                     required
                     placeholder="e.g., EODSA Nationals Championships 2024"
                   />
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Venue</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Venue</label>
                   <input
                     type="text"
                     value={newEvent.venue}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, venue: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                     required
                     placeholder="e.g., Johannesburg Civic Theatre"
                   />
                 </div>
 
                 <div className="lg:col-span-2">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Description</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Description</label>
                   <textarea
                     value={newEvent.description}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium placeholder-gray-400"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                     rows={3}
                     required
                     placeholder="Describe the event..."
@@ -2396,22 +2396,22 @@ function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Legacy Entry Fee (Not Used)</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Legacy Entry Fee (Not Used)</label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={0}
                     disabled
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${theme === 'dark' ? 'bg-gray-700/30' : 'bg-gray-100'} ${themeClasses.textMuted} cursor-not-allowed`}
                     placeholder="0.00"
                   />
-                  <p className="text-xs text-orange-600 mt-1 font-medium">⚠️ This field is deprecated. Use the Fee Configuration section below.</p>
+                  <p className={`text-xs ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'} mt-1 font-medium`}>⚠️ This field is deprecated. Use the Fee Configuration section below.</p>
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Competition</label>
-                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 ${themeClasses.textPrimary} font-medium text-base">
+                  <label className={`block ${themeClasses.label} mb-2`}>Competition</label>
+                  <div className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.textPrimary} font-medium`}>
                     EODSA Nationals
                   </div>
                 </div>
@@ -2419,34 +2419,34 @@ function AdminDashboard() {
 
 
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Event Date</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Event Date</label>
                   <input
                     type="datetime-local"
                     value={newEvent.eventDate}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, eventDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   />
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>End Date</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>End Date</label>
                   <input
                     type="datetime-local"
                     value={newEvent.eventEndDate}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, eventEndDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   />
                 </div>
 
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Registration Deadline</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Registration Deadline</label>
                   <input
                     type="datetime-local"
                     value={newEvent.registrationDeadline}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, registrationDeadline: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   />
                 </div>
@@ -2454,8 +2454,8 @@ function AdminDashboard() {
 
 
                 <div className="lg:col-span-1">
-                  <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-3`}>Performance Types</label>
-                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 ${themeClasses.textPrimary} font-medium text-base">
+                  <label className={`block ${themeClasses.label} mb-2`}>Performance Types</label>
+                  <div className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.textPrimary} font-medium`}>
                     🎭 Creates All Performance Types (Solo, Duet, Trio, Group)
                   </div>
                   <p className={`text-xs ${themeClasses.textMuted} mt-1`}>
@@ -2465,17 +2465,17 @@ function AdminDashboard() {
               </div>
 
               {/* Fee Configuration Section */}
-              <div className="mt-8 p-6 border-2 border-indigo-200 rounded-xl bg-indigo-50/50">
-                <h3 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2">
+              <div className={`mt-8 p-6 border-2 ${theme === 'dark' ? 'border-indigo-700/50 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50/50'} ${themeClasses.cardRadius}`}>
+                <h3 className={`${themeClasses.heading3} mb-4 flex items-center gap-2`}>
                   💰 Fee Configuration
                 </h3>
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Currency</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Currency</label>
                     <select
                       value={newEvent.currency}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, currency: e.target.value }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     >
                       <option value="ZAR">ZAR (R)</option>
                       <option value="USD">USD ($)</option>
@@ -2485,105 +2485,105 @@ function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Registration Fee (per dancer)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Registration Fee (per dancer)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.registrationFeePerDancer}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, registrationFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="300"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">1 Solo Package</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>1 Solo Package</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.solo1Fee}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, solo1Fee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">2 Solos Package</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>2 Solos Package</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.solo2Fee}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, solo2Fee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="750"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">3 Solos Package</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>3 Solos Package</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.solo3Fee}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, solo3Fee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="1050"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Each Additional Solo</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Each Additional Solo</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.soloAdditionalFee}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, soloAdditionalFee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Duo/Trio (per dancer)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Duo/Trio (per dancer)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.duoTrioFeePerDancer}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, duoTrioFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="280"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Small Group (per dancer, 4-9)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Small Group (per dancer, 4-9)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.groupFeePerDancer}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, groupFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="220"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Large Group (per dancer, 10+)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Large Group (per dancer, 10+)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={newEvent.largeGroupFeePerDancer}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, largeGroupFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-base font-medium"
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                       placeholder="190"
                     />
                   </div>
@@ -2591,10 +2591,14 @@ function AdminDashboard() {
               </div>
 
               {createEventMessage && (
-                <div className={`mt-6 p-4 rounded-xl font-medium animate-slideIn ${
+                <div className={`mt-6 p-4 ${themeClasses.cardRadius} font-medium animate-slideIn border ${
                   createEventMessage.includes('Error') 
-                    ? 'bg-red-50 text-red-700 border border-red-200' 
-                    : 'bg-green-50 text-green-700 border border-green-200'
+                    ? theme === 'dark'
+                      ? 'bg-red-900/80 text-red-200 border-red-700'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                    : theme === 'dark'
+                      ? 'bg-green-900/80 text-green-200 border-green-700'
+                      : 'bg-green-50 text-green-700 border-green-200'
                 }`}>
                   <div className="flex items-center space-x-2">
                     <span>{createEventMessage.includes('Error') ? '❌' : '✅'}</span>
@@ -2603,23 +2607,23 @@ function AdminDashboard() {
                 </div>
               )}
 
-              <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+              <div className={`flex justify-end space-x-4 mt-8 pt-6 border-t ${themeClasses.modalBorder}`}>
                 <button
                   type="button"
                   onClick={() => setShowCreateEventModal(false)}
-                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} rounded-xl transition-colors font-medium`}
+                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} ${themeClasses.cardRadius} transition-colors font-medium`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreatingEvent}
-                  className="inline-flex items-center space-x-3 px-8 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
+                  className={`inline-flex items-center space-x-3 px-8 py-3 ${themeClasses.buttonBase} ${themeClasses.buttonPrimary} ${isCreatingEvent ? themeClasses.buttonDisabled : ''} font-semibold`}
                 >
                   {isCreatingEvent ? (
                     <>
                       <div className="relative w-5 h-5">
-                        <div className="absolute inset-0 border-2 border-white/30 rounded-full"></div>
+                        <div className={`absolute inset-0 border-2 ${theme === 'dark' ? 'border-white/30' : 'border-white/30'} rounded-full`}></div>
                       </div>
                       <span>Creating...</span>
                     </>
@@ -2638,15 +2642,15 @@ function AdminDashboard() {
 
       {/* Edit Event Modal */}
       {showEditEventModal && editingEvent && (
-        <div className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/30">
-            <div className="p-6 border-b border-gray-200/50">
+        <div className={`fixed inset-0 ${themeClasses.modalOverlay} flex items-center justify-center p-4 z-50`}>
+          <div className={`${themeClasses.modalBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${themeClasses.modalBorder}`}>
+            <div className={`${themeClasses.cardPadding} border-b ${themeClasses.modalBorder}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <div className={`w-10 h-10 ${themeClasses.iconContainer} ${themeClasses.cardRadius} flex items-center justify-center`}>
                     <span className="text-white text-lg">✏️</span>
                   </div>
-                  <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Edit Event</h2>
+                  <h2 className={`${themeClasses.heading3}`}>Edit Event</h2>
                 </div>
                 <button
                   onClick={() => {
@@ -2661,30 +2665,30 @@ function AdminDashboard() {
               </div>
             </div>
             
-            <form onSubmit={handleUpdateEvent} className="p-6">
-              <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                <h3 className="text-sm font-semibold text-blue-800 mb-2">📝 Update Event Details:</h3>
-                <p className="text-sm text-blue-700">Modify the event information below. This will update the event for all judges and participants.</p>
+            <form onSubmit={handleUpdateEvent} className={themeClasses.cardPadding}>
+              <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
+                <h3 className={`text-sm font-semibold ${theme === 'dark' ? 'text-blue-300' : 'text-blue-800'} mb-2`}>📝 Update Event Details:</h3>
+                <p className={`text-sm ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>Modify the event information below. This will update the event for all judges and participants.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Event Name *</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Event Name *</label>
                   <input
                     type="text"
                     value={editEventData.name}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   />
                 </div>
 
                 <div>
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Region *</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Region *</label>
                   <select
                     value={editEventData.region}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, region: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   >
                     <option value="Nationals">Nationals</option>
@@ -2695,43 +2699,43 @@ function AdminDashboard() {
                 </div>
 
                 <div>
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Event Date *</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Event Date *</label>
                   <input
                     type="date"
                     value={editEventData.eventDate}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, eventDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   />
                 </div>
 
                 <div>
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Event End Date</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Event End Date</label>
                   <input
                     type="date"
                     value={editEventData.eventEndDate}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, eventEndDate: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                   />
                 </div>
 
                 <div>
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Registration Deadline *</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Registration Deadline *</label>
                   <input
                     type="date"
                     value={editEventData.registrationDeadline}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, registrationDeadline: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   />
                 </div>
 
                 <div>
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Status</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Status</label>
                   <select
                     value={editEventData.status}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                   >
                     <option value="upcoming">Upcoming</option>
                     <option value="registration_open">Registration Open</option>
@@ -2742,40 +2746,40 @@ function AdminDashboard() {
                 </div>
 
                 <div className="md:col-span-2">
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Venue *</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Venue *</label>
                   <input
                     type="text"
                     value={editEventData.venue}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, venue: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                   <label className={`block text-sm font-semibold ${themeClasses.textSecondary} mb-2`}>Description</label>
+                   <label className={`block ${themeClasses.label} mb-2`}>Description</label>
                   <textarea
                     value={editEventData.description}
                     onChange={(e) => setEditEventData(prev => ({ ...prev, description: e.target.value }))}
                     rows={3}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-base font-medium"
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
                     placeholder="Event description (optional)"
                   />
                 </div>
               </div>
 
               {/* Fee Configuration Section */}
-              <div className="mt-8 p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200">
-                <h3 className="text-lg font-bold text-green-800 mb-4 flex items-center space-x-2">
+              <div className={`mt-8 p-6 border-2 ${theme === 'dark' ? 'border-green-700/50 bg-green-900/20' : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'} ${themeClasses.cardRadius}`}>
+                <h3 className={`${themeClasses.heading3} mb-4 flex items-center space-x-2`}>
                   💰 Fee Configuration
                 </h3>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Currency</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Currency</label>
                     <select
                       value={editEventData.currency}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, currency: e.target.value }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     >
                       <option value="ZAR">ZAR (R)</option>
                       <option value="USD">USD ($)</option>
@@ -2785,108 +2789,112 @@ function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Registration Fee (per dancer)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Registration Fee (per dancer)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.registrationFeePerDancer}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, registrationFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">1 Solo Package</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>1 Solo Package</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.solo1Fee}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, solo1Fee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">2 Solos Package</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>2 Solos Package</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.solo2Fee}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, solo2Fee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">3 Solos Package</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>3 Solos Package</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.solo3Fee}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, solo3Fee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Each Additional Solo</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Each Additional Solo</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.soloAdditionalFee}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, soloAdditionalFee: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Duo/Trio (per dancer)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Duo/Trio (per dancer)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.duoTrioFeePerDancer}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, duoTrioFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Small Group (per dancer, 4-9)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Small Group (per dancer, 4-9)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.groupFeePerDancer}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, groupFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Large Group (per dancer, 10+)</label>
+                    <label className={`block ${themeClasses.label} mb-2`}>Large Group (per dancer, 10+)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={editEventData.largeGroupFeePerDancer}
                       onChange={(e) => setEditEventData(prev => ({ ...prev, largeGroupFeePerDancer: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
                     />
                   </div>
                 </div>
               </div>
 
               {updateEventMessage && (
-                <div className={`mt-6 p-4 rounded-xl font-medium animate-slideIn ${
+                <div className={`mt-6 p-4 ${themeClasses.cardRadius} font-medium animate-slideIn border ${
                   updateEventMessage.includes('Error') 
-                    ? 'bg-red-50 text-red-700 border border-red-200' 
-                    : 'bg-green-50 text-green-700 border border-green-200'
+                    ? theme === 'dark'
+                      ? 'bg-red-900/80 text-red-200 border-red-700'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                    : theme === 'dark'
+                      ? 'bg-green-900/80 text-green-200 border-green-700'
+                      : 'bg-green-50 text-green-700 border-green-200'
                 }`}>
                   <div className="flex items-center space-x-2">
                     <span>{updateEventMessage.includes('Error') ? '❌' : '✅'}</span>
@@ -2895,7 +2903,7 @@ function AdminDashboard() {
                 </div>
               )}
 
-              <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+              <div className={`flex justify-end space-x-4 mt-8 pt-6 border-t ${themeClasses.modalBorder}`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -2903,20 +2911,20 @@ function AdminDashboard() {
                     setEditingEvent(null);
                     setUpdateEventMessage('');
                   }}
-                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} rounded-xl transition-colors font-medium`}
+                  className={`px-6 py-3 border ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700/50' : 'border-gray-300 hover:bg-gray-50'} ${themeClasses.textSecondary} ${themeClasses.cardRadius} transition-colors font-medium`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdatingEvent}
-                  className="inline-flex items-center space-x-3 px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
+                  className={`inline-flex items-center space-x-3 px-8 py-3 ${themeClasses.buttonBase} ${themeClasses.buttonPrimary} ${isUpdatingEvent ? themeClasses.buttonDisabled : ''} font-semibold`}
                 >
                   {isUpdatingEvent ? (
                     <>
                       <div className="relative w-5 h-5">
-                        <div className="absolute inset-0 border-2 border-white/30 rounded-full"></div>
-                        <div className="absolute inset-0 border-t-2 border-white rounded-full animate-spin"></div>
+                        <div className={`absolute inset-0 border-2 ${theme === 'dark' ? 'border-white/30' : 'border-white/30'} rounded-full`}></div>
+                        <div className={`absolute inset-0 border-t-2 ${theme === 'dark' ? 'border-white' : 'border-white'} rounded-full animate-spin`}></div>
                       </div>
                       <span>Updating...</span>
                     </>
