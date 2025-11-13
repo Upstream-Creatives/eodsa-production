@@ -118,8 +118,8 @@ export async function GET(
       date: formatCertificateDate(event.eventDate)
     });
 
-    // Return image
-    return new NextResponse(certificateBuffer, {
+    // Return image - convert Buffer to Uint8Array for NextResponse
+    return new NextResponse(Uint8Array.from(certificateBuffer), {
       headers: {
         'Content-Type': 'image/jpeg',
         'Content-Disposition': `inline; filename="certificate-${performanceId}.jpg"`,
