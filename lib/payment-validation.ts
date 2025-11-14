@@ -49,6 +49,9 @@ export async function validateBatchEntryFees(
   // Track solo counts per dancer as we process entries
   // This is critical for batch additions where multiple solos are added at once
   const soloCountTracker: Map<string, number> = new Map(); // Map<eodsaId, currentSoloCount>
+  
+  // Track registration charged status per dancer to ensure it's only charged once
+  const registrationChargedTracker: Map<string, boolean> = new Map(); // Map<eodsaId, registrationCharged>
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
@@ -115,35 +118,50 @@ export async function validateBatchEntryFees(
           currency: event.currency || 'ZAR'
         };
 
-        // Check registration charged status
+        // Check registration charged status (only check once per dancer)
         const soloEodsaId = entry.eodsaId || (entry.participantIds && entry.participantIds[0]);
-        const registrationChargedResult = await sql`
-          SELECT COUNT(*) as count
-          FROM registration_charged_flags
-          WHERE event_id = ${eventId}
-          AND (dancer_id = ${entry.contestantId || entry.eodsaId} OR eodsa_id = ${soloEodsaId})
-        ` as any[];
-
-        let registrationCharged = false;
-        if (registrationChargedResult && registrationChargedResult[0]?.count > 0) {
-          registrationCharged = true;
-        } else {
-          const existingEntriesResult = await sql`
+        let registrationCharged = registrationChargedTracker.get(soloEodsaId);
+        
+        if (registrationCharged === undefined) {
+          // First time checking this dancer - query database
+          const registrationChargedResult = await sql`
             SELECT COUNT(*) as count
-            FROM event_entries
+            FROM registration_charged_flags
             WHERE event_id = ${eventId}
-            AND (contestant_id = ${entry.contestantId || entry.eodsaId} OR eodsa_id = ${soloEodsaId})
-            LIMIT 1
+            AND (dancer_id = ${entry.contestantId || entry.eodsaId} OR eodsa_id = ${soloEodsaId})
           ` as any[];
-          registrationCharged = existingEntriesResult && existingEntriesResult[0]?.count > 0;
+
+          if (registrationChargedResult && registrationChargedResult[0]?.count > 0) {
+            registrationCharged = true;
+          } else {
+            const existingEntriesResult = await sql`
+              SELECT COUNT(*) as count
+              FROM event_entries
+              WHERE event_id = ${eventId}
+              AND (contestant_id = ${entry.contestantId || entry.eodsaId} OR eodsa_id = ${soloEodsaId})
+              LIMIT 1
+            ` as any[];
+            registrationCharged = existingEntriesResult && existingEntriesResult[0]?.count > 0;
+          }
+          
+          // Store in tracker
+          registrationChargedTracker.set(soloEodsaId, registrationCharged);
         }
 
         // Calculate solo fee based on solo number
         const soloNumber = existingSoloCount + 1;
         const { calculateSoloEntryFee } = await import('./pricing-utils');
         const entryFee = calculateSoloEntryFee(soloNumber, eventConfig);
-        const registrationFee = registrationCharged ? 0 : eventConfig.registrationFeePerDancer;
+        
+        // Registration fee: only charge if not already charged AND this is the first solo for this dancer in this batch
+        const isFirstSoloInBatch = (soloCountTracker.get(soloEodsaId) || 0) === 0;
+        const registrationFee = (!registrationCharged && isFirstSoloInBatch) ? eventConfig.registrationFeePerDancer : 0;
         const totalFee = entryFee + registrationFee;
+        
+        // Mark registration as charged in tracker after first solo
+        if (!registrationCharged && isFirstSoloInBatch) {
+          registrationChargedTracker.set(soloEodsaId, true);
+        }
 
         feeResult = {
           registrationFee,
