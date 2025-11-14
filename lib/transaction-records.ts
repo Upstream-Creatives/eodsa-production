@@ -122,19 +122,151 @@ export async function updateTransactionRecord(
     return;
   }
 
+  // Build dynamic UPDATE query using conditional logic with tagged template
+  // Since neon uses tagged templates, we need to build the query conditionally
   updateFields.push('updated_at');
   values.push(now);
   values.push(transactionId);
 
-  const setClause = updateFields.map((field, index) => 
-    `${field} = $${index + 1}`
-  ).join(', ');
+  // Build the query conditionally based on which fields are present
+  // Use conditional logic to construct the SET clause with all possible combinations
+  const hasStatus = updateFields.includes('status');
+  const hasAmountPaid = updateFields.includes('amount_paid');
+  const hasPaymentReference = updateFields.includes('payment_reference');
+  const hasRegistrationPaidFlag = updateFields.includes('registration_paid_flag');
 
-  await sql.unsafe(`
-    UPDATE transaction_records 
-    SET ${setClause}
-    WHERE id = $${values.length}
-  `, values);
+  // Build SET clause parts
+  const setParts: string[] = [];
+  if (hasStatus) setParts.push('status');
+  if (hasAmountPaid) setParts.push('amount_paid');
+  if (hasPaymentReference) setParts.push('payment_reference');
+  if (hasRegistrationPaidFlag) setParts.push('registration_paid_flag');
+  setParts.push('updated_at');
+
+  // Execute based on combination - handle all 16 possible combinations
+  if (hasStatus && hasAmountPaid && hasPaymentReference && hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          amount_paid = ${updates.amountPaid}, 
+          payment_reference = ${updates.paymentReference}, 
+          registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasStatus && hasAmountPaid && hasPaymentReference) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          amount_paid = ${updates.amountPaid}, 
+          payment_reference = ${updates.paymentReference}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasStatus && hasAmountPaid && hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          amount_paid = ${updates.amountPaid}, 
+          registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasStatus && hasPaymentReference && hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          payment_reference = ${updates.paymentReference}, 
+          registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasAmountPaid && hasPaymentReference && hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET amount_paid = ${updates.amountPaid}, 
+          payment_reference = ${updates.paymentReference}, 
+          registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasStatus && hasAmountPaid) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          amount_paid = ${updates.amountPaid}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasStatus && hasPaymentReference) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          payment_reference = ${updates.paymentReference}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasStatus && hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasAmountPaid && hasPaymentReference) {
+    await sql`
+      UPDATE transaction_records 
+      SET amount_paid = ${updates.amountPaid}, 
+          payment_reference = ${updates.paymentReference}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasAmountPaid && hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET amount_paid = ${updates.amountPaid}, 
+          registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasPaymentReference && hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET payment_reference = ${updates.paymentReference}, 
+          registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasStatus) {
+    await sql`
+      UPDATE transaction_records 
+      SET status = ${updates.status}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasAmountPaid) {
+    await sql`
+      UPDATE transaction_records 
+      SET amount_paid = ${updates.amountPaid}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasPaymentReference) {
+    await sql`
+      UPDATE transaction_records 
+      SET payment_reference = ${updates.paymentReference}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  } else if (hasRegistrationPaidFlag) {
+    await sql`
+      UPDATE transaction_records 
+      SET registration_paid_flag = ${updates.registrationPaidFlag}, 
+          updated_at = ${now}
+      WHERE id = ${transactionId}
+    `;
+  }
 }
 
 /**
