@@ -165,7 +165,9 @@ export async function POST(request: NextRequest) {
           }
         } else {
           console.log('   ℹ️ No custom template URL found, using default template');
-          console.log('   Event object:', JSON.stringify({ id: event.id, name: event.name, hasTemplateUrl: !!event.certificateTemplateUrl }));
+          if (event) {
+            console.log('   Event object:', JSON.stringify({ id: event.id, name: event.name, hasTemplateUrl: !!event.certificateTemplateUrl }));
+          }
         }
       } catch (err) {
         console.error('   ❌ Could not fetch event for custom template, using default:', err);
