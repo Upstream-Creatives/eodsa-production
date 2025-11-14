@@ -43,11 +43,16 @@ export async function POST(
       participantNames.push(legacyName || `Participant ${i + 1}`);
     }
 
-    // Check if performance already exists for this entry
-    const existingPerformances = await db.getAllPerformances();
-    const existingPerformance = existingPerformances.find(p => p.eventEntryId === entryId);
+    // Check if performance already exists for this entry using direct SQL query
+    const { getSql } = await import('@/lib/database');
+    const sqlClient = getSql();
     
-    if (existingPerformance) {
+    const existingPerformanceCheck = await sqlClient`
+      SELECT id FROM performances WHERE event_entry_id = ${entryId} LIMIT 1
+    ` as any[];
+    
+    if (existingPerformanceCheck.length > 0) {
+      const existingPerformance = await db.getPerformanceById(existingPerformanceCheck[0].id);
       return NextResponse.json({
         success: true,
         message: 'Performance already exists for this entry',
@@ -55,14 +60,46 @@ export async function POST(
       });
     }
 
+    // CRITICAL FIX: Validate contestant_id exists before creating performance
+    let validContestantId = entry.contestantId;
+    try {
+      // Check if contestant exists
+      const contestantCheck = await sqlClient`
+        SELECT id FROM contestants WHERE id = ${entry.contestantId}
+      ` as any[];
+      
+      if (contestantCheck.length === 0) {
+        console.warn(`⚠️  Contestant ${entry.contestantId} doesn't exist, using first participant as contestant`);
+        
+        // Try to use first participant as contestant
+        if (entry.participantIds && entry.participantIds.length > 0) {
+          const firstParticipant = entry.participantIds[0];
+          
+          // Check if participant is a dancer
+          const dancerCheck = await sqlClient`
+            SELECT id FROM dancers WHERE id = ${firstParticipant} OR eodsa_id = ${firstParticipant}
+          ` as any[];
+          
+          if (dancerCheck.length > 0) {
+            validContestantId = dancerCheck[0].id;
+            console.log(`✅ Using dancer ID as contestant: ${validContestantId}`);
+          } else {
+            console.error(`❌ Cannot find valid contestant for entry ${entryId}`);
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.error('Error checking contestant:', checkErr);
+    }
+
     // Create the performance
     const performance = await db.createPerformance({
       eventId: entry.eventId,
       eventEntryId: entry.id,
-      contestantId: entry.contestantId,
+      contestantId: validContestantId,
       title: entry.itemName,
       participantNames,
-      duration: entry.estimatedDuration,
+      duration: entry.estimatedDuration || 0,
       itemNumber: entry.itemNumber, // Copy item number from entry
       choreographer: entry.choreographer,
       mastery: entry.mastery,
@@ -74,6 +111,15 @@ export async function POST(
       musicFileUrl: entry.musicFileUrl,
       musicFileName: entry.musicFileName
     });
+    
+    // Verify the performance was actually created
+    const verifyPerformance = await sqlClient`
+      SELECT id FROM performances WHERE event_entry_id = ${entryId} LIMIT 1
+    ` as any[];
+    
+    if (verifyPerformance.length === 0) {
+      throw new Error('Performance creation reported success but performance not found in database');
+    }
 
     return NextResponse.json({
       success: true,

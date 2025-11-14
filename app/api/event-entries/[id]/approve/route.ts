@@ -37,11 +37,18 @@ export async function PATCH(
 
     // CRITICAL: Auto-create performance for this approved entry (idempotent)
     try {
-      const existingPerformances = await db.getAllPerformances();
-      const alreadyExists = existingPerformances.some(p => p.eventEntryId === entryId);
+      const { getSql } = await import('@/lib/database');
+      const sqlClient = getSql();
+      
+      // Use direct SQL query to check if performance exists (more reliable)
+      const existingPerformanceCheck = await sqlClient`
+        SELECT id FROM performances WHERE event_entry_id = ${entryId} LIMIT 1
+      ` as any[];
+      
+      const alreadyExists = existingPerformanceCheck.length > 0;
       
       if (!alreadyExists) {
-        console.log(`🎭 Creating performance for approved entry: ${entryId}`);
+        console.log(`🎭 Creating performance for approved entry: ${entryId} (${entry.itemName})`);
         
         // Build participant names using unified dancer records when available
         const participantNames: string[] = [];
@@ -64,9 +71,6 @@ export async function PATCH(
         // CRITICAL FIX: Validate contestant_id exists before creating performance
         let validContestantId = entry.contestantId;
         try {
-          const { getSql } = await import('@/lib/database');
-          const sqlClient = getSql();
-          
           // Check if contestant exists
           const contestantCheck = await sqlClient`
             SELECT id FROM contestants WHERE id = ${entry.contestantId}
@@ -97,7 +101,7 @@ export async function PATCH(
           console.error('Error checking contestant:', checkErr);
         }
 
-        await db.createPerformance({
+        const createdPerformance = await db.createPerformance({
           eventId: entry.eventId,
           eventEntryId: entryId,
           contestantId: validContestantId,
@@ -116,9 +120,18 @@ export async function PATCH(
           musicFileName: entry.musicFileName
         });
         
-        console.log(`✅ Performance created successfully for entry: ${entryId}`);
+        // Verify the performance was actually created
+        const verifyPerformance = await sqlClient`
+          SELECT id FROM performances WHERE event_entry_id = ${entryId} LIMIT 1
+        ` as any[];
+        
+        if (verifyPerformance.length > 0) {
+          console.log(`✅ Performance created successfully for entry: ${entryId} (Performance ID: ${verifyPerformance[0].id})`);
+        } else {
+          console.error(`❌ CRITICAL: Performance creation reported success but performance not found in database for entry: ${entryId}`);
+        }
       } else {
-        console.log(`ℹ️  Performance already exists for entry: ${entryId}`);
+        console.log(`ℹ️  Performance already exists for entry: ${entryId} (Performance ID: ${existingPerformanceCheck[0].id})`);
       }
     } catch (perfErr) {
       console.error('⚠️  CRITICAL: Failed to auto-create performance for entry', entryId);

@@ -953,9 +953,10 @@ export const db = {
     const sqlClient = getSql();
     const id = Date.now().toString();
     
-    // Ensure optional music cue column exists
+    // Ensure optional columns exist
     try {
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS music_cue TEXT`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS age_category TEXT`;
     } catch {}
 
     await sqlClient`
