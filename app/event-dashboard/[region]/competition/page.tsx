@@ -1026,21 +1026,26 @@ export default function CompetitionEntryPage() {
         // Recalculate solo fees based on new positioning using event configuration
         soloEntries.forEach((entry, index) => {
           const soloCount = index + 1;
+          const solo1Fee = event?.solo1Fee || 400;
+          const solo2Fee = event?.solo2Fee || 750;
+          const solo3Fee = event?.solo3Fee || 1050;
+          const soloAdditionalFee = event?.soloAdditionalFee || 100;
+          
+          // Validate fee structure to prevent negative fees
+          const validatedSolo2Fee = solo2Fee >= solo1Fee ? solo2Fee : solo1Fee;
+          const validatedSolo3Fee = solo3Fee >= validatedSolo2Fee ? solo3Fee : validatedSolo2Fee;
+          
           if (soloCount === 1) {
-            entry.fee = event?.solo1Fee || 400;
+            entry.fee = solo1Fee;
           } else if (soloCount === 2) {
             // 2nd solo: incremental cost
-            const total2 = event?.solo2Fee || 750;
-            const total1 = event?.solo1Fee || 400;
-            entry.fee = total2 - total1;
+            entry.fee = Math.max(0, validatedSolo2Fee - solo1Fee);
           } else if (soloCount === 3) {
             // 3rd solo: incremental cost
-            const total3 = event?.solo3Fee || 1050;
-            const total2 = event?.solo2Fee || 750;
-            entry.fee = total3 - total2;
+            entry.fee = Math.max(0, validatedSolo3Fee - validatedSolo2Fee);
           } else {
             // 4th+ solos: additional fee
-            entry.fee = event?.soloAdditionalFee || 100;
+            entry.fee = soloAdditionalFee;
           }
         });
       }
