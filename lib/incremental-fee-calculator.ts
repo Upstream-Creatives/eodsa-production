@@ -211,14 +211,20 @@ function getSoloFeeBreakdown(soloNumber: number, eventConfig: EventFeeConfig): s
                    eventConfig.currency === 'EUR' ? '€' : 
                    eventConfig.currency === 'GBP' ? '£' : 'R';
   
+  // Ensure all fee values are defined with defaults
+  const solo1Fee = eventConfig.solo1Fee ?? 400;
+  const solo2Fee = eventConfig.solo2Fee ?? 750;
+  const solo3Fee = eventConfig.solo3Fee ?? 1050;
+  const soloAdditionalFee = eventConfig.soloAdditionalFee ?? 100;
+  
   if (soloNumber === 1) {
-    return `${currency}${eventConfig.solo1Fee} (1st solo)`;
+    return `${currency}${solo1Fee} (1st solo)`;
   } else if (soloNumber === 2) {
-    return `${currency}${eventConfig.solo2Fee} (2nd solo)`;
+    return `${currency}${solo2Fee} (2nd solo)`;
   } else if (soloNumber === 3) {
-    return `${currency}${eventConfig.solo3Fee} (3rd solo)`;
+    return `${currency}${solo3Fee} (3rd solo)`;
   } else {
-    return `${currency}${eventConfig.soloAdditionalFee} (${soloNumber}th solo)`;
+    return `${currency}${soloAdditionalFee} (${soloNumber}th solo)`;
   }
 }
 
