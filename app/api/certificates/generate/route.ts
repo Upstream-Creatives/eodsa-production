@@ -120,7 +120,10 @@ export async function POST(request: NextRequest) {
         console.log('   Event fetched:', event ? `Found event: ${event.name}` : 'Event not found');
         console.log('   certificateTemplateUrl:', event?.certificateTemplateUrl || 'NULL');
         
-        if (event?.certificateTemplateUrl) {
+        // Type guard: ensure event is not null
+        if (!event) {
+          console.log('   ℹ️ Event not found, using default template');
+        } else if (event.certificateTemplateUrl) {
           // Extract public_id from Cloudinary URL
           // Format: https://res.cloudinary.com/cloud_name/image/upload/v1234567890/folder/public_id.ext
           // Or: https://res.cloudinary.com/cloud_name/image/upload/v1234567890/folder/subfolder/public_id.ext
@@ -164,17 +167,14 @@ export async function POST(request: NextRequest) {
             console.error('   URL was:', event?.certificateTemplateUrl || 'N/A');
           }
         } else {
+          // event is guaranteed to be non-null here due to the type guard above
           console.log('   ℹ️ No custom template URL found, using default template');
-          if (event) {
-            // TypeScript type narrowing - event is guaranteed to be non-null here
-            const nonNullEvent = event;
-            const eventInfo = {
-              id: nonNullEvent.id,
-              name: nonNullEvent.name,
-              hasTemplateUrl: !!(nonNullEvent as any).certificateTemplateUrl
-            };
-            console.log('   Event object:', JSON.stringify(eventInfo));
-          }
+          const eventInfo = {
+            id: event.id,
+            name: event.name,
+            hasTemplateUrl: !!(event as any).certificateTemplateUrl
+          };
+          console.log('   Event object:', JSON.stringify(eventInfo));
         }
       } catch (err) {
         console.error('   ❌ Could not fetch event for custom template, using default:', err);
