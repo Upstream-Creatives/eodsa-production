@@ -795,18 +795,22 @@ export default function CompetitionEntryPage() {
       // Use event-specific solo pricing
       let performanceFee = 0;
       
+      const solo1Fee = event?.solo1Fee || 400;
+      const solo2Fee = event?.solo2Fee || 750;
+      const solo3Fee = event?.solo3Fee || 1050;
+      
+      // Validate fee structure to prevent negative fees
+      const validatedSolo2Fee = solo2Fee >= solo1Fee ? solo2Fee : solo1Fee;
+      const validatedSolo3Fee = solo3Fee >= validatedSolo2Fee ? solo3Fee : validatedSolo2Fee;
+      
       if (totalSoloCount === 1) {
-        performanceFee = event?.solo1Fee || 400;
+        performanceFee = solo1Fee;
       } else if (totalSoloCount === 2) {
         // Calculate cumulative, then subtract previous
-        const total2 = event?.solo2Fee || 750;
-        const total1 = event?.solo1Fee || 400;
-        performanceFee = total2 - total1;
+        performanceFee = Math.max(0, validatedSolo2Fee - solo1Fee);
       } else if (totalSoloCount === 3) {
         // Calculate cumulative, then subtract previous
-        const total3 = event?.solo3Fee || 1050;
-        const total2 = event?.solo2Fee || 750;
-        performanceFee = total3 - total2;
+        performanceFee = Math.max(0, validatedSolo3Fee - validatedSolo2Fee);
       } else {
         // More than 3: additional fee
         performanceFee = event?.soloAdditionalFee || 100;
