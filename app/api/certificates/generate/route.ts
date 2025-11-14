@@ -161,12 +161,19 @@ export async function POST(request: NextRequest) {
             }
           } catch (urlError) {
             console.error('   ❌ Could not parse certificate template URL, using default:', urlError);
-            console.error('   URL was:', event.certificateTemplateUrl);
+            console.error('   URL was:', event?.certificateTemplateUrl || 'N/A');
           }
         } else {
           console.log('   ℹ️ No custom template URL found, using default template');
           if (event) {
-            console.log('   Event object:', JSON.stringify({ id: event.id, name: event.name, hasTemplateUrl: !!event.certificateTemplateUrl }));
+            // TypeScript type narrowing - event is guaranteed to be non-null here
+            const nonNullEvent = event;
+            const eventInfo = {
+              id: nonNullEvent.id,
+              name: nonNullEvent.name,
+              hasTemplateUrl: !!(nonNullEvent as any).certificateTemplateUrl
+            };
+            console.log('   Event object:', JSON.stringify(eventInfo));
           }
         }
       } catch (err) {
