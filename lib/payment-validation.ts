@@ -46,19 +46,126 @@ export async function validateBatchEntryFees(
   const validations: EntryFeeValidation[] = [];
   let totalComputedFee = 0;
 
+  // Track solo counts per dancer as we process entries
+  // This is critical for batch additions where multiple solos are added at once
+  const soloCountTracker: Map<string, number> = new Map(); // Map<eodsaId, currentSoloCount>
+
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     
     try {
+      // For solo entries, we need to track the solo count as we process entries in the batch
+      // This ensures that if 3 solos are added at once, they get solo numbers 1, 2, 3
+      let existingSoloCount = 0;
+      if (entry.performanceType === 'Solo') {
+        const soloEodsaId = entry.eodsaId || (entry.participantIds && entry.participantIds[0]);
+        if (soloEodsaId) {
+          // Get existing count from database
+          const initialFeeResult = await computeIncrementalFee({
+            eventId,
+            dancerId: entry.contestantId || entry.eodsaId,
+            eodsaId: soloEodsaId,
+            performanceType: 'Solo',
+            participantIds: Array.isArray(entry.participantIds) ? entry.participantIds : [entry.participantIds],
+            masteryLevel: entry.mastery
+          });
+          
+          existingSoloCount = initialFeeResult.entryCount;
+          
+          // Add count from entries already processed in this batch
+          const batchSoloCount = soloCountTracker.get(soloEodsaId) || 0;
+          existingSoloCount += batchSoloCount;
+          
+          // Update tracker for next entry
+          soloCountTracker.set(soloEodsaId, batchSoloCount + 1);
+        }
+      }
+
       // Compute incremental fee for this entry
-      const feeResult = await computeIncrementalFee({
-        eventId,
-        dancerId: entry.contestantId || entry.eodsaId,
-        eodsaId: entry.eodsaId,
-        performanceType: entry.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group',
-        participantIds: Array.isArray(entry.participantIds) ? entry.participantIds : [entry.participantIds],
-        masteryLevel: entry.mastery
-      });
+      // For solo entries, we need to manually calculate based on the tracked solo count
+      let feeResult;
+      if (entry.performanceType === 'Solo' && existingSoloCount !== undefined) {
+        // Manually calculate solo fee using the tracked count
+        const { getSql } = await import('./database');
+        const sql = getSql();
+        
+        // Get event config
+        const eventResult = await sql`
+          SELECT 
+            registration_fee_per_dancer, solo_1_fee, solo_2_fee, solo_3_fee, solo_additional_fee,
+            duo_trio_fee_per_dancer, group_fee_per_dancer, large_group_fee_per_dancer, currency
+          FROM events
+          WHERE id = ${eventId}
+        ` as any[];
+
+        if (!eventResult || eventResult.length === 0) {
+          throw new Error(`Event ${eventId} not found`);
+        }
+
+        const event = eventResult[0];
+        const eventConfig = {
+          registrationFeePerDancer: parseFloat(event.registration_fee_per_dancer) || 300,
+          solo1Fee: parseFloat(event.solo_1_fee) || 400,
+          solo2Fee: parseFloat(event.solo_2_fee) || 200,
+          solo3Fee: parseFloat(event.solo_3_fee) || 100,
+          soloAdditionalFee: parseFloat(event.solo_additional_fee) || 100,
+          duoTrioFeePerDancer: parseFloat(event.duo_trio_fee_per_dancer) || 280,
+          groupFeePerDancer: parseFloat(event.group_fee_per_dancer) || 220,
+          largeGroupFeePerDancer: parseFloat(event.large_group_fee_per_dancer) || 190,
+          currency: event.currency || 'ZAR'
+        };
+
+        // Check registration charged status
+        const soloEodsaId = entry.eodsaId || (entry.participantIds && entry.participantIds[0]);
+        const registrationChargedResult = await sql`
+          SELECT COUNT(*) as count
+          FROM registration_charged_flags
+          WHERE event_id = ${eventId}
+          AND (dancer_id = ${entry.contestantId || entry.eodsaId} OR eodsa_id = ${soloEodsaId})
+        ` as any[];
+
+        let registrationCharged = false;
+        if (registrationChargedResult && registrationChargedResult[0]?.count > 0) {
+          registrationCharged = true;
+        } else {
+          const existingEntriesResult = await sql`
+            SELECT COUNT(*) as count
+            FROM event_entries
+            WHERE event_id = ${eventId}
+            AND (contestant_id = ${entry.contestantId || entry.eodsaId} OR eodsa_id = ${soloEodsaId})
+            LIMIT 1
+          ` as any[];
+          registrationCharged = existingEntriesResult && existingEntriesResult[0]?.count > 0;
+        }
+
+        // Calculate solo fee based on solo number
+        const soloNumber = existingSoloCount + 1;
+        const { calculateSoloEntryFee } = await import('./pricing-utils');
+        const entryFee = calculateSoloEntryFee(soloNumber, eventConfig);
+        const registrationFee = registrationCharged ? 0 : eventConfig.registrationFeePerDancer;
+        const totalFee = entryFee + registrationFee;
+
+        feeResult = {
+          registrationFee,
+          entryFee,
+          totalFee,
+          registrationCharged: !registrationCharged && registrationFee > 0,
+          registrationWasAlreadyCharged: registrationCharged,
+          entryCount: existingSoloCount,
+          breakdown: `Solo entry #${soloNumber}: ${eventConfig.currency}${entryFee}${registrationFee > 0 ? ` + Registration: ${eventConfig.currency}${registrationFee}` : ' (Registration already charged)'}`,
+          warnings: []
+        };
+      } else {
+        // For non-solo entries, use the standard computeIncrementalFee
+        feeResult = await computeIncrementalFee({
+          eventId,
+          dancerId: entry.contestantId || entry.eodsaId,
+          eodsaId: entry.eodsaId,
+          performanceType: entry.performanceType as 'Solo' | 'Duet' | 'Trio' | 'Group',
+          participantIds: Array.isArray(entry.participantIds) ? entry.participantIds : [entry.participantIds],
+          masteryLevel: entry.mastery
+        });
+      }
 
       const clientSentFee = entry.calculatedFee || 0;
       const mismatchDetected = Math.abs(clientSentFee - feeResult.totalFee) > 0.01;
