@@ -4567,7 +4567,6 @@ function EventsTabContent({ events, setShowCreateEventModal, handleEditEvent, ha
                             🎭 Hybrid
                           </span>
                         )}
-                        <div className={`text-xs sm:text-sm ${themeClasses.textSecondary}`}>{event.ageCategory}</div>
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium">
