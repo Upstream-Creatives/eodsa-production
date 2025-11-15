@@ -506,7 +506,7 @@ function AdminDashboard() {
           createdBy: adminData.id,
           status: 'upcoming',
           currency: 'ZAR', // Always ZAR
-          numberOfJudges: newEvent.numberOfJudges || 4, // Explicitly include numberOfJudges
+          numberOfJudges: newEvent.numberOfJudges !== undefined ? parseInt(String(newEvent.numberOfJudges)) || 4 : 4, // Explicitly include numberOfJudges as integer
         }),
       });
 
