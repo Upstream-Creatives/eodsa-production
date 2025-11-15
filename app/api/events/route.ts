@@ -13,6 +13,9 @@ async function ensureDbInitialized() {
 
 export async function GET() {
   try {
+    // Ensure database is initialized (adds missing columns like number_of_judges)
+    await ensureDbInitialized();
+    
     // Update event statuses based on current date/time before fetching
     await database.updateEventStatuses();
     
@@ -36,6 +39,14 @@ export async function POST(request: Request) {
     await ensureDbInitialized();
     
     const body = await request.json();
+    
+    // Log incoming request for debugging
+    console.log('🔍 [Event Creation] Incoming request body:', {
+      name: body.name,
+      numberOfJudges: body.numberOfJudges,
+      participationMode: body.participationMode,
+      hasNumberOfJudges: 'numberOfJudges' in body
+    });
     
     // Validate required fields
     const requiredFields = [
@@ -99,7 +110,15 @@ export async function POST(request: Request) {
       currency: body.currency || 'ZAR',
       participationMode: body.participationMode || 'hybrid',
       certificateTemplateUrl: body.certificateTemplateUrl || undefined,
-      numberOfJudges: body.numberOfJudges || 4
+      numberOfJudges: body.numberOfJudges !== undefined ? body.numberOfJudges : 4
+    });
+    
+    // Log the event object returned from DB
+    console.log('✅ [Event Creation] Event created:', {
+      id: event.id,
+      name: event.name,
+      numberOfJudges: (event as any).numberOfJudges,
+      participationMode: (event as any).participationMode
     });
 
     // 🚀 AUTO-ASSIGN: Automatically assign judges who are already assigned to this region

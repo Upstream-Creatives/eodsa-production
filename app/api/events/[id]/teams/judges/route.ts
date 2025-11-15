@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
-import { getSql } from '@/lib/database';
+import { getSql, initializeDatabase } from '@/lib/database';
 
 // POST /api/events/[id]/teams/judges - Add judge to event
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Ensure database is initialized
+  await initializeDatabase();
+  
+  const { id: eventId } = await params;
+  let judgeId: string | undefined;
   try {
-    const { id: eventId } = await params;
     const body = await request.json();
-    const { judgeId, assignedBy } = body;
+    judgeId = body.judgeId;
+    const { assignedBy } = body;
     
     if (!judgeId || !assignedBy) {
       return NextResponse.json(
@@ -54,7 +59,34 @@ export async function POST(
       );
     }
     
-    // Check current judge count and max (default to 4)
+    // Get the event's numberOfJudges setting
+    // First, ensure the column exists
+    try {
+      await sqlClient`
+        ALTER TABLE events ADD COLUMN IF NOT EXISTS number_of_judges INTEGER DEFAULT 4
+      `;
+    } catch (alterError: any) {
+      // Ignore if column already exists or other non-critical errors
+      console.warn('Note: Could not ensure number_of_judges column exists:', alterError?.message);
+    }
+    
+    // Try to get the event's numberOfJudges setting
+    let maxJudges = 4; // Default to 4
+    try {
+      const eventResult = await sqlClient`
+        SELECT number_of_judges FROM events WHERE id = ${eventId}
+      ` as any[];
+      
+      if (eventResult.length > 0 && eventResult[0].number_of_judges != null) {
+        maxJudges = parseInt(eventResult[0].number_of_judges, 10);
+      }
+    } catch (queryError: any) {
+      // If column doesn't exist, use default of 4
+      console.warn('Note: Could not query number_of_judges, using default of 4:', queryError?.message);
+      maxJudges = 4;
+    }
+    
+    // Check current judge count
     const currentCountResult = await sqlClient`
       SELECT COUNT(*) as count
       FROM judge_event_assignments
@@ -63,7 +95,6 @@ export async function POST(
     ` as any[];
     
     const currentCount = parseInt(currentCountResult[0]?.count || '0', 10);
-    const maxJudges = 4; // Standard competition judge count
     
     if (currentCount >= maxJudges) {
       return NextResponse.json(
@@ -106,10 +137,16 @@ export async function POST(
       },
       message: 'Judge assigned successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error assigning judge:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      eventId,
+      judgeId: judgeId || 'unknown'
+    });
     return NextResponse.json(
-      { success: false, error: 'Failed to assign judge' },
+      { success: false, error: error?.message || 'Failed to assign judge' },
       { status: 500 }
     );
   }

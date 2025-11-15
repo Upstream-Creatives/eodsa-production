@@ -146,8 +146,12 @@ interface JudgeAssignmentsTabContentProps {
   setExpandedEventId: (id: string | null) => void;
   showAddJudgeModal: boolean;
   selectedEventId: string | null;
+  selectedJudgeId: string | null;
+  setSelectedJudgeId: (id: string | null) => void;
+  addingJudgeId: string | null;
+  removingJudgeId: string | null;
   openAddJudgeModal: (eventId: string) => void;
-  handleAddJudge: (judgeId: string) => void;
+  handleAddJudge: () => void;
   handleRemoveJudge: (eventId: string, judgeId: string, assignmentId?: string) => void;
   getAvailableJudgesForEvent: (eventId: string) => any[];
   setShowAddJudgeModal: (show: boolean) => void;
@@ -248,7 +252,10 @@ function AdminDashboard() {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [showAddJudgeModal, setShowAddJudgeModal] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedJudgeId, setSelectedJudgeId] = useState<string | null>(null);
   const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [addingJudgeId, setAddingJudgeId] = useState<string | null>(null);
+  const [removingJudgeId, setRemovingJudgeId] = useState<string | null>(null);
   
   // Dashboard access management state
   const [staffAccounts, setStaffAccounts] = useState<Client[]>([]);
@@ -499,6 +506,7 @@ function AdminDashboard() {
           createdBy: adminData.id,
           status: 'upcoming',
           currency: 'ZAR', // Always ZAR
+          numberOfJudges: newEvent.numberOfJudges || 4, // Explicitly include numberOfJudges
         }),
       });
 
@@ -1542,15 +1550,16 @@ function AdminDashboard() {
           displayOrder: 0 // We can add this from the assignment if needed
         }));
         
-        // Get expected judge count from event (default to 4 if not specified)
+        // Get expected judge count from event (use numberOfJudges from database)
         const expectedJudges = (event as any).numberOfJudges || 4;
         
-        console.log(`[Judge Assignments] Event ${event.name}: ${judges.length}/${expectedJudges} judges`);
+        console.log(`[Judge Assignments] Event ${event.name}: ${judges.length}/${expectedJudges} judges (numberOfJudges: ${(event as any).numberOfJudges})`);
         
         return {
           ...event,
           judges: judges,
-          expectedJudges: expectedJudges
+          expectedJudges: expectedJudges,
+          numberOfJudges: expectedJudges // Ensure it's available
         };
       });
 
@@ -1574,22 +1583,30 @@ function AdminDashboard() {
     }
   };
 
-  const handleAddJudge = async (judgeId: string) => {
-    if (!selectedEventId) {
-      error('Invalid event');
+  const handleAddJudge = async () => {
+    if (!selectedEventId || !selectedJudgeId) {
+      error('Please select a judge');
       return;
     }
 
     // Check if max judges reached
     const event = eventsWithJudges.find(e => e.id === selectedEventId);
     const currentJudgeCount = event?.judges?.length || 0;
-    const maxJudges = event?.expectedJudges || 4;
+    const maxJudges = event?.numberOfJudges || event?.expectedJudges || 4;
     
     if (currentJudgeCount >= maxJudges) {
       error(`Maximum number of judges (${maxJudges}) has been reached for this event`);
       return;
     }
 
+    // Check if judge is already assigned
+    const isAlreadyAssigned = event?.judges?.some((j: any) => j.id === selectedJudgeId);
+    if (isAlreadyAssigned) {
+      error('This judge is already assigned to this event');
+      return;
+    }
+
+    setAddingJudgeId(selectedJudgeId);
     try {
       const session = localStorage.getItem('adminSession');
       const adminData = session ? JSON.parse(session) : null;
@@ -1600,7 +1617,7 @@ function AdminDashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          judgeId,
+          judgeId: selectedJudgeId,
           assignedBy: adminData?.id || 'admin'
         })
       });
@@ -1610,18 +1627,23 @@ function AdminDashboard() {
         success('Judge assigned successfully');
         setShowAddJudgeModal(false);
         setSelectedEventId(null);
-        loadJudgeAssignments();
+        setSelectedJudgeId(null);
+        await loadJudgeAssignments();
       } else {
-        // Check if error is about max judges
-        if (data.error?.toLowerCase().includes('maximum') || data.error?.toLowerCase().includes('max')) {
+        // Check if error is about max judges or duplicate
+        if (data.error?.toLowerCase().includes('maximum') || 
+            data.error?.toLowerCase().includes('max') ||
+            data.error?.toLowerCase().includes('already assigned')) {
           error(data.error);
         } else {
           error(data.error || 'Failed to assign judge');
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error assigning judge:', err);
-      error('Failed to assign judge');
+      error(err?.message || 'Failed to assign judge');
+    } finally {
+      setAddingJudgeId(null);
     }
   };
 
@@ -1644,6 +1666,7 @@ function AdminDashboard() {
       return;
     }
 
+    setRemovingJudgeId(judgeId);
     try {
       // Use the new API endpoint first, fallback to old method if needed
       if (assignmentId) {
@@ -1654,7 +1677,7 @@ function AdminDashboard() {
         const data = await response.json();
         if (data.success) {
           success('Judge removed successfully');
-          loadJudgeAssignments();
+          await loadJudgeAssignments();
           return;
         }
       }
@@ -1667,18 +1690,21 @@ function AdminDashboard() {
       const data = await response.json();
       if (data.success) {
         success('Judge removed successfully');
-        loadJudgeAssignments();
+        await loadJudgeAssignments();
       } else {
         error(data.error || 'Failed to remove judge');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error removing judge:', err);
-      error('Failed to remove judge');
+      error(err?.message || 'Failed to remove judge');
+    } finally {
+      setRemovingJudgeId(null);
     }
   };
 
   const openAddJudgeModal = (eventId: string) => {
     setSelectedEventId(eventId);
+    setSelectedJudgeId(null);
     setShowAddJudgeModal(true);
   };
 
@@ -4085,6 +4111,10 @@ function AdminDashboard() {
           setExpandedEventId={setExpandedEventId}
           showAddJudgeModal={showAddJudgeModal}
           selectedEventId={selectedEventId}
+          selectedJudgeId={selectedJudgeId}
+          setSelectedJudgeId={setSelectedJudgeId}
+          addingJudgeId={addingJudgeId}
+          removingJudgeId={removingJudgeId}
           openAddJudgeModal={openAddJudgeModal}
           handleAddJudge={handleAddJudge}
           handleRemoveJudge={handleRemoveJudge}
@@ -4119,6 +4149,10 @@ function JudgeAssignmentsTabContent({
   setExpandedEventId,
   showAddJudgeModal,
   selectedEventId,
+  selectedJudgeId,
+  setSelectedJudgeId,
+  addingJudgeId,
+  removingJudgeId,
   openAddJudgeModal,
   handleAddJudge,
   handleRemoveJudge,
@@ -4203,9 +4237,9 @@ function JudgeAssignmentsTabContent({
                         <div>
                           <span className={themeClasses.textMuted}>Judges: </span>
                           <span className={themeClasses.textPrimary}>
-                            {event.judges?.length || 0}/{event.expectedJudges || 4}
-                            {((event.judges?.length || 0) < (event.expectedJudges || 4)) && (
-                              <span className="text-amber-500 ml-1" title={`Event needs ${event.expectedJudges || 4} judges`}>
+                            {event.judges?.length || 0}/{event.numberOfJudges || event.expectedJudges || 4}
+                            {((event.judges?.length || 0) < (event.numberOfJudges || event.expectedJudges || 4)) && (
+                              <span className="text-amber-500 ml-1" title={`Event needs ${event.numberOfJudges || event.expectedJudges || 4} judges`}>
                                 ⚠️
                               </span>
                             )}
@@ -4227,11 +4261,11 @@ function JudgeAssignmentsTabContent({
                     <div className="mt-4 pt-4 border-t border-gray-700/20">
                       <div className="flex items-center justify-between mb-4">
                         <h4 className={`text-lg font-semibold ${themeClasses.textPrimary}`}>
-                          Assigned Judges ({event.judges?.length || 0}/{event.expectedJudges || 4})
+                          Assigned Judges ({event.judges?.length || 0}/{event.numberOfJudges || event.expectedJudges || 4})
                         </h4>
-                        {(event.judges?.length || 0) >= (event.expectedJudges || 4) ? (
+                        {(event.judges?.length || 0) >= (event.numberOfJudges || event.expectedJudges || 4) ? (
                           <div className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm cursor-not-allowed opacity-50">
-                            Maximum Reached ({event.expectedJudges || 4}/{event.expectedJudges || 4})
+                            Maximum Reached ({event.numberOfJudges || event.expectedJudges || 4}/{event.numberOfJudges || event.expectedJudges || 4})
                           </div>
                         ) : (
                           <button
@@ -4247,7 +4281,7 @@ function JudgeAssignmentsTabContent({
                       {!event.judges || event.judges.length === 0 ? (
                         <div className={`text-center py-8 ${themeClasses.textMuted}`}>
                           <p>No judges assigned to this event yet.</p>
-                          {(event.judges?.length || 0) < (event.expectedJudges || 4) && getAvailableJudgesForEvent(event.id).length > 0 && (
+                          {(event.judges?.length || 0) < (event.numberOfJudges || event.expectedJudges || 4) && getAvailableJudgesForEvent(event.id).length > 0 && (
                             <button
                               onClick={() => openAddJudgeModal(event.id)}
                               className="mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
@@ -4255,8 +4289,8 @@ function JudgeAssignmentsTabContent({
                               Add First Judge
                             </button>
                           )}
-                          {(event.judges?.length || 0) >= (event.expectedJudges || 4) && (
-                            <p className="mt-4 text-sm text-amber-500">Maximum number of judges ({event.expectedJudges || 4}) has been reached.</p>
+                          {(event.judges?.length || 0) >= (event.numberOfJudges || event.expectedJudges || 4) && (
+                            <p className="mt-4 text-sm text-amber-500">Maximum number of judges ({event.numberOfJudges || event.expectedJudges || 4}) has been reached.</p>
                           )}
                         </div>
                       ) : (
@@ -4282,9 +4316,17 @@ function JudgeAssignmentsTabContent({
                                 </div>
                                 <button
                                   onClick={() => handleRemoveJudge(event.id, judge.id, judge.assignmentId)}
-                                  className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded transition-colors text-sm"
+                                  disabled={removingJudgeId === judge.id}
+                                  className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                                 >
-                                  Remove
+                                  {removingJudgeId === judge.id ? (
+                                    <>
+                                      <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                                      <span>Removing...</span>
+                                    </>
+                                  ) : (
+                                    <span>Remove</span>
+                                  )}
                                 </button>
                               </div>
                             ))}
@@ -4309,6 +4351,7 @@ function JudgeAssignmentsTabContent({
                 onClick={() => {
                   setShowAddJudgeModal(false);
                   setSelectedEventId(null);
+                  setSelectedJudgeId(null);
                 }}
                 className={themeClasses.textMuted + ' hover:' + themeClasses.textPrimary + ' transition-colors'}
               >
@@ -4329,8 +4372,16 @@ function JudgeAssignmentsTabContent({
                   {getAvailableJudgesForEvent(selectedEventId).map((judge) => (
                     <button
                       key={judge.id}
-                      onClick={() => handleAddJudge(judge.id)}
-                      className={`w-full text-left ${theme === 'dark' ? 'bg-gray-700/50 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} rounded-lg p-4 transition-colors`}
+                      onClick={() => setSelectedJudgeId(judge.id)}
+                      className={`w-full text-left rounded-lg p-4 transition-colors ${
+                        selectedJudgeId === judge.id
+                          ? theme === 'dark' 
+                            ? 'bg-blue-700/50 border-2 border-blue-500' 
+                            : 'bg-blue-100 border-2 border-blue-500'
+                          : theme === 'dark' 
+                            ? 'bg-gray-700/50 hover:bg-gray-700 border-2 border-transparent' 
+                            : 'bg-gray-100 hover:bg-gray-200 border-2 border-transparent'
+                      }`}
                     >
                       <div className={themeClasses.textPrimary + ' font-medium'}>{judge.name}</div>
                       <div className={themeClasses.textMuted + ' text-sm'}>{judge.email}</div>
@@ -4348,10 +4399,25 @@ function JudgeAssignmentsTabContent({
                 onClick={() => {
                   setShowAddJudgeModal(false);
                   setSelectedEventId(null);
+                  setSelectedJudgeId(null);
                 }}
                 className={`px-4 py-2 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} text-white rounded-lg transition-colors`}
               >
                 Cancel
+              </button>
+              <button
+                onClick={handleAddJudge}
+                disabled={!selectedJudgeId || !!addingJudgeId}
+                className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2`}
+              >
+                {addingJudgeId ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Adding...</span>
+                  </>
+                ) : (
+                  <span>Add Judge to Event</span>
+                )}
               </button>
             </div>
           </div>

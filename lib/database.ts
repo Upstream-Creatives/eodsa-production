@@ -2406,6 +2406,17 @@ export const db = {
     const id = `event-${Date.now()}`;
     const createdAt = new Date().toISOString();
     
+    // Get numberOfJudges from event, default to 4 only if undefined
+    const numberOfJudges = (event as any).numberOfJudges !== undefined ? (event as any).numberOfJudges : 4;
+    
+    // Log the values being inserted
+    console.log('💾 [Database] Creating event with:', {
+      name: event.name,
+      numberOfJudges: numberOfJudges,
+      receivedNumberOfJudges: (event as any).numberOfJudges,
+      participationMode: event.participationMode
+    });
+    
     await sqlClient`
       INSERT INTO events (
         id, name, description, region, age_category, performance_type, event_date, event_end_date, 
@@ -2422,11 +2433,18 @@ export const db = {
         ${event.registrationFeePerDancer ?? 300}, ${event.solo1Fee ?? 400}, ${event.solo2Fee ?? 750}, 
         ${event.solo3Fee ?? 1050}, ${event.soloAdditionalFee ?? 100}, ${event.duoTrioFeePerDancer ?? 280},
         ${event.groupFeePerDancer ?? 220}, ${event.largeGroupFeePerDancer ?? 190}, ${event.currency || 'ZAR'},
-        ${event.participationMode || 'hybrid'}, ${event.certificateTemplateUrl || null}, ${(event as any).numberOfJudges ?? 4}
+        ${event.participationMode || 'hybrid'}, ${event.certificateTemplateUrl || null}, ${numberOfJudges}
       )
     `;
     
-    return { ...event, id, createdAt };
+    const createdEvent = { ...event, id, createdAt, numberOfJudges };
+    console.log('✅ [Database] Event created successfully:', {
+      id: createdEvent.id,
+      name: createdEvent.name,
+      numberOfJudges: (createdEvent as any).numberOfJudges
+    });
+    
+    return createdEvent;
   },
 
   async getAllEvents() {
