@@ -92,6 +92,8 @@ export interface Event {
   participationMode?: 'live' | 'virtual' | 'hybrid'; // live = only live entries, virtual = only virtual entries, hybrid = both allowed
   // NEW: Custom certificate template URL for this event
   certificateTemplateUrl?: string;
+  // NEW: Number of judges for this event
+  numberOfJudges?: number;
 }
 
 export interface EventEntry {

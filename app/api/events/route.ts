@@ -98,7 +98,8 @@ export async function POST(request: Request) {
       largeGroupFeePerDancer: body.largeGroupFeePerDancer,
       currency: body.currency || 'ZAR',
       participationMode: body.participationMode || 'hybrid',
-      certificateTemplateUrl: body.certificateTemplateUrl || undefined
+      certificateTemplateUrl: body.certificateTemplateUrl || undefined,
+      numberOfJudges: body.numberOfJudges || 4
     });
 
     // 🚀 AUTO-ASSIGN: Automatically assign judges who are already assigned to this region

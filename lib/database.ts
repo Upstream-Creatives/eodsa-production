@@ -79,6 +79,9 @@ export const initializeDatabase = async () => {
     
     // Add certificate template URL column to events table
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS certificate_template_url TEXT`;
+    
+    // Add number of judges column to events table
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS number_of_judges INTEGER DEFAULT 4`;
 
     // Phase 2: Virtual entry support columns
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS entry_type TEXT DEFAULT 'live'`;
@@ -2380,6 +2383,26 @@ export const db = {
       console.error('Migration error for participation_mode:', migrationError);
     }
     
+    // Ensure number_of_judges column exists (migration check)
+    try {
+      const judgesCheck = await sqlClient`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'events' 
+        AND column_name = 'number_of_judges'
+      ` as any[];
+      
+      if (judgesCheck.length === 0) {
+        await sqlClient`
+          ALTER TABLE events 
+          ADD COLUMN number_of_judges INTEGER DEFAULT 4
+        `;
+        console.log('✅ Added number_of_judges column to events table');
+      }
+    } catch (migrationError) {
+      console.error('Migration error for number_of_judges:', migrationError);
+    }
+    
     const id = `event-${Date.now()}`;
     const createdAt = new Date().toISOString();
     
@@ -2389,7 +2412,7 @@ export const db = {
         registration_deadline, venue, status, max_participants, entry_fee, created_by, created_at,
         registration_fee_per_dancer, solo_1_fee, solo_2_fee, solo_3_fee, solo_additional_fee,
         duo_trio_fee_per_dancer, group_fee_per_dancer, large_group_fee_per_dancer, currency,
-        participation_mode, certificate_template_url
+        participation_mode, certificate_template_url, number_of_judges
       )
       VALUES (
         ${id}, ${event.name}, ${event.description}, ${event.region}, ${event.ageCategory}, 
@@ -2399,7 +2422,7 @@ export const db = {
         ${event.registrationFeePerDancer ?? 300}, ${event.solo1Fee ?? 400}, ${event.solo2Fee ?? 750}, 
         ${event.solo3Fee ?? 1050}, ${event.soloAdditionalFee ?? 100}, ${event.duoTrioFeePerDancer ?? 280},
         ${event.groupFeePerDancer ?? 220}, ${event.largeGroupFeePerDancer ?? 190}, ${event.currency || 'ZAR'},
-        ${event.participationMode || 'hybrid'}, ${event.certificateTemplateUrl || null}
+        ${event.participationMode || 'hybrid'}, ${event.certificateTemplateUrl || null}, ${(event as any).numberOfJudges ?? 4}
       )
     `;
     
@@ -2435,7 +2458,8 @@ export const db = {
       largeGroupFeePerDancer: row.large_group_fee_per_dancer != null ? parseFloat(row.large_group_fee_per_dancer) : 190,
       currency: row.currency || 'ZAR',
       participationMode: row.participation_mode || 'hybrid',
-      certificateTemplateUrl: row.certificate_template_url || undefined
+      certificateTemplateUrl: row.certificate_template_url || undefined,
+      numberOfJudges: row.number_of_judges != null ? parseInt(row.number_of_judges) : 4
     })) as Event[];
   },
 
