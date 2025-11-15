@@ -4542,7 +4542,7 @@ function EventsTabContent({ events, setShowCreateEventModal, handleEditEvent, ha
                         <div className={`text-xs sm:text-sm font-bold ${themeClasses.textPrimary} leading-tight`}>{event.name}</div>
                         <div className={`text-xs sm:text-sm ${themeClasses.textSecondary} font-medium mt-1`}>{event.venue}</div>
                         <div className={`text-xs ${themeClasses.textMuted} sm:hidden mt-1`}>
-                          {event.region} • {event.performanceType === 'All' ? 'All Performance Types' : event.performanceType} • {event.ageCategory}
+                          {event.region} • {event.participationMode ? event.participationMode.charAt(0).toUpperCase() + event.participationMode.slice(1) : 'Hybrid'} • {event.ageCategory}
                         </div>
                       </div>
                     </td>
