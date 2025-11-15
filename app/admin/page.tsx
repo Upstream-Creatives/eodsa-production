@@ -1542,8 +1542,8 @@ function AdminDashboard() {
           displayOrder: 0 // We can add this from the assignment if needed
         }));
         
-        // Get expected judge count (default to 4 if not specified)
-        const expectedJudges = 4; // Standard competition judge count
+        // Get expected judge count from event (default to 4 if not specified)
+        const expectedJudges = (event as any).numberOfJudges || 4;
         
         console.log(`[Judge Assignments] Event ${event.name}: ${judges.length}/${expectedJudges} judges`);
         
@@ -4205,7 +4205,7 @@ function JudgeAssignmentsTabContent({
                           <span className={themeClasses.textPrimary}>
                             {event.judges?.length || 0}/{event.expectedJudges || 4}
                             {((event.judges?.length || 0) < (event.expectedJudges || 4)) && (
-                              <span className="text-amber-500 ml-1" title="Event needs 4 judges">
+                              <span className="text-amber-500 ml-1" title={`Event needs ${event.expectedJudges || 4} judges`}>
                                 ⚠️
                               </span>
                             )}
