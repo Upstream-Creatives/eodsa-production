@@ -86,39 +86,91 @@ export async function GET(
             // This is a unified system dancer
             console.log(`Found unified dancer: ${dancer.name} (${dancer.eodsaId})`);
             
-            // Get studio information for the main contestant
-            const allDancers = await unifiedDb.getAllDancers();
-            const dancerWithStudio = allDancers.find(d => d.id === entry.contestantId);
+            // Get SQL client for direct queries
+            const sqlClient = getSql();
             
-            // Get all participant names and studio info for this entry
+            // Get studio information for the main contestant via direct SQL query
+            const contestantStudioRows = await sqlClient`
+              SELECT 
+                s.id as studio_id,
+                s.name as studio_name,
+                s.email as studio_email
+              FROM dancers d
+              LEFT JOIN studio_applications sa ON d.id = sa.dancer_id AND sa.status = 'accepted'
+              LEFT JOIN studios s ON sa.studio_id = s.id
+              WHERE d.id = ${entry.contestantId} OR d.eodsa_id = ${entry.contestantId}
+              LIMIT 1
+            ` as any[];
+            
+            const contestantStudio = contestantStudioRows.length > 0 ? {
+              studioId: contestantStudioRows[0].studio_id,
+              studioName: contestantStudioRows[0].studio_name,
+              studioEmail: contestantStudioRows[0].studio_email
+            } : null;
+            
+            // Get all participant names and studio info for this entry via direct SQL queries
             const participantDetails = await Promise.all(
               entry.participantIds.map(async (participantId) => {
                 try {
+                  // Try direct SQL query first for most accurate studio info
+                  const participantRows = await sqlClient`
+                    SELECT 
+                      d.id,
+                      d.name,
+                      d.eodsa_id,
+                      s.id as studio_id,
+                      s.name as studio_name,
+                      s.email as studio_email
+                    FROM dancers d
+                    LEFT JOIN studio_applications sa ON d.id = sa.dancer_id AND sa.status = 'accepted'
+                    LEFT JOIN studios s ON sa.studio_id = s.id
+                    WHERE d.id = ${participantId} OR d.eodsa_id = ${participantId}
+                    LIMIT 1
+                  ` as any[];
+                  
+                  if (participantRows.length > 0) {
+                    return {
+                      name: participantRows[0].name || 'Unknown Dancer',
+                      studioName: participantRows[0].studio_name || null,
+                      studioId: participantRows[0].studio_id || null,
+                      studioEmail: participantRows[0].studio_email || null
+                    };
+                  }
+                  
+                  // Fallback to unified system
                   const participant = await unifiedDb.getDancerById(participantId);
+                  const allDancers = await unifiedDb.getAllDancers();
                   const participantWithStudio = allDancers.find(d => d.id === participantId);
                   return {
                     name: participant ? participant.name : 'Unknown Dancer',
-                    studioName: participantWithStudio?.studioName || null
+                    studioName: participantWithStudio?.studioName || null,
+                    studioId: participantWithStudio?.studioId || null,
+                    studioEmail: participantWithStudio?.studioEmail || null
                   };
                 } catch (error) {
                   console.error(`Error fetching participant ${participantId}:`, error);
                   return {
                     name: 'Unknown Dancer',
-                    studioName: null
+                    studioName: null,
+                    studioId: null,
+                    studioEmail: null
                   };
                 }
               })
             );
+            
+            // Get studio from first participant with studio info, or use contestant's studio
+            const studioInfo = participantDetails.find(p => p.studioName) || contestantStudio;
             
             return {
               ...entry,
               contestantName: dancer.name,
               contestantEmail: dancer.email || '',
               participantNames: participantDetails.map(p => p.name),
-              // Add studio information
-              studioName: dancerWithStudio?.studioName || 'Independent',
-              studioId: dancerWithStudio?.studioId || null,
-              studioEmail: dancerWithStudio?.studioEmail || null,
+              // Use participant's studio if available, otherwise contestant's studio, otherwise "Independent"
+              studioName: studioInfo?.studioName || 'Independent',
+              studioId: studioInfo?.studioId || null,
+              studioEmail: studioInfo?.studioEmail || null,
               participantStudios: participantDetails.map(p => p.studioName || 'Independent'),
               computedAgeCategory
             };
@@ -191,36 +243,115 @@ export async function GET(
               };
             } else {
               console.error(`Could not find contestant or dancer for ID: ${entry.contestantId}`);
-              // Fallback: resolve studio from registration number and resolve participants from unified dancers table
+              // Fallback: Try to get studio from participants via studio_applications
               try {
+                const sqlClient = getSql();
                 const { unifiedDb } = await import('@/lib/database');
-                const allStudios = await unifiedDb.getAllStudios?.();
-                const matchedStudio = Array.isArray(allStudios)
-                  ? allStudios.find((s: any) => s.registrationNumber === entry.eodsaId)
-                  : null;
-
-                // Resolve participant names via unified dancers table
-                const names: string[] = [];
-                if (Array.isArray(entry.participantIds)) {
-                  for (let i = 0; i < entry.participantIds.length; i++) {
+                
+                // First, try to get studio from participants via studio_applications
+                let participantStudioInfo: { studioName: string | null; studioId: string | null; studioEmail: string | null } | null = null;
+                const participantDetails: Array<{ name: string; studioName: string | null }> = [];
+                
+                if (Array.isArray(entry.participantIds) && entry.participantIds.length > 0) {
+                  for (const participantId of entry.participantIds) {
                     try {
-                      const p = await unifiedDb.getDancerById(entry.participantIds[i]);
-                      names.push(p?.name || `Participant ${i + 1}`);
-                    } catch {
-                      names.push(`Participant ${i + 1}`);
+                      // Try to get dancer with studio info from database
+                      const dancerRows = await sqlClient`
+                        SELECT 
+                          d.id,
+                          d.name,
+                          d.eodsa_id,
+                          s.id as studio_id,
+                          s.name as studio_name,
+                          s.email as studio_email
+                        FROM dancers d
+                        LEFT JOIN studio_applications sa ON d.id = sa.dancer_id AND sa.status = 'accepted'
+                        LEFT JOIN studios s ON sa.studio_id = s.id
+                        WHERE d.id = ${participantId} OR d.eodsa_id = ${participantId}
+                        LIMIT 1
+                      ` as any[];
+                      
+                      if (dancerRows.length > 0) {
+                        const row = dancerRows[0];
+                        participantDetails.push({
+                          name: row.name || 'Unknown Dancer',
+                          studioName: row.studio_name || null
+                        });
+                        
+                        // Use first participant's studio if we don't have one yet
+                        if (!participantStudioInfo && row.studio_name) {
+                          participantStudioInfo = {
+                            studioName: row.studio_name,
+                            studioId: row.studio_id,
+                            studioEmail: row.studio_email
+                          };
+                        }
+                      } else {
+                        // Try unified system as fallback
+                        try {
+                          const p = await unifiedDb.getDancerById(participantId);
+                          const allDancers = await unifiedDb.getAllDancers();
+                          const pWithStudio = allDancers.find(d => d.id === participantId);
+                          participantDetails.push({
+                            name: p?.name || 'Unknown Dancer',
+                            studioName: pWithStudio?.studioName || null
+                          });
+                          
+                          if (!participantStudioInfo && pWithStudio?.studioName) {
+                            participantStudioInfo = {
+                              studioName: pWithStudio.studioName,
+                              studioId: pWithStudio.studioId || null,
+                              studioEmail: pWithStudio.studioEmail || null
+                            };
+                          }
+                        } catch {
+                          participantDetails.push({
+                            name: 'Unknown Dancer',
+                            studioName: null
+                          });
+                        }
+                      }
+                    } catch (error) {
+                      console.error(`Error fetching participant ${participantId}:`, error);
+                      participantDetails.push({
+                        name: 'Unknown Dancer',
+                        studioName: null
+                      });
                     }
+                  }
+                }
+                
+                // If still no studio, try matching by registration number
+                if (!participantStudioInfo) {
+                  const allStudios = await unifiedDb.getAllStudios?.();
+                  const matchedStudio = Array.isArray(allStudios)
+                    ? allStudios.find((s: any) => s.registrationNumber === entry.eodsaId)
+                    : null;
+                  
+                  if (matchedStudio) {
+                    participantStudioInfo = {
+                      studioName: matchedStudio.name,
+                      studioId: matchedStudio.id,
+                      studioEmail: matchedStudio.email
+                    };
                   }
                 }
 
                 return {
                   ...entry,
-                  contestantName: matchedStudio?.name || entry.eodsaId || 'Unknown',
+                  contestantName: participantDetails.length > 0 
+                    ? participantDetails.map(p => p.name).join(', ')
+                    : entry.eodsaId || 'Unknown',
                   contestantEmail: '',
-                  participantNames: names.length > 0 ? names : ['Participant 1'],
-                  studioName: matchedStudio?.name || 'Unknown',
-                  studioId: matchedStudio?.id || null,
-                  studioEmail: matchedStudio?.email || null,
-                  participantStudios: names.map(() => matchedStudio?.name || 'Unknown'),
+                  participantNames: participantDetails.length > 0 
+                    ? participantDetails.map(p => p.name)
+                    : ['Participant 1'],
+                  studioName: participantStudioInfo?.studioName || 'Independent',
+                  studioId: participantStudioInfo?.studioId || null,
+                  studioEmail: participantStudioInfo?.studioEmail || null,
+                  participantStudios: participantDetails.length > 0
+                    ? participantDetails.map(p => p.studioName || 'Independent')
+                    : ['Independent'],
                   computedAgeCategory
                 };
               } catch (fallbackErr) {
@@ -230,10 +361,10 @@ export async function GET(
                   contestantName: entry.eodsaId || 'Unknown (Not Found)',
                   contestantEmail: '',
                   participantNames: (entry.participantIds || []).map((_: any, i: number) => `Participant ${i + 1}`),
-                  studioName: 'Unknown',
+                  studioName: 'Independent',
                   studioId: null,
                   studioEmail: null,
-                  participantStudios: (entry.participantIds || []).map(() => 'Unknown'),
+                  participantStudios: (entry.participantIds || []).map(() => 'Independent'),
                   computedAgeCategory
                 };
               }
