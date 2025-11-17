@@ -260,11 +260,12 @@ export const calculateSmartEODSAFee = async (
     }
     
     // Get package fees (these are CUMULATIVE package totals, not individual fees)
-    const solo1Package = eventFees.eventSolo1Fee || 550;  // 1 Solo Package total (performance only)
-    const solo2Package = eventFees.eventSolo2Fee || 942;   // 2 Solos Package total (performance only)
-    const solo3Package = eventFees.eventSolo3Fee || 1256;  // 3 Solos Package total (performance only)
-    const additionalSoloFee = eventFees.eventSoloAdditionalFee || 349;
-    const registrationFee = eventFees.eventRegistrationFee || 175;
+    // Use nullish coalescing (??) to allow 0 as a valid value, only fallback for null/undefined
+    const solo1Package = eventFees.eventSolo1Fee ?? 550;  // 1 Solo Package total (performance only)
+    const solo2Package = eventFees.eventSolo2Fee ?? 942;   // 2 Solos Package total (performance only)
+    const solo3Package = eventFees.eventSolo3Fee ?? 1256;  // 3 Solos Package total (performance only)
+    const additionalSoloFee = eventFees.eventSoloAdditionalFee ?? 349;
+    const registrationFee = eventFees.eventRegistrationFee ?? 175;
     
     // Check if registration was already assigned (has ANY entry in this event, paid or unpaid)
     // This includes checking other entry types too, not just solos
