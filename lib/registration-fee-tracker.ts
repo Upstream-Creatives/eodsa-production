@@ -159,6 +159,8 @@ export const calculateSmartEODSAFee = async (
     }
     
     console.log(`🔍 Searching for existing solos with IDs: ${allDancerIds.join(', ')}`);
+    console.log(`🔍 Dancer EODSA ID: ${dancerEodsaId || 'N/A'}`);
+    console.log(`🔍 Event ID: ${options.eventId}`);
     
     // Build comprehensive query that checks all possible matching fields
     // Get ALL solos for this event first, then filter client-side (more reliable)
@@ -172,6 +174,24 @@ export const calculateSmartEODSAFee = async (
     ` as any[];
     
     console.log(`🔍 Found ${allSolosInEvent.length} total solo entries in event ${options.eventId}`);
+    
+    // Log ALL entries for debugging
+    if (allSolosInEvent.length > 0) {
+      console.log(`📋 All solo entries in event:`);
+      allSolosInEvent.forEach((entry, idx) => {
+        let entryParticipantIds: string[] = [];
+        try {
+          if (typeof entry.participant_ids === 'string') {
+            entryParticipantIds = JSON.parse(entry.participant_ids);
+          } else if (Array.isArray(entry.participant_ids)) {
+            entryParticipantIds = entry.participant_ids;
+          }
+        } catch (e) {
+          console.error('Error parsing participant_ids:', e);
+        }
+        console.log(`   Entry ${idx + 1}: ID=${entry.id}, eodsa_id=${entry.eodsa_id}, contestant_id=${entry.contestant_id}, participant_ids=${JSON.stringify(entryParticipantIds)}`);
+      });
+    }
     
     // Filter client-side by checking if any ID matches
     let existingSoloEntries: any[] = [];
@@ -192,18 +212,23 @@ export const calculateSmartEODSAFee = async (
       }
       
       // Check if any of our IDs match any field
-      const matches = allDancerIds.some(id => 
-        entryEodsaId === id ||
-        entryContestantId === id ||
-        entryParticipantIds.includes(id)
-      ) || (dancerEodsaId && (
-        entryEodsaId === dancerEodsaId ||
-        entryParticipantIds.includes(dancerEodsaId)
-      ));
+      const matchesEodsaId = dancerEodsaId && entryEodsaId === dancerEodsaId;
+      const matchesContestantId = allDancerIds.some(id => entryContestantId === id);
+      const matchesParticipantIds = allDancerIds.some(id => entryParticipantIds.includes(id)) || 
+                                     (dancerEodsaId && entryParticipantIds.includes(dancerEodsaId));
+      const matches = matchesEodsaId || matchesContestantId || matchesParticipantIds;
       
       if (matches) {
         existingSoloEntries.push(entry);
-        console.log(`   - ✅ Matched entry ${entry.id}: eodsa_id=${entryEodsaId}, contestant_id=${entryContestantId}, participant_ids=${JSON.stringify(entryParticipantIds)}`);
+        console.log(`   - ✅ Matched entry ${entry.id}:`);
+        console.log(`     - eodsa_id match: ${matchesEodsaId} (${entryEodsaId} === ${dancerEodsaId})`);
+        console.log(`     - contestant_id match: ${matchesContestantId} (${entryContestantId} in [${allDancerIds.join(', ')}])`);
+        console.log(`     - participant_ids match: ${matchesParticipantIds} (${JSON.stringify(entryParticipantIds)} contains any of [${allDancerIds.join(', ')}, ${dancerEodsaId || 'N/A'}])`);
+      } else {
+        console.log(`   - ❌ No match for entry ${entry.id}:`);
+        console.log(`     - eodsa_id: ${entryEodsaId} (looking for: ${dancerEodsaId || 'N/A'})`);
+        console.log(`     - contestant_id: ${entryContestantId} (looking for: ${allDancerIds.join(', ')})`);
+        console.log(`     - participant_ids: ${JSON.stringify(entryParticipantIds)} (looking for: ${allDancerIds.join(', ')}, ${dancerEodsaId || 'N/A'})`);
       }
     }
     
