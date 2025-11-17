@@ -200,27 +200,63 @@ export const calculateSmartEODSAFee = async (
       }
     }
     
-    existingSoloCount = existingSoloEntries.length;
+    const dbExistingSoloCount = existingSoloEntries.length;
+    existingSoloCount = dbExistingSoloCount;
     
     // Debug logging for dev/staging
-    console.log(`✅ Found ${existingSoloCount} existing solo entries`);
+    console.log(`✅ Database query found ${dbExistingSoloCount} existing solo entries`);
     console.log(`   - Matching entry IDs: ${matchingEntryIds.join(', ') || 'none'}`);
-    existingSoloEntries.forEach((entry, idx) => {
-      let entryParticipantIds: string[] = [];
-      try {
-        if (typeof entry.participant_ids === 'string') {
-          entryParticipantIds = JSON.parse(entry.participant_ids);
-        } else if (Array.isArray(entry.participant_ids)) {
-          entryParticipantIds = entry.participant_ids;
-        }
-      } catch (e) {
-        // Ignore parse errors
-      }
-      console.log(`   - Entry ${idx + 1}: ID=${entry.id}, Fee=R${entry.calculated_fee}, eodsa_id=${entry.eodsa_id}, contestant_id=${entry.contestant_id}, participant_ids=${JSON.stringify(entryParticipantIds)}`);
-    });
+    console.log(`   - Frontend soloCount: ${options?.soloCount || 'not provided'}`);
     
-    if (existingSoloCount === 0) {
+    if (existingSoloEntries.length > 0) {
+      existingSoloEntries.forEach((entry, idx) => {
+        let entryParticipantIds: string[] = [];
+        try {
+          if (typeof entry.participant_ids === 'string') {
+            entryParticipantIds = JSON.parse(entry.participant_ids);
+          } else if (Array.isArray(entry.participant_ids)) {
+            entryParticipantIds = entry.participant_ids;
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+        console.log(`   - Entry ${idx + 1}: ID=${entry.id}, Fee=R${entry.calculated_fee}, eodsa_id=${entry.eodsa_id}, contestant_id=${entry.contestant_id}, participant_ids=${JSON.stringify(entryParticipantIds)}`);
+      });
+    }
+    
+    // CRITICAL FIX: If database query finds 0 entries but frontend soloCount suggests existing entries,
+    // use the frontend's soloCount to calculate existing count
+    // soloCount from frontend = existing + session + 1 (new)
+    // So existingCount = soloCount - 1 (if no session entries)
+    if (dbExistingSoloCount === 0 && options?.soloCount && options.soloCount > 1) {
+      // Frontend says this is solo #N, so there should be N-1 existing entries
+      const calculatedExistingCount = options.soloCount - 1;
+      console.warn(`⚠️ Database query found 0 entries, but frontend soloCount=${options.soloCount} suggests ${calculatedExistingCount} existing entries`);
+      console.warn(`   - Using calculated existing count: ${calculatedExistingCount}`);
+      console.warn(`   - This may indicate a matching issue. Check logs above for why entries weren't matched.`);
+      existingSoloCount = calculatedExistingCount;
+      
+      // Also log all entries for manual verification
+      if (allSolosInEvent.length > 0) {
+        console.warn(`📋 All ${allSolosInEvent.length} solo entries in event (for manual verification):`);
+        allSolosInEvent.forEach((entry, idx) => {
+          let entryParticipantIds: string[] = [];
+          try {
+            if (typeof entry.participant_ids === 'string') {
+              entryParticipantIds = JSON.parse(entry.participant_ids);
+            } else if (Array.isArray(entry.participant_ids)) {
+              entryParticipantIds = entry.participant_ids;
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+          console.warn(`   Entry ${idx + 1}: ID=${entry.id}, eodsa_id="${entry.eodsa_id}", contestant_id="${entry.contestant_id}", participant_ids=${JSON.stringify(entryParticipantIds)}`);
+          console.warn(`      Searching with: participantId="${participantId}", dancerEodsaId="${dancerEodsaId}", allInternalIds=[${allInternalIds.join(', ')}]`);
+        });
+      }
+    } else if (dbExistingSoloCount === 0) {
       console.warn(`⚠️ No existing solo entries found for dancer ${participantId} (EODSA: ${dancerEodsaId || 'N/A'}) in event ${options.eventId}`);
+      console.warn(`   - This is correct if this is their first solo entry`);
     }
     
     // Get package fees (these are CUMULATIVE package totals, not individual fees)
