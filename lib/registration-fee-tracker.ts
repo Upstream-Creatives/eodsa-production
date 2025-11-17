@@ -171,7 +171,7 @@ export const calculateSmartEODSAFee = async (
       // Build query with multiple OR conditions for participant_ids
       const participantIdConditions = allDancerIds.map(id => `(participant_ids::jsonb ? '${id.replace(/'/g, "''")}')`).join(' OR ');
       
-      existingSoloEntries = await sqlClient.unsafe(`
+      existingSoloEntries = (await sqlClient.unsafe(`
         SELECT id, calculated_fee, payment_status, participant_ids, eodsa_id, contestant_id
         FROM event_entries
         WHERE event_id = '${options.eventId}'
@@ -182,12 +182,12 @@ export const calculateSmartEODSAFee = async (
           OR ${participantIdConditions}
         )
         ORDER BY submitted_at ASC
-      `) as any[];
+      `)) as unknown as any[];
     } else if (allDancerIds.length > 0) {
       // No EODSA ID, but we have internal IDs
       const participantIdConditions = allDancerIds.map(id => `(participant_ids::jsonb ? '${id.replace(/'/g, "''")}')`).join(' OR ');
       
-      existingSoloEntries = await sqlClient.unsafe(`
+      existingSoloEntries = (await sqlClient.unsafe(`
         SELECT id, calculated_fee, payment_status, participant_ids, eodsa_id, contestant_id
         FROM event_entries
         WHERE event_id = '${options.eventId}'
@@ -197,7 +197,7 @@ export const calculateSmartEODSAFee = async (
           OR ${participantIdConditions}
         )
         ORDER BY submitted_at ASC
-      `) as any[];
+      `)) as unknown as any[];
     } else {
       // Fallback: just check by participantId
       existingSoloEntries = await sqlClient`
