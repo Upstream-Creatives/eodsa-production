@@ -167,7 +167,15 @@ export const calculateSmartEODSAFee = async (
     console.log(`   - Found ${existingSoloEntries.length} existing solo entries`);
     existingSoloEntries.forEach((entry, idx) => {
       console.log(`   - Entry ${idx + 1}: ID ${entry.id}, Fee R${entry.calculated_fee}, Payment: ${entry.payment_status}`);
+      console.log(`     - participant_ids: ${JSON.stringify(entry.participant_ids)}`);
+      console.log(`     - eodsa_id: ${entry.eodsa_id}`);
+      console.log(`     - contestant_id: ${entry.contestant_id}`);
     });
+    
+    if (existingSoloEntries.length === 0 && dancerEodsaId) {
+      console.warn(`⚠️ No existing solo entries found for dancer ${participantId} (EODSA: ${dancerEodsaId}) in event ${options.eventId}`);
+      console.warn(`   - This might be correct if this is their first solo, or there might be a matching issue`);
+    }
     
     existingSoloCount = existingSoloEntries.length;
     
