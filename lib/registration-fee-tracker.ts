@@ -161,56 +161,50 @@ export const calculateSmartEODSAFee = async (
     console.log(`🔍 Searching for existing solos with IDs: ${allDancerIds.join(', ')}`);
     
     // Build comprehensive query that checks all possible matching fields
+    // Get ALL solos for this event first, then filter client-side (more reliable)
+    // This avoids complex SQL queries with dynamic conditions
+    const allSolosInEvent = await sqlClient`
+      SELECT id, calculated_fee, payment_status, participant_ids, eodsa_id, contestant_id
+      FROM event_entries
+      WHERE event_id = ${options.eventId}
+      AND performance_type = 'Solo'
+      ORDER BY submitted_at ASC
+    ` as any[];
+    
+    console.log(`🔍 Found ${allSolosInEvent.length} total solo entries in event ${options.eventId}`);
+    
+    // Filter client-side by checking if any ID matches
     let existingSoloEntries: any[] = [];
     
-    // Query that checks ALL possible matches:
-    // 1. eodsa_id matches
-    // 2. contestant_id matches any of our dancer IDs
-    // 3. participant_ids contains any of our dancer IDs (as strings)
-    if (dancerEodsaId && allDancerIds.length > 0) {
-      // Build query with multiple OR conditions for participant_ids
-      const participantIdConditions = allDancerIds.map(id => `(participant_ids::jsonb ? '${id.replace(/'/g, "''")}')`).join(' OR ');
+    for (const entry of allSolosInEvent) {
+      const entryEodsaId = entry.eodsa_id;
+      const entryContestantId = entry.contestant_id;
+      let entryParticipantIds: string[] = [];
       
-      existingSoloEntries = (await sqlClient.unsafe(`
-        SELECT id, calculated_fee, payment_status, participant_ids, eodsa_id, contestant_id
-        FROM event_entries
-        WHERE event_id = '${options.eventId}'
-        AND performance_type = 'Solo'
-        AND (
-          eodsa_id = '${dancerEodsaId.replace(/'/g, "''")}'
-          OR contestant_id = ANY(ARRAY[${allDancerIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ')}])
-          OR ${participantIdConditions}
-        )
-        ORDER BY submitted_at ASC
-      `)) as unknown as any[];
-    } else if (allDancerIds.length > 0) {
-      // No EODSA ID, but we have internal IDs
-      const participantIdConditions = allDancerIds.map(id => `(participant_ids::jsonb ? '${id.replace(/'/g, "''")}')`).join(' OR ');
+      try {
+        if (typeof entry.participant_ids === 'string') {
+          entryParticipantIds = JSON.parse(entry.participant_ids);
+        } else if (Array.isArray(entry.participant_ids)) {
+          entryParticipantIds = entry.participant_ids;
+        }
+      } catch (e) {
+        console.error('Error parsing participant_ids:', e);
+      }
       
-      existingSoloEntries = (await sqlClient.unsafe(`
-        SELECT id, calculated_fee, payment_status, participant_ids, eodsa_id, contestant_id
-        FROM event_entries
-        WHERE event_id = '${options.eventId}'
-        AND performance_type = 'Solo'
-        AND (
-          contestant_id = ANY(ARRAY[${allDancerIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ')}])
-          OR ${participantIdConditions}
-        )
-        ORDER BY submitted_at ASC
-      `)) as unknown as any[];
-    } else {
-      // Fallback: just check by participantId
-      existingSoloEntries = await sqlClient`
-        SELECT id, calculated_fee, payment_status, participant_ids, eodsa_id, contestant_id
-        FROM event_entries
-        WHERE event_id = ${options.eventId}
-        AND performance_type = 'Solo'
-        AND (
-          contestant_id = ${participantId}
-          OR (participant_ids::jsonb ? ${participantId})
-        )
-        ORDER BY submitted_at ASC
-      ` as any[];
+      // Check if any of our IDs match any field
+      const matches = allDancerIds.some(id => 
+        entryEodsaId === id ||
+        entryContestantId === id ||
+        entryParticipantIds.includes(id)
+      ) || (dancerEodsaId && (
+        entryEodsaId === dancerEodsaId ||
+        entryParticipantIds.includes(dancerEodsaId)
+      ));
+      
+      if (matches) {
+        existingSoloEntries.push(entry);
+        console.log(`   - ✅ Matched entry ${entry.id}: eodsa_id=${entryEodsaId}, contestant_id=${entryContestantId}, participant_ids=${JSON.stringify(entryParticipantIds)}`);
+      }
     }
     
     // If no results, try alternative query with more flexible matching
