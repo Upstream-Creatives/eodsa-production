@@ -2304,7 +2304,7 @@ function EventParticipantsPage() {
                 </div>
 
                 {/* Fee Breakdown */}
-                <FeeBreakdownComponent entry={entryModal} event={event} />
+                <FeeBreakdownComponent entry={entryModal} event={event} allEntries={entries} />
 
                 <button
                   onClick={() => { setShowEntryModal(false); handlePaymentUpdate(entryModal); }}
@@ -2323,7 +2323,7 @@ function EventParticipantsPage() {
 }
 
 // Fee Breakdown Component for Entry Details Modal
-function FeeBreakdownComponent({ entry, event }: { entry: EventEntry | null; event: Event | null }) {
+function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry | null; event: Event | null; allEntries?: EventEntry[] }) {
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
   const [breakdown, setBreakdown] = useState<{
@@ -2372,8 +2372,34 @@ function FeeBreakdownComponent({ entry, event }: { entry: EventEntry | null; eve
           const data = await response.json();
           console.log('✅ Fee Breakdown Response:', data);
           
-          // Extract solo count from debug info if available
-          const soloCount = data.details?.soloCount || (performanceType === 'Solo' ? (data.debug?.existingSoloCount !== undefined ? data.debug.existingSoloCount + 1 : 1) : undefined);
+          // For solo entries, count existing solos EXCLUDING this entry
+          let soloCount: number | undefined = undefined;
+          if (performanceType === 'Solo' && entry && allEntries) {
+            // Count solo entries for this dancer in this event, excluding the current entry
+            const participantId = entry.participantIds?.[0];
+            const matchingSolos = allEntries.filter(e => {
+              // Must be same event, solo type, and not this entry
+              if (e.id === entry.id || e.eventId !== entry.eventId) return false;
+              
+              // Check if it's a solo (1 participant)
+              const eParticipantIds = Array.isArray(e.participantIds) ? e.participantIds : 
+                                      (typeof e.participantIds === 'string' ? JSON.parse(e.participantIds || '[]') : []);
+              if (eParticipantIds.length !== 1) return false;
+              
+              // Check if it matches this dancer
+              const eParticipantId = eParticipantIds[0];
+              return eParticipantId === participantId || 
+                     e.eodsaId === entry.eodsaId ||
+                     e.contestantId === entry.contestantId;
+            });
+            
+            // Solo number = existing solos + 1 (this entry)
+            soloCount = matchingSolos.length + 1;
+            console.log(`📊 Solo count calculation: ${matchingSolos.length} existing + 1 (this entry) = Solo #${soloCount}`);
+          } else if (performanceType === 'Solo') {
+            // Fallback: use API response if we don't have allEntries
+            soloCount = data.details?.soloCount || (data.debug?.existingSoloCount !== undefined ? data.debug.existingSoloCount + 1 : 1);
+          }
           
           setBreakdown({
             performanceFee: data.fees?.performanceFee || 0,
