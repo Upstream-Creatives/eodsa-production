@@ -30,12 +30,11 @@ export async function GET(request: NextRequest) {
       return false;
     });
     
-    // Filter entries that need video upload (virtual entries without video)
+    // Filter virtual entries (with or without video - allow updates)
     // Nationals entries are all virtual and don't have entryType field
     const entriesNeedingVideo = contestantEntries.filter(entry => {
       const isVirtual = (entry as any).entryType === 'virtual' || (entry as any).nationalsEventId; // nationals entries are virtual
-      const hasNoVideo = !(entry as any).videoFileUrl && !(entry as any).videoExternalUrl;
-      return isVirtual && hasNoVideo;
+      return isVirtual;
     });
     
     // Get additional info for each entry

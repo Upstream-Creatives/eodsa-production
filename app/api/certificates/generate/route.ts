@@ -42,18 +42,25 @@ export async function POST(request: NextRequest) {
       studioName,
       percentage,
       style,
-      title,
+      title: originalTitle,
       medallion,
       eventDate,
       createdBy
     } = body;
 
     // Validate required fields
-    if (!dancerId || !dancerName || !percentage || !style || !title || !medallion || !eventDate) {
+    if (!dancerId || !dancerName || !percentage || !style || !originalTitle || !medallion || !eventDate) {
       return NextResponse.json(
         { error: 'Missing required certificate data' },
         { status: 400 }
       );
+    }
+
+    // Truncate title if too long (max 26 characters to fit on certificate)
+    const MAX_TITLE_LENGTH = 26;
+    let title = originalTitle;
+    if (title.length > MAX_TITLE_LENGTH) {
+      title = title.substring(0, MAX_TITLE_LENGTH - 3) + '...';
     }
 
     // Check if this dancer has custom position settings
@@ -81,7 +88,7 @@ export async function POST(request: NextRequest) {
     const medallionTop = pos?.medallion_top || 80.5;
     const medallionLeft = pos?.medallion_left || 72;
     const medallionFontSize = pos?.medallion_font_size || 26; // Standardized to 26px
-    const dateTop = pos?.date_top || 90;
+    const dateTop = pos?.date_top || 88; // Moved up from 90 to align better with date line
     const dateLeft = pos?.date_left || 66.5;
     const dateFontSize = pos?.date_font_size || 39;
 

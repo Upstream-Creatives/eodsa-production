@@ -28,13 +28,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type (PDF or PNG)
+    // Validate file type (only PNG/JPG images)
     const fileType = file.type;
-    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const allowedExtensions = ['png', 'jpg', 'jpeg'];
     
-    if (!allowedTypes.includes(fileType)) {
+    if (!allowedTypes.includes(fileType) || !allowedExtensions.includes(fileExtension || '')) {
       return NextResponse.json(
-        { success: false, error: 'Invalid file type. Only PDF, PNG, or JPG files are allowed.' },
+        { success: false, error: 'Invalid file type. Only PNG or JPG files are allowed.' },
         { status: 400 }
       );
     }
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
         {
           folder: 'certificate-templates',
           public_id: `event-${eventId}-template`, // Don't include folder in public_id
-          resource_type: fileType === 'application/pdf' ? 'raw' : 'image',
+          resource_type: 'image',
           overwrite: true,
         },
         (error, result) => {

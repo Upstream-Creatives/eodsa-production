@@ -261,7 +261,7 @@ export async function updateTransactionRecord(
     `;
   } else if (hasRegistrationPaidFlag) {
     await sql`
-      UPDATE transaction_records 
+    UPDATE transaction_records 
       SET registration_paid_flag = ${updates.registrationPaidFlag}, 
           updated_at = ${now}
       WHERE id = ${transactionId}

@@ -32,3 +32,4 @@ SELECT id, name, number_of_judges,
 FROM events
 ORDER BY created_at DESC;
 
+

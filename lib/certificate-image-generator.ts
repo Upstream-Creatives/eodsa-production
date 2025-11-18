@@ -31,6 +31,7 @@ export interface CertificateImageData {
   medallion: 'Elite' | 'Opus' | 'Legend' | 'Gold' | 'Silver+' | 'Silver' | 'Bronze' | '';
   date: string;
   positions?: CertificatePositions;
+  templateUrl?: string; // Optional custom template URL from event
 }
 
 /**
@@ -38,15 +39,38 @@ export interface CertificateImageData {
  */
 export async function generateCertificateImage(data: CertificateImageData): Promise<Buffer> {
   try {
-    // Read the template image
-    const templatePath = path.join(process.cwd(), 'public', 'Template.jpg');
-
-    if (!fs.existsSync(templatePath)) {
-      throw new Error('Certificate template not found');
+    let templateBuffer: Buffer;
+    
+    // Use custom template URL if provided, otherwise use default local file
+    if (data.templateUrl) {
+      try {
+        // Download the template from URL
+        const response = await fetch(data.templateUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch template: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        templateBuffer = Buffer.from(arrayBuffer);
+      } catch (fetchError) {
+        console.error('Error fetching custom template, falling back to default:', fetchError);
+        // Fallback to default template
+        const templatePath = path.join(process.cwd(), 'public', 'Template.jpg');
+        if (!fs.existsSync(templatePath)) {
+          throw new Error('Certificate template not found and custom template failed to load');
+        }
+        templateBuffer = fs.readFileSync(templatePath);
+      }
+    } else {
+      // Use default local template
+      const templatePath = path.join(process.cwd(), 'public', 'Template.jpg');
+      if (!fs.existsSync(templatePath)) {
+        throw new Error('Certificate template not found');
+      }
+      templateBuffer = fs.readFileSync(templatePath);
     }
 
     // Get image dimensions
-    const metadata = await sharp(templatePath).metadata();
+    const metadata = await sharp(templateBuffer).metadata();
     const width = metadata.width || 904;
     const height = metadata.height || 1280;
 
@@ -68,7 +92,7 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
       medallionTop: 80.5,
       medallionLeft: 65.5,
       medallionFontSize: 26, // Standardized to 26px
-      dateTop: 90.5,
+      dateTop: 88, // Moved up from 90.5 to align better with date line
       dateLeft: 52,
       dateFontSize: 39,
     };
@@ -89,7 +113,7 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
     };
 
     // Start with the base template
-    let sharpInstance = sharp(templatePath);
+    let sharpInstance = sharp(templateBuffer);
 
     // Add each text element as a separate composite layer
     const composites = [];

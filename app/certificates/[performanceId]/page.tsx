@@ -10,6 +10,7 @@ interface CertificateData {
   title: string;
   medallion: string;
   date: string;
+  templateUrl?: string;
 }
 
 export default function CertificatePage() {
@@ -23,12 +24,22 @@ export default function CertificatePage() {
     const fetchCertificateData = async () => {
       try {
         const response = await fetch(`/api/certificates/${performanceId}`);
-        const data = await response.json();
-
+        
+        // Check if response is ok before parsing JSON
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to load certificate');
+          let errorMessage = 'Failed to load certificate';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.details || errorMessage;
+          } catch {
+            // If JSON parsing fails, use status text
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
 
+        // Parse JSON only if response is ok
+        const data = await response.json();
         setCertificateData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load certificate');
@@ -66,7 +77,7 @@ export default function CertificatePage() {
       <div className="relative w-full h-full max-w-[90vw] max-h-[90vh]" style={{ aspectRatio: '904/1280' }}>
         {/* Background Image */}
         <img
-          src="/Template.jpg"
+          src={certificateData.templateUrl || '/Template.jpg'}
           alt="Certificate Template"
           className="absolute inset-0 w-full h-full object-contain"
         />

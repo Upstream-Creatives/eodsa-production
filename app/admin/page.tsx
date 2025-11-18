@@ -341,19 +341,44 @@ function AdminDashboard() {
         fetch('/api/clients')
       ]);
 
-      const eventsData = await eventsRes.json();
+      // Handle events response
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json();
+        // Handle events - check for both success flag and array format
+        if (eventsData.success && Array.isArray(eventsData.events)) {
+          setEvents(eventsData.events || []);
+        } else if (Array.isArray(eventsData)) {
+          // Fallback: if response is directly an array
+          setEvents(eventsData);
+        } else if (eventsData.success && !eventsData.events) {
+          // Success but no events array - might be empty or missing
+          console.warn('Events API returned success but no events array:', eventsData);
+          setEvents([]);
+        } else {
+          console.error('Events data format error:', eventsData);
+          setEvents([]);
+        }
+      } else {
+        console.error('Failed to fetch events:', eventsRes.status, eventsRes.statusText);
+        const errorData = await eventsRes.json().catch(() => ({}));
+        console.error('Events error details:', errorData);
+        setEvents([]);
+      }
+
+      // Handle other responses
       const dancersData = await dancersRes.json();
       const studiosData = await studiosRes.json();
       const applicationsData = await applicationsRes.json();
       const clientsData = await clientsRes.json();
-
-      if (eventsData.success) setEvents(eventsData.events);
+      
       if (dancersData.success) setDancers(dancersData.dancers);
       if (studiosData.success) setStudios(studiosData.studios);
       if (applicationsData.success) setStudioApplications(applicationsData.applications);
       if (clientsData.success) setClients(clientsData.clients);
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Ensure events is set to empty array on error
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -513,41 +538,47 @@ function AdminDashboard() {
       const data = await response.json();
 
       if (data.success) {
-        // Certificate upload temporarily disabled - will be re-enabled after deployment
-        // if (certificateTemplateFile && data.event?.id) {
-        //   setIsUploadingCertificate(true);
-        //   try {
-        //     const uploadFormData = new FormData();
-        //     uploadFormData.append('file', certificateTemplateFile);
-        //     uploadFormData.append('eventId', data.event.id);
-        //     
-        //     const uploadResponse = await fetch('/api/upload/certificate-template', {
-        //       method: 'POST',
-        //       body: uploadFormData,
-        //     });
-        //     
-        //     const uploadData = await uploadResponse.json();
-        //     if (uploadData.success) {
-        //       // Update event with certificate template URL
-        //       await fetch(`/api/events/${data.event.id}`, {
-        //         method: 'PUT',
-        //         headers: {
-        //           'Content-Type': 'application/json',
-        //         },
-        //         body: JSON.stringify({
-        //           certificateTemplateUrl: uploadData.url,
-        //           adminSession: session
-        //         }),
-        //       });
-        //     }
-        //   } catch (uploadError) {
-        //     console.error('Certificate upload error:', uploadError);
-        //     // Non-critical error, event is already created
-        //   } finally {
-        //     setIsUploadingCertificate(false);
-        //   }
-        // }
-        setCreateEventMessage('🎉 Event created successfully! This event can accommodate all performance types (Solo, Duet, Trio, Group)');
+        // Upload certificate template if provided
+        if (certificateTemplateFile && data.event?.id) {
+          setIsUploadingCertificate(true);
+          try {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', certificateTemplateFile);
+            uploadFormData.append('eventId', data.event.id);
+            
+            const uploadResponse = await fetch('/api/upload/certificate-template', {
+              method: 'POST',
+              body: uploadFormData,
+            });
+            
+            const uploadData = await uploadResponse.json();
+            if (uploadData.success) {
+              // Update event with certificate template URL
+              await fetch(`/api/events/${data.event.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  certificateTemplateUrl: uploadData.url,
+                  adminSession: session
+                }),
+              });
+            } else {
+              console.error('Certificate upload error:', uploadData.error);
+              setCreateEventMessage(`🎉 Event created successfully, but certificate template upload failed: ${uploadData.error}`);
+            }
+          } catch (uploadError) {
+            console.error('Certificate upload error:', uploadError);
+            setCreateEventMessage('🎉 Event created successfully, but certificate template upload failed. You can upload it later in event settings.');
+          } finally {
+            setIsUploadingCertificate(false);
+          }
+        }
+        
+        if (!certificateTemplateFile || !isUploadingCertificate) {
+          setCreateEventMessage('🎉 Event created successfully! This event can accommodate all performance types (Solo, Duet, Trio, Group)');
+        }
         setNewEvent({
           name: '',
           description: '',
@@ -769,42 +800,46 @@ function AdminDashboard() {
       const data = await response.json();
 
       if (data.success) {
-        // Certificate upload temporarily disabled - will be re-enabled after deployment
-        // if (editCertificateTemplateFile && editingEvent.id) {
-        //   setIsUploadingEditCertificate(true);
-        //   try {
-        //     const uploadFormData = new FormData();
-        //     uploadFormData.append('file', editCertificateTemplateFile);
-        //     uploadFormData.append('eventId', editingEvent.id);
-        //     
-        //     const uploadResponse = await fetch('/api/upload/certificate-template', {
-        //       method: 'POST',
-        //       body: uploadFormData,
-        //     });
-        //     
-        //     const uploadData = await uploadResponse.json();
-        //     if (uploadData.success) {
-        //       // Update event with certificate template URL
-        //       await fetch(`/api/events/${editingEvent.id}`, {
-        //         method: 'PUT',
-        //         headers: {
-        //           'Content-Type': 'application/json',
-        //         },
-        //         body: JSON.stringify({
-        //           certificateTemplateUrl: uploadData.url,
-        //           adminSession: session
-        //         }),
-        //       });
-        //     }
-        //   } catch (uploadError) {
-        //     console.error('Certificate upload error:', uploadError);
-        //     // Non-critical error, event is already updated
-        //   } finally {
-        //     setIsUploadingEditCertificate(false);
-        //   }
-        // }
-        
-        setUpdateEventMessage('✅ Event updated successfully!');
+        // Upload certificate template if a new one was selected
+        if (editCertificateTemplateFile && editingEvent.id) {
+          setIsUploadingEditCertificate(true);
+          try {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', editCertificateTemplateFile);
+            uploadFormData.append('eventId', editingEvent.id);
+            
+            const uploadResponse = await fetch('/api/upload/certificate-template', {
+              method: 'POST',
+              body: uploadFormData,
+            });
+            
+            const uploadData = await uploadResponse.json();
+            if (uploadData.success) {
+              // Update event with certificate template URL
+              await fetch(`/api/events/${editingEvent.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  certificateTemplateUrl: uploadData.url,
+                  adminSession: session
+                }),
+              });
+              setUpdateEventMessage('✅ Event updated successfully! Certificate template uploaded.');
+            } else {
+              console.error('Certificate upload error:', uploadData.error);
+              setUpdateEventMessage(`✅ Event updated successfully, but certificate template upload failed: ${uploadData.error}`);
+            }
+          } catch (uploadError) {
+            console.error('Certificate upload error:', uploadError);
+            setUpdateEventMessage('✅ Event updated successfully, but certificate template upload failed. Please try uploading again.');
+          } finally {
+            setIsUploadingEditCertificate(false);
+          }
+        } else {
+          setUpdateEventMessage('✅ Event updated successfully!');
+        }
         fetchData();
         setTimeout(() => {
           setShowEditEventModal(false);
@@ -2929,19 +2964,46 @@ function AdminDashboard() {
                   🏆 Certificate Settings
                 </h3>
                 <div>
-                  <label className={`block ${themeClasses.label} mb-2`}>Custom Certificate Template (Optional)</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Upload Certificate Template (JPG/PNG)</label>
                   <p className={`text-xs ${themeClasses.textMuted} mb-3`}>
-                    Certificate template upload is temporarily disabled. The default template will be used for all events.
+                    This will be used as the background for all certificates in this event. Only PNG and JPG files are accepted.
                   </p>
+                  {certificateTemplateFile && (
+                    <div className={`mb-3 p-3 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
+                      <p className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'} mb-2`}>
+                        📄 Selected: {certificateTemplateFile.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCertificateTemplateFile(null)}
+                        className={`text-xs px-3 py-1 ${theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white rounded transition-colors`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
                   <input
                     type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    disabled
-                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200 opacity-50 cursor-not-allowed`}
+                    accept=".png,.jpg,.jpeg"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Validate file type
+                        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+                        const fileExtension = file.name.toLowerCase().split('.').pop();
+                        const allowedExtensions = ['png', 'jpg', 'jpeg'];
+                        
+                        if (!allowedTypes.includes(file.type) || !allowedExtensions.includes(fileExtension || '')) {
+                          setCreateEventMessage('❌ Invalid file type. Only PNG or JPG files are allowed.');
+                          e.target.value = '';
+                          return;
+                        }
+                        setCertificateTemplateFile(file);
+                        setCreateEventMessage('');
+                      }
+                    }}
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                   />
-                  <p className={`text-xs ${theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'} mt-2`}>
-                    ⚠️ Upload feature temporarily disabled
-                  </p>
                 </div>
               </div>
 
@@ -3382,25 +3444,125 @@ function AdminDashboard() {
                   🏆 Certificate Settings
                 </h3>
                 <div>
-                  <label className={`block ${themeClasses.label} mb-2`}>Custom Certificate Template (Optional)</label>
+                  <label className={`block ${themeClasses.label} mb-2`}>Upload Certificate Template (JPG/PNG)</label>
                   <p className={`text-xs ${themeClasses.textMuted} mb-3`}>
-                    Certificate template upload is temporarily disabled. The default template will be used.
+                    This will be used as the background for all certificates in this event. Only PNG and JPG files are accepted.
                   </p>
-                  {editEventData.certificateTemplateUrl && (
-                    <div className={`mb-3 p-3 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
-                        📄 Current template: <a href={editEventData.certificateTemplateUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-500">View current template</a>
+                  
+                  {/* Current Template Preview */}
+                  {editEventData.certificateTemplateUrl && !editCertificateTemplateFile && (
+                    <div className={`mb-3 p-4 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
+                      <p className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'} mb-2`}>
+                        📄 Current Template
                       </p>
+                      <div className="mb-3">
+                        <img 
+                          src={editEventData.certificateTemplateUrl} 
+                          alt="Certificate Template Preview" 
+                          className={`max-w-full h-auto max-h-48 rounded border ${themeClasses.modalBorder}`}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <a 
+                          href={editEventData.certificateTemplateUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className={`text-xs px-3 py-1 ${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded transition-colors`}
+                        >
+                          View Full Size
+                        </a>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (confirm('Are you sure you want to remove the certificate template? The default template will be used instead.')) {
+                              try {
+                                const session = localStorage.getItem('adminSession');
+                                if (!session) {
+                                  setUpdateEventMessage('Error: Session expired. Please log in again.');
+                                  return;
+                                }
+                                
+                                const response = await fetch(`/api/events/${editingEvent?.id}`, {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    certificateTemplateUrl: null,
+                                    adminSession: session
+                                  }),
+                                });
+                                
+                                const data = await response.json();
+                                if (data.success) {
+                                  setEditEventData(prev => ({ ...prev, certificateTemplateUrl: undefined }));
+                                  setUpdateEventMessage('✅ Certificate template removed successfully.');
+                                  setTimeout(() => setUpdateEventMessage(''), 3000);
+                                } else {
+                                  setUpdateEventMessage(`❌ Failed to remove template: ${data.error}`);
+                                }
+                              } catch (error) {
+                                console.error('Error removing template:', error);
+                                setUpdateEventMessage('❌ Error removing template. Please try again.');
+                              }
+                            }
+                          }}
+                          className={`text-xs px-3 py-1 ${theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white rounded transition-colors`}
+                        >
+                          Remove Template
+                        </button>
+                      </div>
                     </div>
                   )}
+                  
+                  {/* New File Selected */}
+                  {editCertificateTemplateFile && (
+                    <div className={`mb-3 p-3 ${theme === 'dark' ? 'bg-green-900/20 border-green-700/50' : 'bg-green-50 border-green-200'} ${themeClasses.cardRadius} border`}>
+                      <p className={`text-sm ${theme === 'dark' ? 'text-green-300' : 'text-green-700'} mb-2`}>
+                        📄 New template selected: {editCertificateTemplateFile.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditCertificateTemplateFile(null);
+                          // Reset file input
+                          const fileInput = document.querySelector('input[type="file"][accept=".png,.jpg,.jpeg"]') as HTMLInputElement;
+                          if (fileInput) fileInput.value = '';
+                        }}
+                        className={`text-xs px-3 py-1 ${theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white rounded transition-colors`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  
                   <input
                     type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    disabled
-                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200 opacity-50 cursor-not-allowed`}
+                    accept=".png,.jpg,.jpeg"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Validate file type
+                        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+                        const fileExtension = file.name.toLowerCase().split('.').pop();
+                        const allowedExtensions = ['png', 'jpg', 'jpeg'];
+                        
+                        if (!allowedTypes.includes(file.type) || !allowedExtensions.includes(fileExtension || '')) {
+                          setUpdateEventMessage('❌ Invalid file type. Only PNG or JPG files are allowed.');
+                          e.target.value = '';
+                          return;
+                        }
+                        setEditCertificateTemplateFile(file);
+                        setUpdateEventMessage('');
+                      }
+                    }}
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
                   />
-                  <p className={`text-xs ${theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'} mt-2`}>
-                    ⚠️ Upload feature temporarily disabled
+                  <p className={`text-xs ${themeClasses.textMuted} mt-2`}>
+                    {editEventData.certificateTemplateUrl ? 'Select a new file to replace the current template.' : 'Upload a template to use as the background for certificates in this event.'}
                   </p>
                 </div>
               </div>
@@ -4168,22 +4330,22 @@ function JudgeAssignmentsTabContent({
   themeClasses
 }: JudgeAssignmentsTabContentProps) {
   return (
-    <div className="space-y-6 sm:space-y-8 animate-fadeIn">
-      <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+        <div className="space-y-6 sm:space-y-8 animate-fadeIn">
+          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
         <div className={`px-4 sm:px-6 py-4 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border-b ${themeClasses.cardBorder}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-yellow-600 rounded-lg flex items-center justify-center">
                 <span className="text-white text-lg">⚖️</span>
-              </div>
-              <div>
+                  </div>
+                  <div>
                 <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Assignments</h2>
                 <p className={`text-xs ${themeClasses.textMuted}`}>Manage judge assignments and dashboard access for events</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-
+            
         <div className="p-6">
           {loadingAssignments ? (
             <div className={`text-center py-12 ${themeClasses.textMuted}`}>
@@ -4220,21 +4382,21 @@ function JudgeAssignmentsTabContent({
                         </span>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
+                <div>
                           <span className={themeClasses.textMuted}>Date: </span>
                           <span className={themeClasses.textPrimary}>
                             {new Date(event.eventDate).toLocaleDateString()}
                           </span>
-                        </div>
-                        <div>
+                </div>
+                <div>
                           <span className={themeClasses.textMuted}>Venue: </span>
                           <span className={themeClasses.textPrimary}>{event.venue}</span>
-                        </div>
-                        <div>
+                </div>
+                <div>
                           <span className={themeClasses.textMuted}>Region: </span>
                           <span className={themeClasses.textPrimary}>{event.region}</span>
-                        </div>
-                        <div>
+                </div>
+                <div>
                           <span className={themeClasses.textMuted}>Judges: </span>
                           <span className={themeClasses.textPrimary}>
                             {event.judges?.length || 0}/{event.numberOfJudges || event.expectedJudges || 4}
@@ -4244,7 +4406,7 @@ function JudgeAssignmentsTabContent({
                               </span>
                             )}
                           </span>
-                        </div>
+                </div>
                       </div>
                     </div>
                     <button
@@ -4255,7 +4417,7 @@ function JudgeAssignmentsTabContent({
                     >
                       {expandedEventId === event.id ? 'Hide' : 'View'} Judges
                     </button>
-                  </div>
+              </div>
 
                   {expandedEventId === event.id && (
                     <div className="mt-4 pt-4 border-t border-gray-700/20">
@@ -4306,7 +4468,7 @@ function JudgeAssignmentsTabContent({
                                   <div className="w-10 h-10 bg-amber-600 rounded-full flex items-center justify-center text-white font-bold">
                                     {index + 1}
                                   </div>
-                                  <div>
+              <div>
                                     <div className={themeClasses.textPrimary + ' font-medium'}>{judge.name}</div>
                                     <div className={themeClasses.textMuted + ' text-sm'}>{judge.email}</div>
                                     {judge.phone && (
@@ -4329,17 +4491,17 @@ function JudgeAssignmentsTabContent({
                                   )}
                                 </button>
                               </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  ))}
                 </div>
+                      )}
+              </div>
+                  )}
+                  </div>
               ))}
             </div>
           )}
         </div>
-      </div>
+              </div>
 
       {/* Add Judge Modal */}
       {showAddJudgeModal && selectedEventId && (
@@ -4362,7 +4524,7 @@ function JudgeAssignmentsTabContent({
             <div className="mb-4">
               <label className={`block text-sm font-medium ${themeClasses.textPrimary} mb-2`}>
                 Select Judge
-              </label>
+                </label>
               {getAvailableJudgesForEvent(selectedEventId).length === 0 ? (
                 <div className={`text-center py-8 ${themeClasses.textMuted}`}>
                   <p>All available judges are already assigned to this event.</p>
@@ -4392,10 +4554,10 @@ function JudgeAssignmentsTabContent({
                   ))}
                 </div>
               )}
-            </div>
+              </div>
 
             <div className="flex justify-end space-x-3">
-              <button
+                <button
                 onClick={() => {
                   setShowAddJudgeModal(false);
                   setSelectedEventId(null);
@@ -4409,23 +4571,23 @@ function JudgeAssignmentsTabContent({
                 onClick={handleAddJudge}
                 disabled={!selectedJudgeId || !!addingJudgeId}
                 className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2`}
-              >
+                >
                 {addingJudgeId ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Adding...</span>
                   </>
-                ) : (
+                  ) : (
                   <span>Add Judge to Event</span>
-                )}
-              </button>
-            </div>
+                  )}
+                </button>
+              </div>
           </div>
         </div>
       )}
 
       {/* Dashboard Access Management Section */}
-      <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+          <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
         <div className={`px-4 sm:px-6 py-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-b ${themeClasses.cardBorder}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -4438,18 +4600,18 @@ function JudgeAssignmentsTabContent({
               </div>
             </div>
           </div>
-        </div>
+            </div>
 
-        <div className="p-6">
+            <div className="p-6">
           {staffAccounts.length === 0 ? (
             <div className={`text-center py-12 ${themeClasses.textMuted}`}>
               <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">👤</span>
-              </div>
+                    <span className="text-2xl">👤</span>
+                  </div>
               <h3 className="text-lg font-medium mb-2">No Staff Accounts</h3>
               <p className="text-sm">No staff accounts have been created yet.</p>
-            </div>
-          ) : (
+                </div>
+              ) : (
             <div className="space-y-4">
               {staffAccounts.map((client) => (
                 <div
@@ -4465,32 +4627,32 @@ function JudgeAssignmentsTabContent({
                         </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div>
+                            <div>
                           <span className={themeClasses.textMuted}>Email: </span>
                           <span className={themeClasses.textPrimary}>{client.email}</span>
-                        </div>
+                              </div>
                         {client.phone && (
                           <div>
                             <span className={themeClasses.textMuted}>Phone: </span>
                             <span className={themeClasses.textPrimary}>{client.phone}</span>
-                          </div>
+                              </div>
                         )}
                         <div>
                           <span className={themeClasses.textMuted}>Dashboards: </span>
                           <span className={themeClasses.textPrimary}>
                             {client.allowedDashboards?.length || 0} enabled
-                          </span>
-                        </div>
+                              </span>
+                            </div>
                       </div>
                     </div>
-                    <button
+                              <button
                       onClick={() => setExpandedStaffId(
                         expandedStaffId === client.id ? null : client.id
                       )}
                       className="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
+                              >
                       {expandedStaffId === client.id ? 'Hide' : 'Manage'} Access
-                    </button>
+                              </button>
                   </div>
 
                   {expandedStaffId === client.id && (
@@ -4521,13 +4683,13 @@ function JudgeAssignmentsTabContent({
                             </label>
                           );
                         })}
-                      </div>
-                    </div>
-                  )}
+                            </div>
                 </div>
-              ))}
+              )}
             </div>
-          )}
+              ))}
+        </div>
+      )}
         </div>
       </div>
     </div>
@@ -5002,6 +5164,79 @@ function DancersTabContent({ dancers, dancerSearchTerm, setDancerSearchTerm, dan
                 <option value="approved" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>✅ Approved</option>
                 <option value="rejected" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>❌ Rejected</option>
               </select>
+              
+              <button
+                onClick={async () => {
+                  try {
+                    const XLSX = await import('xlsx');
+                    const wb = XLSX.utils.book_new();
+                    
+                    const headers = [
+                      'Name',
+                      'EODSA ID',
+                      'National ID',
+                      'Age',
+                      'Date of Birth',
+                      'Email',
+                      'Phone',
+                      'Guardian Name',
+                      'Guardian Email',
+                      'Guardian Phone',
+                      'Studio Name',
+                      'Studio Email',
+                      'Mastery Level',
+                      'Status',
+                      'Registration Fee Paid',
+                      'Registration Fee Paid At',
+                      'Approved By',
+                      'Approved At',
+                      'Rejection Reason',
+                      'Created At'
+                    ];
+                    
+                    const rows = filteredDancers.map(d => [
+                      d.name || '',
+                      d.eodsaId || '',
+                      d.nationalId || '',
+                      d.age || '',
+                      d.dateOfBirth || '',
+                      d.email || '',
+                      d.phone || '',
+                      d.guardianName || '',
+                      d.guardianEmail || '',
+                      d.guardianPhone || '',
+                      d.studioName || '',
+                      d.studioEmail || '',
+                      (d as any).registrationFeeMasteryLevel || '',
+                      d.approved ? 'Approved' : d.rejectionReason ? 'Rejected' : 'Pending',
+                      d.registrationFeePaid ? 'Yes' : 'No',
+                      d.registrationFeePaidAt || '',
+                      d.approvedByName || '',
+                      d.approvedAt || '',
+                      d.rejectionReason || '',
+                      d.createdAt || ''
+                    ]);
+                    
+                    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                    ws['!cols'] = [
+                      { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 5 }, { wch: 12 },
+                      { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 15 },
+                      { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 },
+                      { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 20 }
+                    ];
+                    
+                    XLSX.utils.book_append_sheet(wb, ws, 'Dancers');
+                    XLSX.writeFile(wb, `dancers-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+                  } catch (error) {
+                    console.error('Export error:', error);
+                    alert('Failed to export. Please try again.');
+                  }
+                }}
+                className={`px-4 py-2 ${theme === 'dark' ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'} text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2`}
+              >
+                <span>📊</span>
+                <span>Export Excel</span>
+              </button>
             </div>
           </div>
         </div>
@@ -5292,6 +5527,53 @@ function StudiosTabContent({ studios, studioSearchTerm, setStudioSearchTerm, stu
                 <option value="approved" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>✅ Approved</option>
                 <option value="rejected" style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}>❌ Rejected</option>
               </select>
+              
+              <button
+                onClick={async () => {
+                  try {
+                    const XLSX = await import('xlsx');
+                    const wb = XLSX.utils.book_new();
+                    
+                    const headers = [
+                      'Studio Name',
+                      'Registration Number',
+                      'Email',
+                      'Status',
+                      'Approved By',
+                      'Approved At',
+                      'Rejection Reason',
+                      'Created At'
+                    ];
+                    
+                    const rows = filteredStudios.map(s => [
+                      s.name || '',
+                      s.registrationNumber || '',
+                      s.email || '',
+                      s.approved ? 'Approved' : s.rejectionReason ? 'Rejected' : 'Pending',
+                      s.approvedByName || '',
+                      s.approvedAt || '',
+                      s.rejectionReason || '',
+                      s.createdAt || ''
+                    ]);
+                    
+                    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                    ws['!cols'] = [
+                      { wch: 30 }, { wch: 20 }, { wch: 25 }, { wch: 12 },
+                      { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 20 }
+                    ];
+                    
+                    XLSX.utils.book_append_sheet(wb, ws, 'Studios');
+                    XLSX.writeFile(wb, `studios-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+                  } catch (error) {
+                    console.error('Export error:', error);
+                    alert('Failed to export. Please try again.');
+                  }
+                }}
+                className={`px-4 py-2 ${theme === 'dark' ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'} text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2`}
+              >
+                <span>📊</span>
+                <span>Export Excel</span>
+              </button>
             </div>
           </div>
         </div>

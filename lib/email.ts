@@ -7,7 +7,7 @@ const EMAIL_CONFIG = {
   secure: false, // true for 465, false for other ports
   auth: {
     user: 'devops@upstreamcreatives.co.za',
-    pass: 'p69t5HKsDSHmqFMPxDsZ'
+    pass: 'ceTWgaQXrDTTCYQuRJg4' // Updated password from test-email.js
   },
   tls: {
     rejectUnauthorized: false // Accept self-signed certificates

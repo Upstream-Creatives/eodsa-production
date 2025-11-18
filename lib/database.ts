@@ -2408,6 +2408,7 @@ export const db = {
                   
                   // Trigger email notifications via API route (fire and forget)
                   if (certData.certificateId) {
+                    console.log(`📧 Triggering email notifications for performance ${performanceId}...`);
                     fetch(`${baseUrl}/api/certificates/notify`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -2420,9 +2421,21 @@ export const db = {
                         percentage: averagePercentage,
                         medallion: medallion
                       })
-                    }).catch((emailError) => {
-                      console.error('Error triggering certificate email notifications:', emailError);
+                    })
+                    .then(async (notifyResponse) => {
+                      if (notifyResponse.ok) {
+                        const notifyData = await notifyResponse.json();
+                        console.log(`✅ Email notification triggered:`, notifyData);
+                      } else {
+                        const errorText = await notifyResponse.text();
+                        console.error(`⚠️ Email notification API returned error:`, errorText);
+                      }
+                    })
+                    .catch((emailError) => {
+                      console.error('❌ Error triggering certificate email notifications:', emailError);
                     });
+                  } else {
+                    console.log(`⚠️ Certificate ID not found in response, skipping email notifications`);
                   }
                 } else {
                   console.error(`⚠️ Failed to generate certificate for performance ${performanceId}:`, await certResponse.text());

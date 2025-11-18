@@ -10,8 +10,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ performanceId: string }> }
 ) {
+  let performanceId: string = 'unknown';
   try {
-    const { performanceId } = await params;
+    const resolvedParams = await params;
+    performanceId = resolvedParams.performanceId || 'unknown';
+
+    if (!performanceId || performanceId === 'unknown') {
+      return NextResponse.json(
+        { error: 'Performance ID is required' },
+        { status: 400 }
+      );
+    }
 
     // Get performance details
     const allPerformances = await db.getAllPerformances();
@@ -19,16 +28,8 @@ export async function GET(
 
     if (!performance) {
       return NextResponse.json(
-        { error: 'Performance not found' },
+        { error: 'Performance not found', performanceId },
         { status: 404 }
-      );
-    }
-
-    // Check if performance is completed
-    if (performance.status !== 'completed') {
-      return NextResponse.json(
-        { error: 'Certificate not available - performance not completed' },
-        { status: 400 }
       );
     }
 
@@ -37,10 +38,17 @@ export async function GET(
 
     if (!scores || scores.length === 0) {
       return NextResponse.json(
-        { error: 'No scores found for this performance' },
+        { 
+          error: 'No scores found for this performance',
+          performanceId,
+          status: performance.status
+        },
         { status: 404 }
       );
     }
+
+    // Allow certificate generation if scores exist, regardless of status
+    // (Some performances may have scores but not be marked as 'completed' yet)
 
     // Calculate average percentage using total judges assigned to event (not just scores submitted)
     const { getTotalJudgesForEvent } = await import('@/lib/database');
@@ -121,13 +129,19 @@ export async function GET(
       title: performance.title,
       medallion: medallion,
       date: formatCertificateDate(event.eventDate),
-      certificateUrl: certificateUrl
+      certificateUrl: certificateUrl,
+      templateUrl: (event as any).certificateTemplateUrl || '/Template.jpg' // Use custom template or default
     });
 
   } catch (error) {
     console.error('Error fetching certificate data:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to fetch certificate data' },
+      { 
+        error: 'Failed to fetch certificate data',
+        details: errorMessage,
+        performanceId
+      },
       { status: 500 }
     );
   }

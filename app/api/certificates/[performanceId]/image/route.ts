@@ -34,23 +34,22 @@ export async function GET(
       );
     }
 
-    // Check if performance is completed
-    if (performance.status !== 'completed') {
-      return NextResponse.json(
-        { error: 'Certificate not available - performance not completed' },
-        { status: 400 }
-      );
-    }
-
     // Get scores for this performance
     const scores = await db.getScoresByPerformance(performanceId);
 
     if (!scores || scores.length === 0) {
       return NextResponse.json(
-        { error: 'No scores found for this performance' },
+        { 
+          error: 'No scores found for this performance',
+          performanceId,
+          status: performance.status
+        },
         { status: 404 }
       );
     }
+
+    // Allow certificate generation if scores exist, regardless of status
+    // (Some performances may have scores but not be marked as 'completed' yet)
 
     // Calculate average percentage using total judges assigned to event (not just scores submitted)
     const { getTotalJudgesForEvent } = await import('@/lib/database');
@@ -112,14 +111,22 @@ export async function GET(
       ? studioName.toUpperCase() 
       : performance.participantNames.join(', ').toUpperCase();
 
+    // Truncate title if too long (max 26 characters to fit on certificate)
+    const MAX_TITLE_LENGTH = 26;
+    let certificateTitle = performance.title.toUpperCase();
+    if (certificateTitle.length > MAX_TITLE_LENGTH) {
+      certificateTitle = certificateTitle.substring(0, MAX_TITLE_LENGTH - 3) + '...';
+    }
+
     // Generate certificate image
     const certificateBuffer = await generateCertificateImage({
       dancerName: displayName,
       percentage: averagePercentage,
       style: performance.itemStyle.toUpperCase(),
-      title: performance.title.toUpperCase(),
+      title: certificateTitle,
       medallion: medallion,
-      date: formatCertificateDate(event.eventDate)
+      date: formatCertificateDate(event.eventDate),
+      templateUrl: (event as any).certificateTemplateUrl // Use custom template if available
     });
 
     // Return image - convert Buffer to Uint8Array for NextResponse

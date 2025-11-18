@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function TestCertificatePage() {
   const [formData, setFormData] = useState({
@@ -10,8 +10,23 @@ export default function TestCertificatePage() {
     title: 'RISING PHOENIX',
     medallion: 'GOLD',
     date: '4 October 2025',
-    email: 'solisangelo882@gmail.com'
+    email: 'solisangelo882@gmail.com',
+    eventId: '' // Optional: event ID for custom template
   });
+  
+  const [events, setEvents] = useState<Array<{id: string; name: string}>>([]);
+  
+  // Fetch events on mount
+  useEffect(() => {
+    fetch('/api/events')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.events) {
+          setEvents(data.events);
+        }
+      })
+      .catch(err => console.error('Error fetching events:', err));
+  }, []);
 
   const [showCertificate, setShowCertificate] = useState(false);
   const [sending, setSending] = useState(false);
@@ -69,6 +84,10 @@ export default function TestCertificatePage() {
       medallion: formData.medallion,
       date: formData.date
     });
+    // Add eventId if provided
+    if (formData.eventId) {
+      params.append('eventId', formData.eventId);
+    }
     return `/api/certificates/test/image?${params.toString()}`;
   };
 
@@ -182,6 +201,26 @@ export default function TestCertificatePage() {
                   className="w-full px-4 py-2 bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-600"
                   placeholder="4 October 2025"
                 />
+              </div>
+
+              {/* Event ID (for custom template) */}
+              <div>
+                <label className="block text-white text-sm font-bold mb-2">
+                  Event ID (Optional - for custom template)
+                </label>
+                <select
+                  value={formData.eventId}
+                  onChange={(e) => handleInputChange('eventId', e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-600"
+                >
+                  <option value="">Use Default Template</option>
+                  {events.map(event => (
+                    <option key={event.id} value={event.id}>{event.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Select an event to use its custom certificate template
+                </p>
               </div>
 
               {/* Action Buttons */}

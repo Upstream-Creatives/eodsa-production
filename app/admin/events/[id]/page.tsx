@@ -131,6 +131,7 @@ function EventParticipantsPage() {
     judged: 0,
     notScored: 0
   });
+  const [entrySearchTerm, setEntrySearchTerm] = useState('');
   const performancesSectionRef = useRef<HTMLDivElement>(null);
   
   const scrollToPerformances = () => {
@@ -171,7 +172,7 @@ function EventParticipantsPage() {
   // Payment status filter (all | paid | pending | unpaid)
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'pending' | 'unpaid'>('all');
 
-  // Filter entries by performance type, entry type, and payment status
+  // Filter entries by performance type, entry type, payment status, and search term
   const filteredEntries = entries.filter(entry => {
     const performanceTypeMatch = performanceTypeFilter === 'all' || 
       getPerformanceType(entry.participantIds).toLowerCase() === performanceTypeFilter;
@@ -181,7 +182,15 @@ function EventParticipantsPage() {
       (paymentFilter === 'paid' && entry.paymentStatus === 'paid') ||
       (paymentFilter === 'pending' && entry.paymentStatus === 'pending') ||
       (paymentFilter === 'unpaid' && (entry.paymentStatus === 'unpaid' || entry.paymentStatus === 'unpaid_invoice'));
-    return performanceTypeMatch && entryTypeMatch && paymentMatch;
+    const searchMatch = !entrySearchTerm || 
+      (entry.itemName && entry.itemName.toLowerCase().includes(entrySearchTerm.toLowerCase())) ||
+      (entry.contestantName && entry.contestantName.toLowerCase().includes(entrySearchTerm.toLowerCase())) ||
+      (entry.eodsaId && entry.eodsaId.toLowerCase().includes(entrySearchTerm.toLowerCase())) ||
+      (entry.itemNumber && entry.itemNumber.toString().includes(entrySearchTerm)) ||
+      (entry.itemStyle && entry.itemStyle.toLowerCase().includes(entrySearchTerm.toLowerCase())) ||
+      (entry.choreographer && entry.choreographer.toLowerCase().includes(entrySearchTerm.toLowerCase())) ||
+      (entry.participantNames && entry.participantNames.some((name: string) => name.toLowerCase().includes(entrySearchTerm.toLowerCase())));
+    return performanceTypeMatch && entryTypeMatch && paymentMatch && searchMatch;
   });
 
   // Filter performances by scoring status
@@ -1497,10 +1506,36 @@ function EventParticipantsPage() {
                 </div>
               </div>
               
-              {/* Integrated Filters */}
+              {/* Search and Filters */}
               {entries.length > 0 && (
-                <div className={`flex flex-wrap items-center gap-3 pt-2 border-t ${themeClasses.cardBorder}`}>
-                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Filters:</span>
+                <div className={`space-y-3 pt-2 border-t ${themeClasses.cardBorder}`}>
+                  {/* Search Input */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <input
+                        type="text"
+                        placeholder="Search by item name, contestant, EODSA ID, item number, style, choreographer, or participant..."
+                        value={entrySearchTerm}
+                        onChange={(e) => setEntrySearchTerm(e.target.value)}
+                        className={`w-full px-4 py-2 pr-10 border ${themeClasses.cardBorder} ${themeClasses.cardBg} rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm ${themeClasses.textPrimary}`}
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <span className={themeClasses.textMuted}>🔍</span>
+                      </div>
+                    </div>
+                    {entrySearchTerm && (
+                      <button
+                        onClick={() => setEntrySearchTerm('')}
+                        className={`px-3 py-2 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'} rounded-lg transition-colors text-sm`}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Filter Buttons */}
+                  <div className={`flex flex-wrap items-center gap-3`}>
+                    <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Filters:</span>
                   
                   {/* Performance Type Filters */}
                   <div className="flex flex-wrap gap-2">
@@ -1638,6 +1673,7 @@ function EventParticipantsPage() {
                       }`}
                     >Unpaid</button>
                   </div>
+                </div>
                 </div>
               )}
             </div>

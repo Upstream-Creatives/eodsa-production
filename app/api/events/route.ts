@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       certificateTemplateUrl: body.certificateTemplateUrl || undefined,
       numberOfJudges: body.numberOfJudges !== undefined ? body.numberOfJudges : 4
     });
-    
+
     // Log the event object returned from DB
     console.log('✅ [Event Creation] Event created:', {
       id: event.id,

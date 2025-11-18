@@ -1641,10 +1641,14 @@ export default function PerformanceTypeEntryPage() {
                         
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Item Name *</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Item Name * 
+                              <span className="text-xs text-gray-400 ml-2">(Max 26 characters for certificate display)</span>
+                            </label>
                             <input
                               type="text"
                               value={solo.itemName}
+                              maxLength={26}
                               onChange={(e) => {
                                 const value = e.target.value;
                                 // Prevent empty strings with just spaces and enforce minimum length
@@ -1656,9 +1660,29 @@ export default function PerformanceTypeEntryPage() {
                                 updateSoloField(index, 'itemName', value);
                               }}
                               placeholder="Name of your performance piece"
-                              className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
+                              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400 ${
+                                solo.itemName.length > 22 
+                                  ? 'border-yellow-500 bg-yellow-900/20' 
+                                  : 'border-gray-600 bg-gray-700'
+                              }`}
                               required
                             />
+                            <div className={`mt-1 text-xs flex justify-between ${
+                              solo.itemName.length > 22 
+                                ? 'text-yellow-400' 
+                                : solo.itemName.length > 20 
+                                ? 'text-yellow-300' 
+                                : 'text-gray-400'
+                            }`}>
+                              <span>
+                                {solo.itemName.length >= 26 
+                                  ? '⚠️ Maximum length reached' 
+                                  : solo.itemName.length > 22 
+                                  ? '⚠️ Approaching limit' 
+                                  : 'Max 26 characters'}
+                              </span>
+                              <span>{solo.itemName.length}/26</span>
+                            </div>
                           </div>
 
                           <div>
@@ -1728,11 +1752,15 @@ export default function PerformanceTypeEntryPage() {
                     // Single performance form for non-solo or non-nationals
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Item Name *</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Item Name * 
+                          <span className="text-xs text-gray-400 ml-2">(Max 26 characters for certificate display)</span>
+                        </label>
                         <input
                           type="text"
                           name="itemName"
                           value={formData.itemName}
+                          maxLength={26}
                           onChange={(e) => {
                             const value = e.target.value;
                             // Prevent empty strings with just spaces and enforce minimum length
@@ -1744,9 +1772,29 @@ export default function PerformanceTypeEntryPage() {
                             setFormData(prev => ({ ...prev, itemName: value }));
                           }}
                           placeholder="Name of your performance piece"
-                          className="w-full px-4 py-3 border border-gray-600 bg-gray-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400"
+                          className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400 ${
+                            formData.itemName.length > 22 
+                              ? 'border-yellow-500 bg-yellow-900/20' 
+                              : 'border-gray-600 bg-gray-700'
+                          }`}
                           required
                         />
+                        <div className={`mt-1 text-xs flex justify-between ${
+                          formData.itemName.length > 22 
+                            ? 'text-yellow-400' 
+                            : formData.itemName.length > 20 
+                            ? 'text-yellow-300' 
+                            : 'text-gray-400'
+                        }`}>
+                          <span>
+                            {formData.itemName.length >= 26 
+                              ? '⚠️ Maximum length reached' 
+                              : formData.itemName.length > 22 
+                              ? '⚠️ Approaching limit' 
+                              : 'Max 26 characters'}
+                          </span>
+                          <span>{formData.itemName.length}/26</span>
+                        </div>
                       </div>
 
                       <div>

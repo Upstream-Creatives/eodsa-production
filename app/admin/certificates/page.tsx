@@ -93,7 +93,7 @@ function AdminCertificatesPageContent() {
 
   useEffect(() => {
     if (viewMode === 'rankings') {
-      applyFilters();
+    applyFilters();
     } else {
       applyCertificateFilters();
     }
@@ -793,9 +793,9 @@ function AdminCertificatesPageContent() {
                 {filteredCertificates.length === 0 ? (
                   <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} ${themeClasses.cardPadding} text-center border ${themeClasses.cardBorder}`}>
                     <p className={themeClasses.textSecondary}>No certificates found matching the selected filters.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredCertificates.map((cert) => (
                   <div key={cert.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                     <img
@@ -840,8 +840,8 @@ function AdminCertificatesPageContent() {
                       </div>
                     </div>
                   </div>
-                    ))}
-                  </div>
+                ))}
+              </div>
                 )}
               </>
             )}

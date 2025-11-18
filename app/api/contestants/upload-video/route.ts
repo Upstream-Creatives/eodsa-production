@@ -4,11 +4,19 @@ import { db } from '@/lib/database';
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { entryId, videoFileUrl, videoFileName, eodsaId } = body;
+    const { entryId, videoFileUrl, videoFileName, videoExternalUrl, videoExternalType, eodsaId } = body;
     
-    if (!entryId || !videoFileUrl || !videoFileName || !eodsaId) {
+    if (!entryId || !eodsaId) {
       return NextResponse.json(
-        { success: false, error: 'Entry ID, video file URL, filename, and EODSA ID are required' },
+        { success: false, error: 'Entry ID and EODSA ID are required' },
+        { status: 400 }
+      );
+    }
+
+    // Must provide either videoExternalUrl (preferred) or videoFileUrl (legacy)
+    if (!videoExternalUrl && !videoFileUrl) {
+      return NextResponse.json(
+        { success: false, error: 'Video URL or video file URL is required' },
         { status: 400 }
       );
     }
@@ -45,18 +53,29 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update the entry with video information
-    await db.updateEventEntry(entryId, {
-      videoFileUrl,
-      videoFileName
-    });
+    // Prefer videoExternalUrl (link) over videoFileUrl (file upload)
+    const updates: any = {};
+    if (videoExternalUrl) {
+      updates.videoExternalUrl = videoExternalUrl;
+      if (videoExternalType) {
+        updates.videoExternalType = videoExternalType;
+      }
+    } else if (videoFileUrl) {
+      // Legacy support for file uploads
+      updates.videoFileUrl = videoFileUrl;
+      if (videoFileName) {
+        updates.videoFileName = videoFileName;
+      }
+    }
+    
+    await db.updateEventEntry(entryId, updates);
     
     return NextResponse.json({
       success: true,
-      message: 'Video uploaded successfully',
+      message: videoExternalUrl ? 'Video link saved successfully' : 'Video uploaded successfully',
       entry: {
         ...entry,
-        videoFileUrl,
-        videoFileName
+        ...updates
       }
     });
     
