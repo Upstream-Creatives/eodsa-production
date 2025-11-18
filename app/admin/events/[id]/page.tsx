@@ -2353,7 +2353,7 @@ function FeeBreakdownComponent({ entry, event }: { entry: EventEntry | null; eve
             masteryLevel: entry.mastery || 'Water (Competitive)',
             performanceType: performanceType,
             participantIds: entry.participantIds || [],
-            soloCount: performanceType === 'Solo' ? soloCount : undefined,
+            soloCount: performanceType === 'Solo' ? undefined : undefined, // Let API calculate solo count
             includeRegistration: true,
             eventId: entry.eventId
           })
