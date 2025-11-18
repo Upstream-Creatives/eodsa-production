@@ -2295,6 +2295,9 @@ function EventParticipantsPage() {
                   </div>
                 </div>
 
+                {/* Fee Breakdown */}
+                <FeeBreakdownComponent entry={entryModal} event={event} />
+
                 <button
                   onClick={() => { setShowEntryModal(false); handlePaymentUpdate(entryModal); }}
                   className={`${themeClasses.buttonBase} ${themeClasses.buttonPrimary}`}
