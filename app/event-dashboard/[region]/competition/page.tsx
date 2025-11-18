@@ -1207,23 +1207,19 @@ export default function CompetitionEntryPage() {
     
     let registrationFee = 0;
     if (participantIds.length > 0) {
-      // CRITICAL: Check if any participant already has an entry in the current session
-      // This handles the case where multiple entries are added before payment
-      // If a participant has ANY entry in the session, they've already been charged registration
-      const participantsWithSessionEntries = new Set<string>();
+      // CRITICAL: Check if any participant already has an entry in the current session or database
+      // Registration fee is charged ONCE per participant per event
+      // If a participant appears in multiple entries, they only pay registration on the first one
+      
+      // Track which participants appear in which entries
+      const participantEntryCount = new Map<string, number>();
       entries.forEach(entry => {
         entry.participantIds.forEach(id => {
-          // Check if this participant appears in any OTHER entry (not just the current one)
-          const hasOtherEntry = entries.some(e => 
-            e.id !== entry.id && e.participantIds.includes(id)
-          );
-          if (hasOtherEntry) {
-            participantsWithSessionEntries.add(id);
-          }
+          participantEntryCount.set(id, (participantEntryCount.get(id) || 0) + 1);
         });
       });
       
-      // Also check existing database entries
+      // Check existing database entries
       const participantsWithDbEntries = new Set<string>();
       existingDbEntries.forEach(dbEntry => {
         let dbParticipantIds: string[] = [];
@@ -1243,10 +1239,16 @@ export default function CompetitionEntryPage() {
         });
       });
       
-      // If any participant has entries (session or DB), they don't need to pay registration again
-      const participantsNeedingRegistration = participantIds.filter(id => 
-        !participantsWithSessionEntries.has(id) && !participantsWithDbEntries.has(id)
-      );
+      // Participants who need registration:
+      // - Appear in only ONE entry in session AND
+      // - Don't have any database entries
+      // All other participants already have entries (session or DB), so registration is waived
+      const participantsNeedingRegistration = participantIds.filter(id => {
+        const sessionEntryCount = participantEntryCount.get(id) || 0;
+        const hasDbEntry = participantsWithDbEntries.has(id);
+        // Need registration if: only 1 entry in session AND no DB entries
+        return sessionEntryCount === 1 && !hasDbEntry;
+      });
       
       if (participantsNeedingRegistration.length === 0) {
         // All participants already have entries - no registration fee
