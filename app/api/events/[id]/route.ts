@@ -89,7 +89,8 @@ export async function PUT(
       'eventDate', 'eventEndDate', 'registrationDeadline', 'venue', 'entryFee', 
       'maxParticipants', 'status', 'registrationFeePerDancer', 'solo1Fee', 'solo2Fee',
       'solo3Fee', 'soloAdditionalFee', 'duoTrioFeePerDancer', 'groupFeePerDancer',
-      'largeGroupFeePerDancer', 'currency', 'participationMode', 'certificateTemplateUrl'
+      'largeGroupFeePerDancer', 'currency', 'participationMode', 'certificateTemplateUrl',
+      'eventType', 'eventMode', 'qualificationRequired', 'qualificationSource', 'minimumQualificationScore', 'numberOfJudges'
     ];
 
     // Filter only allowed fields from the request body
@@ -136,6 +137,12 @@ export async function PUT(
       'largeGroupFeePerDancer': 'large_group_fee_per_dancer',
       'participationMode': 'participation_mode',
       'certificateTemplateUrl': 'certificate_template_url',
+      'eventType': 'event_type',
+      'eventMode': 'event_mode',
+      'qualificationRequired': 'qualification_required',
+      'qualificationSource': 'qualification_source',
+      'minimumQualificationScore': 'minimum_qualification_score',
+      'numberOfJudges': 'number_of_judges',
     };
     
     Object.entries(updateData).forEach(([key, value]) => {
@@ -178,7 +185,13 @@ export async function PUT(
         large_group_fee_per_dancer = COALESCE(${updates.large_group_fee_per_dancer !== undefined ? updates.large_group_fee_per_dancer : null}, large_group_fee_per_dancer),
         currency = COALESCE(${updates.currency !== undefined ? updates.currency : null}, currency),
         participation_mode = COALESCE(${updates.participation_mode !== undefined ? updates.participation_mode : null}, participation_mode),
-        certificate_template_url = COALESCE(${updates.certificate_template_url !== undefined ? updates.certificate_template_url : null}, certificate_template_url)
+        certificate_template_url = COALESCE(${updates.certificate_template_url !== undefined ? updates.certificate_template_url : null}, certificate_template_url),
+        event_type = COALESCE(${updates.event_type !== undefined ? updates.event_type : null}, event_type),
+        event_mode = COALESCE(${updates.event_mode !== undefined ? updates.event_mode : null}, event_mode),
+        qualification_required = COALESCE(${updates.qualification_required !== undefined ? updates.qualification_required : null}, qualification_required),
+        qualification_source = COALESCE(${updates.qualification_source !== undefined ? updates.qualification_source : null}, qualification_source),
+        minimum_qualification_score = COALESCE(${updates.minimum_qualification_score !== undefined ? updates.minimum_qualification_score : null}, minimum_qualification_score),
+        number_of_judges = COALESCE(${updates.number_of_judges !== undefined ? updates.number_of_judges : null}, number_of_judges)
       WHERE id = ${eventId}
       RETURNING *
     `;

@@ -109,8 +109,8 @@ export async function GET(request: NextRequest) {
           },
           color: 'white',
           gravity: 'north',
-          x: Math.floor((77.5 - 50) * 9), // styleLeft: 77.5 (matches original)
-          y: Math.floor(67 * 13) // styleTop: 67 (matches original)
+          x: Math.floor((62.5 - 50) * 9), // styleLeft: 62.5 (matches certificate-image-generator.ts - the working cert)
+          y: Math.floor(67.5 * 13) // styleTop: 67.5 (matches certificate-image-generator.ts)
         },
         {
           overlay: {
@@ -121,8 +121,8 @@ export async function GET(request: NextRequest) {
           },
           color: 'white',
           gravity: 'north',
-          x: Math.floor((74 - 50) * 9), // titleLeft: 74 (matches original)
-          y: Math.floor(74 * 13) // titleTop: 74 (matches original)
+          x: Math.floor((60 - 50) * 9), // titleLeft: 60 (matches certificate-image-generator.ts - the working cert)
+          y: Math.floor(74 * 13) // titleTop: 74 (matches certificate-image-generator.ts)
         },
         {
           overlay: {
@@ -133,8 +133,8 @@ export async function GET(request: NextRequest) {
           },
           color: 'white',
           gravity: 'north',
-          x: Math.floor((72 - 50) * 9), // medallionLeft: 72 (matches original)
-          y: Math.floor(80.5 * 13) // medallionTop: 80.5 (matches original)
+          x: Math.floor((65.5 - 50) * 9), // medallionLeft: 65.5 (matches certificate-image-generator.ts - the working cert)
+          y: Math.floor(80.5 * 13) // medallionTop: 80.5 (matches certificate-image-generator.ts)
         },
         {
           overlay: {
@@ -144,8 +144,8 @@ export async function GET(request: NextRequest) {
           },
           color: 'white',
           gravity: 'north',
-          x: Math.floor((66.5 - 50) * 9), // dateLeft: 66.5 (matches original)
-          y: Math.floor(88 * 13) // dateTop: 88 (moved up from 90, ~1.5 inches)
+          x: Math.floor((52 - 50) * 9), // dateLeft: 52 (matches certificate-image-generator.ts - the working cert)
+          y: Math.floor(88 * 13) // dateTop: 88 (matches certificate-image-generator.ts)
         }
       ],
       format: 'jpg',

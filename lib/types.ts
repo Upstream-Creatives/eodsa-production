@@ -94,6 +94,12 @@ export interface Event {
   certificateTemplateUrl?: string;
   // NEW: Number of judges for this event
   numberOfJudges?: number;
+  // NEW: Event Types & Qualification System
+  eventType?: 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT';
+  eventMode?: 'LIVE' | 'VIRTUAL' | 'HYBRID';
+  qualificationRequired?: boolean;
+  qualificationSource?: 'NONE' | 'REGIONAL' | 'ANY_NATIONAL_LEVEL' | 'MANUAL' | 'CUSTOM' | null;
+  minimumQualificationScore?: number | null;
 }
 
 export interface EventEntry {

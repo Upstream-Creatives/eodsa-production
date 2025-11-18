@@ -62,9 +62,9 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
       }
     } else {
       // Use default local template
-      const templatePath = path.join(process.cwd(), 'public', 'Template.jpg');
-      if (!fs.existsSync(templatePath)) {
-        throw new Error('Certificate template not found');
+    const templatePath = path.join(process.cwd(), 'public', 'Template.jpg');
+    if (!fs.existsSync(templatePath)) {
+      throw new Error('Certificate template not found');
       }
       templateBuffer = fs.readFileSync(templatePath);
     }

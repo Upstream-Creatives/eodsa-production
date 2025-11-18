@@ -110,8 +110,13 @@ export async function POST(request: Request) {
       currency: body.currency || 'ZAR',
       participationMode: body.participationMode || 'hybrid',
       certificateTemplateUrl: body.certificateTemplateUrl || undefined,
-      numberOfJudges: body.numberOfJudges !== undefined ? body.numberOfJudges : 4
-    });
+      numberOfJudges: body.numberOfJudges !== undefined ? body.numberOfJudges : 4,
+      eventType: body.eventType || 'REGIONAL_EVENT',
+      eventMode: body.eventMode || 'HYBRID',
+      qualificationRequired: body.qualificationRequired ?? false,
+      qualificationSource: body.qualificationSource || null,
+      minimumQualificationScore: body.minimumQualificationScore || null
+    } as any);
 
     // Log the event object returned from DB
     console.log('✅ [Event Creation] Event created:', {

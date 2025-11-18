@@ -24,7 +24,7 @@ export default function CertificatePage() {
     const fetchCertificateData = async () => {
       try {
         const response = await fetch(`/api/certificates/${performanceId}`);
-        
+
         // Check if response is ok before parsing JSON
         if (!response.ok) {
           let errorMessage = 'Failed to load certificate';
