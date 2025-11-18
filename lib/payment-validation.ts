@@ -148,10 +148,44 @@ export async function validateBatchEntryFees(
           registrationChargedTracker.set(soloEodsaId, registrationCharged);
         }
 
-        // Calculate solo fee based on solo number
-        const soloNumber = existingSoloCount + 1;
-        const { calculateSoloEntryFee } = await import('./pricing-utils');
-        const entryFee = calculateSoloEntryFee(soloNumber, eventConfig);
+        // Calculate solo fee using CUMULATIVE PACKAGE PRICING (same logic as calculateSmartEODSAFee)
+        // solo1Fee, solo2Fee, solo3Fee are CUMULATIVE package totals, not individual fees
+        const solo1Package = eventConfig.solo1Fee || 550;
+        const solo2Package = eventConfig.solo2Fee || 942;
+        const solo3Package = eventConfig.solo3Fee || 1256;
+        const additionalSoloFee = eventConfig.soloAdditionalFee || 349;
+        
+        // Calculate previous package total (what they should have paid for existing solos)
+        let previousPackageTotal = 0;
+        if (existingSoloCount === 0) {
+          previousPackageTotal = 0;
+        } else if (existingSoloCount === 1) {
+          previousPackageTotal = solo1Package;
+        } else if (existingSoloCount === 2) {
+          previousPackageTotal = solo2Package;
+        } else if (existingSoloCount === 3) {
+          previousPackageTotal = solo3Package;
+        } else {
+          // 4+ solos: 3-solo package + additional solos
+          previousPackageTotal = solo3Package + ((existingSoloCount - 3) * additionalSoloFee);
+        }
+        
+        // Calculate new package total (what they should pay for new total count)
+        const newTotalSoloCount = existingSoloCount + 1;
+        let newPackageTotal = 0;
+        if (newTotalSoloCount === 1) {
+          newPackageTotal = solo1Package;
+        } else if (newTotalSoloCount === 2) {
+          newPackageTotal = solo2Package;
+        } else if (newTotalSoloCount === 3) {
+          newPackageTotal = solo3Package;
+        } else {
+          // 4+ solos: 3-solo package + additional solos
+          newPackageTotal = solo3Package + ((newTotalSoloCount - 3) * additionalSoloFee);
+        }
+        
+        // Entry fee is the INCREMENTAL difference (new package - previous package)
+        const entryFee = Math.max(0, newPackageTotal - previousPackageTotal);
         
         // Registration fee: only charge if not already charged AND this is the first solo for this dancer in this batch
         const isFirstSoloInBatch = (soloCountTracker.get(soloEodsaId) || 0) === 0;
