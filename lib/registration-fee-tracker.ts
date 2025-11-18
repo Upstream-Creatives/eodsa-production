@@ -295,34 +295,57 @@ export const calculateSmartEODSAFee = async (
     
     // Check if registration was already assigned (has ANY entry in this event, paid or unpaid)
     // This includes checking other entry types too, not just solos
-    const registrationAlreadyAssigned = existingSoloEntries.length > 0 || 
-      await (async () => {
-        let anyEntry: any[] = [];
-        if (dancerEodsaId) {
-          anyEntry = await sqlClient`
-            SELECT COUNT(*) as count FROM event_entries
-            WHERE event_id = ${options.eventId}
-            AND (
-              eodsa_id = ${dancerEodsaId}
-              OR contestant_id = ${participantId}
-              OR (participant_ids::jsonb ? ${participantId})
-              OR (participant_ids::jsonb ? ${dancerEodsaId})
-            )
-            LIMIT 1
-          ` as any[];
-        } else {
-          anyEntry = await sqlClient`
-            SELECT COUNT(*) as count FROM event_entries
-            WHERE event_id = ${options.eventId}
-            AND (
-              contestant_id = ${participantId}
-              OR (participant_ids::jsonb ? ${participantId})
-            )
-            LIMIT 1
-          ` as any[];
+    // Use same comprehensive matching logic as solo check to avoid ID matching issues
+    let registrationAlreadyAssigned = existingSoloEntries.length > 0;
+    
+    if (!registrationAlreadyAssigned) {
+      // Get ALL entries (all performance types) for event, then filter client-side
+      // This ensures we use the same comprehensive ID matching logic
+      const allEntriesInEvent = await sqlClient`
+        SELECT id, participant_ids, eodsa_id, contestant_id, payment_status, performance_type
+        FROM event_entries
+        WHERE event_id = ${options.eventId}
+        ORDER BY submitted_at ASC
+      ` as any[];
+      
+      // Filter entries that match the dancer using same logic as solo check
+      for (const entry of allEntriesInEvent) {
+        const entryEodsaId = entry.eodsa_id;
+        const entryContestantId = entry.contestant_id;
+        let entryParticipantIds: string[] = [];
+        
+        try {
+          if (typeof entry.participant_ids === 'string') {
+            entryParticipantIds = JSON.parse(entry.participant_ids);
+          } else if (Array.isArray(entry.participant_ids)) {
+            entryParticipantIds = entry.participant_ids;
+          }
+        } catch (e) {
+          // Ignore parse errors
         }
-        return anyEntry && anyEntry[0] && anyEntry[0].count > 0;
-      })();
+        
+        // Match if:
+        // 1. contestant_id matches any internal ID
+        // 2. eodsa_id matches dancer's EODSA ID
+        // 3. participant_ids array contains any internal ID or EODSA ID
+        const matchesContestantId = allInternalIds.includes(entryContestantId);
+        const matchesEodsaId = dancerEodsaId && entryEodsaId === dancerEodsaId;
+        const matchesParticipantIds = allInternalIds.some(id => entryParticipantIds.includes(id)) ||
+                                      (dancerEodsaId && entryParticipantIds.includes(dancerEodsaId));
+        
+        if (matchesContestantId || matchesEodsaId || matchesParticipantIds) {
+          registrationAlreadyAssigned = true;
+          console.log(`✅ Registration fee already assigned - found matching ${entry.performance_type} entry: ${entry.id}`);
+          break; // Found a match, no need to check further
+        }
+      }
+      
+      if (!registrationAlreadyAssigned) {
+        console.log(`💰 Registration fee will be charged - no existing entries found for this dancer in this event`);
+      }
+    } else {
+      console.log(`✅ Registration fee already assigned - found ${existingSoloEntries.length} existing solo entry/entries`);
+    }
     
     // Calculate what package total they should have been charged for existing solos
     // This is based on the solo count, not what they actually paid
