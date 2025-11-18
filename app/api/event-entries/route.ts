@@ -378,11 +378,26 @@ export async function POST(request: NextRequest) {
         console.warn(`⚠️ Fee correction applied: submitted R${body.calculatedFee}, corrected to R${validatedFee}`);
       }
     } else {
+      // Get event config for event-specific fees (event already fetched above)
+      const eventConfig = event ? {
+        registrationFeePerDancer: event.registrationFeePerDancer,
+        solo1Fee: event.solo1Fee,
+        solo2Fee: event.solo2Fee,
+        solo3Fee: event.solo3Fee,
+        soloAdditionalFee: event.soloAdditionalFee,
+        duoTrioFeePerDancer: event.duoTrioFeePerDancer,
+        groupFeePerDancer: event.groupFeePerDancer,
+        largeGroupFeePerDancer: event.largeGroupFeePerDancer,
+        currency: event.currency
+      } : undefined;
+      
       // For non-solo entries, validate using the utility function
       const feeValidation = validateAndCorrectEntryFee(
         performanceType,
         participantCount,
-        body.calculatedFee
+        body.calculatedFee,
+        0, // existingSoloCount not applicable for non-solo
+        eventConfig
       );
       
       if (!feeValidation.wasCorrect) {
