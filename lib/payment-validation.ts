@@ -204,7 +204,7 @@ export async function validateBatchEntryFees(
           registrationCharged: !registrationCharged && registrationFee > 0,
           registrationWasAlreadyCharged: registrationCharged,
           entryCount: existingSoloCount,
-          breakdown: `Solo entry #${soloNumber}: ${eventConfig.currency}${entryFee}${registrationFee > 0 ? ` + Registration: ${eventConfig.currency}${registrationFee}` : ' (Registration already charged)'}`,
+          breakdown: `Solo Package (${newTotalSoloCount} solos total): ${eventConfig.currency}${newPackageTotal} - Previous: ${eventConfig.currency}${previousPackageTotal} = ${eventConfig.currency}${entryFee}${registrationFee > 0 ? ` + Registration: ${eventConfig.currency}${registrationFee}` : ' (Registration already charged)'}`,
           warnings: []
         };
       } else {
