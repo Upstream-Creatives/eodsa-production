@@ -1207,45 +1207,92 @@ export default function CompetitionEntryPage() {
     
     let registrationFee = 0;
     if (participantIds.length > 0) {
-      // Check if we have cached the result
-      if (registrationFeeCache[cacheKey] !== undefined) {
-        registrationFee = registrationFeeCache[cacheKey];
-      } else {
-        try {
-          // Use the first entry's mastery level (they should all be the same for Nationals)
-          const masteryLevel = entries.length > 0 ? entries[0].mastery : 'Fire (Advanced)';
-          
-          // Call API to get smart fee calculation with registration checking
-          // Use 'Solo' as performance type since we're only calculating registration fees
-          const response = await fetch('/api/eodsa-fees', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              masteryLevel,
-              performanceType: 'Solo', // Use Solo to trigger registration fee logic
-              participantIds: Array.from(participantIds),
-              includeRegistration: true,
-              eventId: eventId // Pass eventId to get event-specific fees
-            })
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            registrationFee = data.fees.registrationFee;
-          } else {
-            throw new Error('API call failed');
+      // CRITICAL: Check if any participant already has an entry in the current session
+      // This handles the case where multiple entries are added before payment
+      // If a participant has ANY entry in the session, they've already been charged registration
+      const participantsWithSessionEntries = new Set<string>();
+      entries.forEach(entry => {
+        entry.participantIds.forEach(id => {
+          // Check if this participant appears in any OTHER entry (not just the current one)
+          const hasOtherEntry = entries.some(e => 
+            e.id !== entry.id && e.participantIds.includes(id)
+          );
+          if (hasOtherEntry) {
+            participantsWithSessionEntries.add(id);
           }
-          
-          // Cache the result
-          setRegistrationFeeCache(prev => ({
-            ...prev,
-            [cacheKey]: registrationFee
-          }));
-        } catch (error) {
-          console.error('Error checking registration status:', error);
-          // Fallback to charging all participants using event configuration
-          const regFeePerDancer = event?.registrationFeePerDancer || 300;
-          registrationFee = uniqueParticipants.size * regFeePerDancer;
+        });
+      });
+      
+      // Also check existing database entries
+      const participantsWithDbEntries = new Set<string>();
+      existingDbEntries.forEach(dbEntry => {
+        let dbParticipantIds: string[] = [];
+        if (Array.isArray(dbEntry.participantIds)) {
+          dbParticipantIds = dbEntry.participantIds;
+        } else if (typeof dbEntry.participantIds === 'string') {
+          try {
+            dbParticipantIds = JSON.parse(dbEntry.participantIds);
+          } catch {
+            dbParticipantIds = [dbEntry.participantIds];
+          }
+        }
+        dbParticipantIds.forEach(id => {
+          if (participantIds.includes(id)) {
+            participantsWithDbEntries.add(id);
+          }
+        });
+      });
+      
+      // If any participant has entries (session or DB), they don't need to pay registration again
+      const participantsNeedingRegistration = participantIds.filter(id => 
+        !participantsWithSessionEntries.has(id) && !participantsWithDbEntries.has(id)
+      );
+      
+      if (participantsNeedingRegistration.length === 0) {
+        // All participants already have entries - no registration fee
+        registrationFee = 0;
+        console.log('✅ Registration fee waived - all participants already have entries in session or database');
+      } else {
+        // Some participants need registration - check cache or call API
+        if (registrationFeeCache[cacheKey] !== undefined) {
+          registrationFee = registrationFeeCache[cacheKey];
+        } else {
+          try {
+            // Use the first entry's mastery level (they should all be the same for Nationals)
+            const masteryLevel = entries.length > 0 ? entries[0].mastery : 'Fire (Advanced)';
+            
+            // Call API to get smart fee calculation with registration checking
+            // Use 'Solo' as performance type since we're only calculating registration fees
+            const response = await fetch('/api/eodsa-fees', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                masteryLevel,
+                performanceType: 'Solo', // Use Solo to trigger registration fee logic
+                participantIds: participantsNeedingRegistration, // Only check participants who need registration
+                includeRegistration: true,
+                eventId: eventId // Pass eventId to get event-specific fees
+              })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              registrationFee = data.fees.registrationFee;
+            } else {
+              throw new Error('API call failed');
+            }
+            
+            // Cache the result
+            setRegistrationFeeCache(prev => ({
+              ...prev,
+              [cacheKey]: registrationFee
+            }));
+          } catch (error) {
+            console.error('Error checking registration status:', error);
+            // Fallback: charge only participants who need registration
+            const regFeePerDancer = event?.registrationFeePerDancer || 300;
+            registrationFee = participantsNeedingRegistration.length * regFeePerDancer;
+          }
         }
       }
     }
