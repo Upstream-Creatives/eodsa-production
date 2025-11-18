@@ -175,7 +175,7 @@ function AdminDashboard() {
   const [studios, setStudios] = useState<Studio[]>([]);
   const [studioApplications, setStudioApplications] = useState<StudioApplication[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'dancers' | 'studios' | 'music-tracking' | 'assignments'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking' | 'assignments'>('events');
   const [isLoading, setIsLoading] = useState(true);
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
@@ -720,7 +720,13 @@ function AdminDashboard() {
       // Event configuration
       participationMode: (event as any).participationMode || 'hybrid',
       numberOfJudges: currentJudgeCount,
-      certificateTemplateUrl: (event as any).certificateTemplateUrl
+      certificateTemplateUrl: (event as any).certificateTemplateUrl,
+      // Event Types & Qualification System
+      eventType: (event as any).eventType || 'REGIONAL_EVENT',
+      eventMode: (event as any).eventMode || 'HYBRID',
+      qualificationRequired: (event as any).qualificationRequired !== undefined ? (event as any).qualificationRequired : false,
+      qualificationSource: (event as any).qualificationSource !== undefined ? (event as any).qualificationSource : null,
+      minimumQualificationScore: (event as any).minimumQualificationScore !== undefined ? (event as any).minimumQualificationScore : null
     });
     setEditCertificateTemplateFile(null);
     setUpdateEventMessage('');
@@ -1945,6 +1951,7 @@ function AdminDashboard() {
               { id: 'assignments', label: 'Assignments', icon: '⚖️', color: 'amber' },
               { id: 'dancers', label: 'Dancers', icon: '💃', color: 'rose' },
               { id: 'studios', label: 'Studios', icon: '🏢', color: 'orange' },
+              { id: 'sound-tech', label: 'Sound Tech', icon: '🎵', color: 'violet' },
               { id: 'music-tracking', label: 'Media Upload Tracking', icon: '🎼', color: 'cyan' }
             ].map((tab) => (
                 tab.link ? (
@@ -2021,6 +2028,115 @@ function AdminDashboard() {
             theme={theme}
             themeClasses={themeClasses}
           />
+        )}
+
+
+        {/* Sound Tech Tab */}
+        {activeTab === 'sound-tech' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-b ${themeClasses.cardBorder}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">🎵</span>
+                    </div>
+                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Sound Tech Dashboard</h2>
+                  </div>
+                  <button
+                    onClick={() => window.open('/admin/sound-tech', '_blank')}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-all duration-200 font-medium"
+                  >
+                    Open Full Dashboard
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-green-900/40 to-emerald-900/40 border-green-700' : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'} rounded-xl p-6 border`}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-green-800' : 'bg-green-100'} rounded-lg flex items-center justify-center`}>
+                        <span className="text-green-600 text-lg">🎵</span>
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Live Performances</p>
+                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Coming Soon</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-blue-900/40 to-cyan-900/40 border-blue-700' : 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200'} rounded-xl p-6 border`}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-blue-800' : 'bg-blue-100'} rounded-lg flex items-center justify-center`}>
+                        <span className="text-blue-600 text-lg">📹</span>
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Virtual Performances</p>
+                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Coming Soon</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-purple-700' : 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200'} rounded-xl p-6 border`}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-purple-800' : 'bg-purple-100'} rounded-lg flex items-center justify-center`}>
+                        <span className="text-purple-600 text-lg">⬇️</span>
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Music Downloads</p>
+                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Available</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`${theme === 'dark' ? 'bg-blue-900/40 border-blue-700' : 'bg-blue-50 border-blue-200'} rounded-xl p-6 border`}>
+                  <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-blue-200' : 'text-blue-900'} mb-3 flex items-center`}>
+                    <span className="mr-2">🎵</span>
+                    Sound Tech Features
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Access all uploaded music files</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Play music with full controls</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Download individual or all music files</span>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Filter by event and performance type</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>View performance details and item numbers</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-500">✅</span>
+                        <span className={`text-sm ${themeClasses.textSecondary}`}>Access virtual performance video links</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`mt-6 p-4 ${theme === 'dark' ? 'bg-blue-800/20 border-blue-600' : 'bg-white border-blue-300'} rounded-lg border`}>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
+                      <strong>For Sound Techs:</strong> Use the full dashboard to access all music files, organize by performance order, 
+                      and prepare audio for live events. Download all music files at once for offline preparation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Music Upload Tracking Tab */}
