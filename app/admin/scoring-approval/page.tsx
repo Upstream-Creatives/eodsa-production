@@ -122,6 +122,41 @@ function ScoringApprovalPageContent() {
     }
   };
 
+  const regenerateCertificate = async (performanceId: string, performanceTitle: string) => {
+    if (processingPublish.has(performanceId)) return;
+
+    setProcessingPublish(prev => new Set(prev).add(performanceId));
+
+    try {
+      const response = await fetch('/api/certificates/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          performanceId,
+          forceRegenerate: true
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        success(`Certificate for "${performanceTitle}" regenerated successfully!`);
+        await fetchApprovals(); // Refresh the list
+      } else {
+        error(data.error || 'Failed to regenerate certificate');
+      }
+    } catch (err) {
+      console.error('Error regenerating certificate:', err);
+      error('Failed to regenerate certificate');
+    } finally {
+      setProcessingPublish(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(performanceId);
+        return newSet;
+      });
+    }
+  };
+
   const openDetails = (approval: PerformanceApproval) => {
     setSelectedApproval(approval);
     setShowDetails(true);
@@ -368,13 +403,13 @@ function ScoringApprovalPageContent() {
                       </div>
 
                       {/* Judge Scores Summary */}
-                      <div className="bg-gray-50 rounded-lg p-3 mb-2">
-                        <p className="text-xs font-semibold text-gray-700 mb-2">Judge Scores:</p>
+                      <div className="bg-gray-100 rounded-lg p-3 mb-2 border border-gray-200">
+                        <p className="text-xs font-semibold text-gray-900 mb-2">Judge Scores:</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {approval.judgeScores.map((js) => (
-                            <div key={js.judgeId} className="bg-white rounded p-2 text-center">
-                              <div className="font-bold text-indigo-600 text-lg">{js.total}/100</div>
-                              <div className="text-gray-600 text-xs truncate">{js.judgeName}</div>
+                            <div key={js.judgeId} className="bg-white rounded p-2 text-center border border-gray-200 shadow-sm">
+                              <div className="font-bold text-indigo-700 text-lg">{js.total}/100</div>
+                              <div className="text-gray-800 text-xs truncate font-medium">{js.judgeName}</div>
                             </div>
                           ))}
                         </div>
@@ -398,16 +433,26 @@ function ScoringApprovalPageContent() {
                           {processingPublish.has(approval.performanceId) ? 'Publishing...' : '✅ Publish Scores'}
                         </button>
                       )}
+                      {approval.scoresPublished && (
+                        <button
+                          onClick={() => regenerateCertificate(approval.performanceId, approval.performanceTitle)}
+                          disabled={processingPublish.has(approval.performanceId)}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+                          title="Regenerate certificate (useful if template was uploaded after publishing)"
+                        >
+                          {processingPublish.has(approval.performanceId) ? 'Regenerating...' : '🔄 Regenerate Cert'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-8 text-center">
+            <div className="p-8 text-center bg-white">
               <span className="text-4xl mb-4 block">🎭</span>
-              <p className="text-black">No performances found for the selected filter</p>
-              <p className="text-sm text-gray-600 mt-2">Performances appear here when all assigned judges have submitted their scores</p>
+              <p className="text-gray-900 font-medium">No performances found for the selected filter</p>
+              <p className="text-sm text-gray-700 mt-2">Performances appear here when all assigned judges have submitted their scores</p>
             </div>
           )}
         </div>
@@ -536,7 +581,7 @@ function ScoringApprovalPageContent() {
                 ))}
               </div>
 
-              {/* Publish Button */}
+              {/* Publish/Regenerate Button */}
               {!selectedApproval.scoresPublished && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <button
@@ -548,6 +593,21 @@ function ScoringApprovalPageContent() {
                   </button>
                   <p className="text-xs text-gray-600 text-center mt-2">
                     Once published, scores will be visible to contestants and teachers. You can still edit individual judge scores after publishing.
+                  </p>
+                </div>
+              )}
+              {selectedApproval.scoresPublished && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => regenerateCertificate(selectedApproval.performanceId, selectedApproval.performanceTitle)}
+                    disabled={processingPublish.has(selectedApproval.performanceId)}
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors disabled:opacity-50"
+                    title="Regenerate certificate (useful if template was uploaded after publishing)"
+                  >
+                    {processingPublish.has(selectedApproval.performanceId) ? 'Regenerating...' : '🔄 Regenerate Certificate'}
+                  </button>
+                  <p className="text-xs text-gray-600 text-center mt-2">
+                    Regenerate certificate for this performance. Useful if the template was uploaded after scores were published.
                   </p>
                 </div>
               )}

@@ -83,7 +83,7 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
       percentageTop: 65.5,
       percentageLeft: 15.5,
       percentageFontSize: 76,
-      styleTop: 67.5,
+      styleTop: 68.5, // Adjusted up from 69.5
       styleLeft: 62.5,
       styleFontSize: 26, // Standardized to 26px
       titleTop: 74,
@@ -92,7 +92,7 @@ export async function generateCertificateImage(data: CertificateImageData): Prom
       medallionTop: 80.5,
       medallionLeft: 65.5,
       medallionFontSize: 26, // Standardized to 26px
-      dateTop: 88, // Moved up from 90.5 to align better with date line
+      dateTop: 89, // Adjusted up from 90
       dateLeft: 52,
       dateFontSize: 39,
     };

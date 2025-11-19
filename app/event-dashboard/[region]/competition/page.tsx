@@ -2801,7 +2801,7 @@ export default function CompetitionEntryPage() {
 
             {/* Action Buttons */}
             <div className="flex space-x-3">
-              {isStudioMode ? (
+              {isStudioMode && studioId ? (
                 <>
                   <button
                     onClick={() => {
@@ -2815,7 +2815,13 @@ export default function CompetitionEntryPage() {
                     Enter More Events
                   </button>
                   <button
-                    onClick={() => router.push(`/studio-dashboard?studioId=${studioId}`)}
+                    onClick={() => {
+                      if (studioId) {
+                        router.push(`/studio-dashboard?studioId=${studioId}`);
+                      } else {
+                        router.push('/');
+                      }
+                    }}
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
                   >
                     Studio Dashboard

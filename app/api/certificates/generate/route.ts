@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     const percentageLeft = pos?.percentage_left || 15.5;
     const percentageFontSize = pos?.percentage_font_size || 76;
     // For style, title, and medallion - use standardized font size (26px) to ensure text always fits
-    const styleTop = pos?.style_top || 67;
+    const styleTop = pos?.style_top || 68.5; // Adjusted up from 69.5
     const styleLeft = pos?.style_left || 77.5;
     const styleFontSize = pos?.style_font_size || 26; // Standardized to 26px
     const titleTop = pos?.title_top || 74;
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const medallionTop = pos?.medallion_top || 80.5;
     const medallionLeft = pos?.medallion_left || 72;
     const medallionFontSize = pos?.medallion_font_size || 26; // Standardized to 26px
-    const dateTop = pos?.date_top || 88; // Moved up from 90 to align better with date line
+    const dateTop = pos?.date_top || 89; // Adjusted up from 90
     const dateLeft = pos?.date_left || 66.5;
     const dateFontSize = pos?.date_font_size || 39;
 

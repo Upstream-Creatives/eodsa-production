@@ -1379,7 +1379,7 @@ export default function PerformanceTypeEntryPage() {
             <p className="text-blue-200 text-sm">Check your email for Yoco card payment link or EFT details</p>
           </div>
           <div className="space-y-3">
-            {isStudioMode ? (
+            {isStudioMode && studioId ? (
               <>
                 <Link 
                   href={`/studio-dashboard?studioId=${studioId}`}
