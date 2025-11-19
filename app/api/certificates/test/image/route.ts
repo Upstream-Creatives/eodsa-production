@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
           color: 'white',
           gravity: 'north',
           x: Math.floor((77.5 - 50) * 9), // styleLeft: 77.5 (matches original)
-          y: Math.floor(67 * 13) // styleTop: 67 (matches original)
+          y: Math.floor(68.5 * 13) // styleTop: 68.5 (adjusted up from 69.5)
         },
         {
           overlay: {
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
           color: 'white',
           gravity: 'north',
           x: Math.floor((66.5 - 50) * 9), // dateLeft: 66.5 (matches original)
-          y: Math.floor(88 * 13) // dateTop: 88 (moved up from 90, ~1.5 inches)
+          y: Math.floor(89 * 13) // dateTop: 89 (adjusted up from 90)
         }
       ],
       format: 'jpg',

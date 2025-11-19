@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/simple-toast';
 import { useAlert } from '@/components/ui/custom-alert';
 import { ThemeProvider, useTheme, getThemeClasses } from '@/components/providers/ThemeProvider';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import MusicUpload from '@/components/MusicUpload';
 
 interface Event {
   id: string;
@@ -174,7 +175,7 @@ function AdminDashboard() {
   const [studios, setStudios] = useState<Studio[]>([]);
   const [studioApplications, setStudioApplications] = useState<StudioApplication[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'dancers' | 'studios' | 'sound-tech' | 'music-tracking' | 'assignments'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'dancers' | 'studios' | 'music-tracking' | 'assignments'>('events');
   const [isLoading, setIsLoading] = useState(true);
   const { success, error, warning, info } = useToast();
   const { showAlert, showConfirm, showPrompt } = useAlert();
@@ -198,7 +199,13 @@ function AdminDashboard() {
     largeGroupFeePerDancer: 0,
     participationMode: 'hybrid' as 'live' | 'virtual' | 'hybrid',
     numberOfJudges: 4, // Default to 4 judges
-    certificateTemplateUrl: '' as string | undefined
+    certificateTemplateUrl: '' as string | undefined,
+    // Event Types & Qualification System
+    eventType: 'REGIONAL_EVENT' as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT',
+    eventMode: 'HYBRID' as 'LIVE' | 'VIRTUAL' | 'HYBRID',
+    qualificationRequired: false,
+    qualificationSource: null as 'NONE' | 'REGIONAL' | 'ANY_NATIONAL_LEVEL' | 'MANUAL' | 'CUSTOM' | null,
+    minimumQualificationScore: null as number | null
   });
   const [certificateTemplateFile, setCertificateTemplateFile] = useState<File | null>(null);
   const [isUploadingCertificate, setIsUploadingCertificate] = useState(false);
@@ -297,7 +304,13 @@ function AdminDashboard() {
     // Event configuration fields
     participationMode: 'hybrid' as 'live' | 'virtual' | 'hybrid',
     numberOfJudges: 4,
-    certificateTemplateUrl: undefined as string | undefined
+    certificateTemplateUrl: undefined as string | undefined,
+    // Event Types & Qualification System
+    eventType: 'REGIONAL_EVENT' as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT',
+    eventMode: 'HYBRID' as 'LIVE' | 'VIRTUAL' | 'HYBRID',
+    qualificationRequired: false,
+    qualificationSource: null as 'NONE' | 'REGIONAL' | 'ANY_NATIONAL_LEVEL' | 'MANUAL' | 'CUSTOM' | null,
+    minimumQualificationScore: null as number | null
   });
   const [editCertificateTemplateFile, setEditCertificateTemplateFile] = useState<File | null>(null);
   const [isUploadingEditCertificate, setIsUploadingEditCertificate] = useState(false);
@@ -330,6 +343,16 @@ function AdminDashboard() {
     
     fetchData();
   }, [router]);
+
+  // Auto-refresh music tracking data when tab is opened
+  useEffect(() => {
+    if (activeTab === 'music-tracking') {
+      const eventId = selectedMusicTrackingEventId === 'all' ? undefined : selectedMusicTrackingEventId;
+      const entryType = activeBackendFilter === 'all' ? undefined : activeBackendFilter;
+      fetchMusicTrackingData({ entryType, eventId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -598,7 +621,12 @@ function AdminDashboard() {
           groupFeePerDancer: 0,
           largeGroupFeePerDancer: 0,
           participationMode: 'hybrid',
-          certificateTemplateUrl: undefined
+          certificateTemplateUrl: undefined,
+          eventType: 'REGIONAL_EVENT',
+          eventMode: 'HYBRID',
+          qualificationRequired: false,
+          qualificationSource: null,
+          minimumQualificationScore: null
         });
         setCertificateTemplateFile(null);
         fetchData();
@@ -692,7 +720,13 @@ function AdminDashboard() {
       // Event configuration
       participationMode: (event as any).participationMode || 'hybrid',
       numberOfJudges: currentJudgeCount,
-      certificateTemplateUrl: (event as any).certificateTemplateUrl
+      certificateTemplateUrl: (event as any).certificateTemplateUrl,
+      // Event type and qualification fields
+      eventType: (event as any).eventType || 'REGIONAL_EVENT',
+      eventMode: (event as any).eventMode || 'HYBRID',
+      qualificationRequired: (event as any).qualificationRequired ?? false,
+      qualificationSource: (event as any).qualificationSource || null,
+      minimumQualificationScore: (event as any).minimumQualificationScore || null
     });
     setEditCertificateTemplateFile(null);
     setUpdateEventMessage('');
@@ -1917,8 +1951,7 @@ function AdminDashboard() {
               { id: 'assignments', label: 'Assignments', icon: '⚖️', color: 'amber' },
               { id: 'dancers', label: 'Dancers', icon: '💃', color: 'rose' },
               { id: 'studios', label: 'Studios', icon: '🏢', color: 'orange' },
-              { id: 'sound-tech', label: 'Sound Tech', icon: '🎵', color: 'violet' },
-              { id: 'music-tracking', label: 'Music Upload Tracking', icon: '🎼', color: 'cyan' }
+              { id: 'music-tracking', label: 'Media Upload Tracking', icon: '🎼', color: 'cyan' }
             ].map((tab) => (
                 tab.link ? (
                   <Link
@@ -1996,115 +2029,6 @@ function AdminDashboard() {
           />
         )}
 
-
-        {/* Sound Tech Tab */}
-        {activeTab === 'sound-tech' && (
-          <div className="space-y-8 animate-fadeIn">
-            <div className={`${themeClasses.cardBg} backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border ${themeClasses.cardBorder}`}>
-              <div className={`px-6 py-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-b ${themeClasses.cardBorder}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white text-sm">🎵</span>
-                    </div>
-                    <h2 className={`text-xl font-bold ${themeClasses.textPrimary}`}>Sound Tech Dashboard</h2>
-                  </div>
-                  <button
-                    onClick={() => window.open('/admin/sound-tech', '_blank')}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-all duration-200 font-medium"
-                  >
-                    Open Full Dashboard
-                  </button>
-                </div>
-              </div>
-              
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-green-900/40 to-emerald-900/40 border-green-700' : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'} rounded-xl p-6 border`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-green-800' : 'bg-green-100'} rounded-lg flex items-center justify-center`}>
-                        <span className="text-green-600 text-lg">🎵</span>
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Live Performances</p>
-                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Coming Soon</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-blue-900/40 to-cyan-900/40 border-blue-700' : 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200'} rounded-xl p-6 border`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-blue-800' : 'bg-blue-100'} rounded-lg flex items-center justify-center`}>
-                        <span className="text-blue-600 text-lg">📹</span>
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Virtual Performances</p>
-                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Coming Soon</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-purple-700' : 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200'} rounded-xl p-6 border`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 ${theme === 'dark' ? 'bg-purple-800' : 'bg-purple-100'} rounded-lg flex items-center justify-center`}>
-                        <span className="text-purple-600 text-lg">⬇️</span>
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Music Downloads</p>
-                        <p className={`text-2xl font-bold ${themeClasses.textPrimary}`}>Available</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`${theme === 'dark' ? 'bg-blue-900/40 border-blue-700' : 'bg-blue-50 border-blue-200'} rounded-xl p-6 border`}>
-                  <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-blue-200' : 'text-blue-900'} mb-3 flex items-center`}>
-                    <span className="mr-2">🎵</span>
-                    Sound Tech Features
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-500">✅</span>
-                        <span className={`text-sm ${themeClasses.textSecondary}`}>Access all uploaded music files</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-500">✅</span>
-                        <span className={`text-sm ${themeClasses.textSecondary}`}>Play music with full controls</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-500">✅</span>
-                        <span className={`text-sm ${themeClasses.textSecondary}`}>Download individual or all music files</span>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-500">✅</span>
-                        <span className={`text-sm ${themeClasses.textSecondary}`}>Filter by event and performance type</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-500">✅</span>
-                        <span className={`text-sm ${themeClasses.textSecondary}`}>View performance details and item numbers</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-500">✅</span>
-                        <span className={`text-sm ${themeClasses.textSecondary}`}>Access virtual performance video links</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={`mt-6 p-4 ${theme === 'dark' ? 'bg-blue-800/20 border-blue-600' : 'bg-white border-blue-300'} rounded-lg border`}>
-                    <p className={`text-sm ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
-                      <strong>For Sound Techs:</strong> Use the full dashboard to access all music files, organize by performance order, 
-                      and prepare audio for live events. Download all music files at once for offline preparation.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Music Upload Tracking Tab */}
         {activeTab === 'music-tracking' && (
           <div className="space-y-8 animate-fadeIn">
@@ -2115,7 +2039,7 @@ function AdminDashboard() {
                     <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
                       <span className="text-white text-sm">🎼</span>
                     </div>
-                    <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Music Upload Tracking</h2>
+                    <h2 className={`text-lg sm:text-xl font-bold ${themeClasses.textPrimary}`}>Media Upload Tracking</h2>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                     <select
@@ -2428,16 +2352,157 @@ function AdminDashboard() {
                           }).map((entry) => (
                             <tr key={entry.id} className={`${themeClasses.tableRowHover} transition-colors duration-200`}>
                               <td className="px-3 sm:px-6 py-3 sm:py-4">
-                                <div className="space-y-1">
-                                  <div className={`text-sm font-medium ${themeClasses.textPrimary} truncate`}>{entry.itemName}</div>
-                                  <div className={`text-xs sm:text-sm ${themeClasses.textMuted}`}>Item #{entry.itemNumber || 'Not assigned'}</div>
-                                  <div className={`text-xs sm:text-sm ${themeClasses.textMuted}`}>{entry.mastery} • {entry.itemStyle}</div>
-                                  {/* Mobile-only content */}
-                                  <div className="sm:hidden space-y-1">
-                                    <div className={`text-xs font-medium ${themeClasses.textPrimary}`}>{entry.contestantName || 'Unknown'}</div>
-                                    <div className={`text-xs ${themeClasses.textMuted}`}>{entry.eodsaId}</div>
-                                    <div className={`text-xs ${themeClasses.textMuted}`}>{entry.studioName || 'Independent'}</div>
+                                <div className="space-y-2">
+                                  <div className="space-y-1">
+                                    <div className={`text-sm font-medium ${themeClasses.textPrimary} truncate`}>{entry.itemName}</div>
+                                    <div className={`text-xs sm:text-sm ${themeClasses.textMuted}`}>Item #{entry.itemNumber || 'Not assigned'}</div>
+                                    <div className={`text-xs sm:text-sm ${themeClasses.textMuted}`}>{entry.mastery} • {entry.itemStyle}</div>
+                                    {/* Mobile-only content */}
+                                    <div className="sm:hidden space-y-1">
+                                      <div className={`text-xs font-medium ${themeClasses.textPrimary}`}>{entry.contestantName || 'Unknown'}</div>
+                                      <div className={`text-xs ${themeClasses.textMuted}`}>{entry.eodsaId}</div>
+                                      <div className={`text-xs ${themeClasses.textMuted}`}>{entry.studioName || 'Independent'}</div>
+                                    </div>
                                   </div>
+                                  {/* Music Upload for Live Entries Missing Music */}
+                                  {entry.entryType === 'live' && !entry.musicFileUrl && (
+                                    <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                                      <div className={`mb-2 p-2 border ${theme === 'dark' ? 'border-yellow-700 bg-yellow-900/20 text-yellow-200' : 'border-yellow-200 bg-yellow-50 text-yellow-800'} rounded-md text-xs`}>
+                                        Upload outstanding — no track uploaded yet.
+                                      </div>
+                                      <MusicUpload
+                                        currentFile={null}
+                                        variant={theme === 'dark' ? 'dark' : 'light'}
+                                        compact
+                                        onUploadSuccess={async (file) => {
+                                          try {
+                                            await fetch(`/api/admin/entries/${entry.id}`, {
+                                              method: 'PUT',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({
+                                                musicFileUrl: file.url,
+                                                musicFileName: file.originalFilename
+                                              })
+                                            });
+                                            success('Music uploaded and saved');
+                                            
+                                            // Update local state instead of refetching
+                                            setMusicTrackingData(prev => prev.map(e => 
+                                              e.id === entry.id 
+                                                ? { ...e, musicFileUrl: file.url, musicFileName: file.originalFilename }
+                                                : e
+                                            ));
+                                          } catch (e) {
+                                            error('Failed to save uploaded music');
+                                          }
+                                        }}
+                                        onUploadError={(err) => error(err)}
+                                      />
+                                    </div>
+                                  )}
+                                  {/* Video Link Input for Virtual Entries Missing Videos */}
+                                  {entry.entryType === 'virtual' && (
+                                    <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                                      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                                        <input
+                                          type="url"
+                                          placeholder={entry.videoExternalUrl ? 'Replace YouTube/Vimeo link…' : 'Paste YouTube/Vimeo link…'}
+                                          value={videoLinkDrafts[entry.id] ?? ''}
+                                          onChange={(e) => setVideoLinkDrafts(prev => ({ ...prev, [entry.id]: e.target.value }))}
+                                          className={`flex-1 min-w-0 px-2 py-1.5 text-xs rounded border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500`}
+                                        />
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={async () => {
+                                              const url = (videoLinkDrafts[entry.id] || '').trim();
+                                              if (!url) { error('Enter a video link first'); return; }
+                                              try {
+                                                const res = await fetch(`/api/admin/entries/${entry.id}`, {
+                                                  method: 'PUT',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({ videoExternalUrl: url })
+                                                });
+                                                const data = await res.json();
+                                                if (res.ok && data.success) {
+                                                  success('Video link saved');
+                                                  setVideoLinkDrafts(prev => ({ ...prev, [entry.id]: '' }));
+                                                  
+                                                  // Detect video type from URL
+                                                  let videoType = 'other';
+                                                  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                                                    videoType = 'youtube';
+                                                  } else if (url.includes('vimeo.com')) {
+                                                    videoType = 'vimeo';
+                                                  }
+                                                  
+                                                  // Update local state instead of refetching
+                                                  setMusicTrackingData(prev => prev.map(e => 
+                                                    e.id === entry.id 
+                                                      ? { ...e, videoExternalUrl: url, videoExternalType: videoType }
+                                                      : e
+                                                  ));
+                                                  
+                                                  try {
+                                                    const { socketClient } = await import('@/lib/socket-client');
+                                                    socketClient.emit('entry:video_updated' as any, {
+                                                      eventId: entry.eventId,
+                                                      entryId: entry.id,
+                                                      videoExternalUrl: url,
+                                                      timestamp: new Date().toISOString()
+                                                    } as any);
+                                                  } catch {}
+                                                } else {
+                                                  error(data?.error || 'Failed to save video link');
+                                                }
+                                              } catch (e) {
+                                                error('Network error saving link');
+                                              }
+                                            }}
+                                            className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                                          >Save</button>
+                                          {entry.videoExternalUrl && (
+                                            <button
+                                              onClick={async () => {
+                                                try {
+                                                  const res = await fetch(`/api/admin/entries/${entry.id}`, {
+                                                    method: 'PUT',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ videoExternalUrl: '' })
+                                                  });
+                                                  const data = await res.json();
+                                                  if (res.ok && data.success) {
+                                                    success('Video link removed');
+                                                    
+                                                    // Update local state instead of refetching
+                                                    setMusicTrackingData(prev => prev.map(e => 
+                                                      e.id === entry.id 
+                                                        ? { ...e, videoExternalUrl: '', videoExternalType: undefined }
+                                                        : e
+                                                    ));
+                                                    
+                                                    try {
+                                                      const { socketClient } = await import('@/lib/socket-client');
+                                                      socketClient.emit('entry:video_updated' as any, {
+                                                        eventId: entry.eventId,
+                                                        entryId: entry.id,
+                                                        videoExternalUrl: '',
+                                                        timestamp: new Date().toISOString()
+                                                      } as any);
+                                                    } catch {}
+                                                  } else {
+                                                    error(data?.error || 'Failed to remove video link');
+                                                  }
+                                                } catch (e) {
+                                                  error('Network error removing link');
+                                                }
+                                              }}
+                                              className={`px-3 py-1.5 text-xs rounded ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'} transition-colors`}
+                                            >Clear</button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
@@ -2488,96 +2553,20 @@ function AdminDashboard() {
                               </td>
                               <td className="px-2 sm:px-6 py-3 sm:py-4">
                                 {entry.entryType === 'virtual' ? (
-                                  <div className="space-y-1">
-                                    {entry.videoExternalUrl ? (
-                                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                                        <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
-                                          <span className="hidden sm:inline">✅ Video Link</span>
-                                          <span className="sm:hidden">✅</span>
-                                        </span>
-                                        <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[80px] mt-1 sm:mt-0`}>{entry.videoExternalType?.toUpperCase() || 'LINK'}</span>
-                                      </div>
-                                    ) : (
-                                      <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
-                                        <span className="hidden sm:inline">❌ No Video Link</span>
-                                        <span className="sm:hidden">❌</span>
+                                  entry.videoExternalUrl ? (
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                                      <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                                        <span className="hidden sm:inline">✅ Video Link</span>
+                                        <span className="sm:hidden">✅</span>
                                       </span>
-                                    )}
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="url"
-                                        placeholder={entry.videoExternalUrl ? 'Replace link…' : 'Paste YouTube/Vimeo link…'}
-                                        value={videoLinkDrafts[entry.id] ?? ''}
-                                        onChange={(e) => setVideoLinkDrafts(prev => ({ ...prev, [entry.id]: e.target.value }))}
-                                        className={`w-40 sm:w-56 px-2 py-1 text-xs rounded border ${themeClasses.cardBorder} ${themeClasses.cardBg} ${themeClasses.textPrimary}`}
-                                      />
-                                      <button
-                                        onClick={async () => {
-                                          const url = (videoLinkDrafts[entry.id] || '').trim();
-                                          if (!url) { error('Enter a video link first'); return; }
-                                          try {
-                                            const res = await fetch(`/api/admin/entries/${entry.id}`, {
-                                              method: 'PUT',
-                                              headers: { 'Content-Type': 'application/json' },
-                                              body: JSON.stringify({ videoExternalUrl: url })
-                                            });
-                                            const data = await res.json();
-                                            if (res.ok && data.success) {
-                                              success('Video link saved');
-                                              setVideoLinkDrafts(prev => ({ ...prev, [entry.id]: '' }));
-                                              try {
-                                                const { socketClient } = await import('@/lib/socket-client');
-                                                socketClient.emit('entry:video_updated' as any, {
-                                                  eventId: entry.eventId,
-                                                  entryId: entry.id,
-                                                  videoExternalUrl: url,
-                                                  timestamp: new Date().toISOString()
-                                                } as any);
-                                              } catch {}
-                                              await fetchMusicTrackingData({ entryType: activeBackendFilter === 'all' ? undefined : activeBackendFilter });
-                                            } else {
-                                              error(data?.error || 'Failed to save video link');
-                                            }
-                                          } catch (e) {
-                                            error('Network error saving link');
-                                          }
-                                        }}
-                                        className="px-2 py-1 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
-                                      >Save</button>
-                                      {entry.videoExternalUrl && (
-                                        <button
-                                          onClick={async () => {
-                                            try {
-                                              const res = await fetch(`/api/admin/entries/${entry.id}`, {
-                                                method: 'PUT',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ videoExternalUrl: '' })
-                                              });
-                                              const data = await res.json();
-                                              if (res.ok && data.success) {
-                                                success('Video link removed');
-                                                try {
-                                                  const { socketClient } = await import('@/lib/socket-client');
-                                                  socketClient.emit('entry:video_updated' as any, {
-                                                    eventId: entry.eventId,
-                                                    entryId: entry.id,
-                                                    videoExternalUrl: '',
-                                                    timestamp: new Date().toISOString()
-                                                  } as any);
-                                                } catch {}
-                                                await fetchMusicTrackingData({ entryType: activeBackendFilter === 'all' ? undefined : activeBackendFilter });
-                                              } else {
-                                                error(data?.error || 'Failed to remove video link');
-                                              }
-                                            } catch (e) {
-                                              error('Network error removing link');
-                                            }
-                                          }}
-                                          className={`px-2 py-1 text-xs rounded ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                                        >Clear</button>
-                                      )}
+                                      <span className={`text-xs ${themeClasses.textMuted} truncate max-w-[80px] mt-1 sm:mt-0`}>{entry.videoExternalType?.toUpperCase() || 'LINK'}</span>
                                     </div>
-                                  </div>
+                                  ) : (
+                                    <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-red-900/80 text-red-200' : 'bg-red-100 text-red-800'}`}>
+                                      <span className="hidden sm:inline">❌ No Video Link</span>
+                                      <span className="sm:hidden">❌</span>
+                                    </span>
+                                  )
                                 ) : (
                                   <span className={`inline-flex px-1.5 sm:px-2 py-1 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
                                     <span className="hidden sm:inline">N/A (Live)</span>
@@ -2658,17 +2647,124 @@ function AdminDashboard() {
             </div>
             
             <form onSubmit={handleCreateEvent} className={themeClasses.cardPadding}>
-              {/* Event Type Selection - Top of Form - v2.0 */}
+              {/* Event Type Selection */}
               <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
                 <label className={`block ${themeClasses.label} mb-3 font-semibold`}>
                   Event Type <span className="text-red-500">*</span>
                 </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewEvent(prev => ({ 
+                        ...prev, 
+                        eventType: 'REGIONAL_EVENT',
+                        qualificationRequired: false,
+                        qualificationSource: null,
+                        minimumQualificationScore: null
+                      }));
+                    }}
+                    className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
+                      newEvent.eventType === 'REGIONAL_EVENT'
+                        ? theme === 'dark'
+                          ? 'bg-green-600 border-green-500 text-white'
+                          : 'bg-green-500 border-green-600 text-white'
+                        : theme === 'dark'
+                          ? 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    🏘️ Regional
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewEvent(prev => ({ 
+                        ...prev, 
+                        eventType: 'NATIONAL_EVENT',
+                        qualificationRequired: true,
+                        qualificationSource: 'REGIONAL',
+                        minimumQualificationScore: 75
+                      }));
+                    }}
+                    className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
+                      newEvent.eventType === 'NATIONAL_EVENT'
+                        ? theme === 'dark'
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-blue-500 border-blue-600 text-white'
+                        : theme === 'dark'
+                          ? 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    🏆 National
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewEvent(prev => ({ 
+                        ...prev, 
+                        eventType: 'QUALIFIER_EVENT',
+                        qualificationRequired: false,
+                        qualificationSource: null,
+                        minimumQualificationScore: null
+                      }));
+                    }}
+                    className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
+                      newEvent.eventType === 'QUALIFIER_EVENT'
+                        ? theme === 'dark'
+                          ? 'bg-yellow-600 border-yellow-500 text-white'
+                          : 'bg-yellow-500 border-yellow-600 text-white'
+                        : theme === 'dark'
+                          ? 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    🎯 Qualifier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewEvent(prev => ({ 
+                        ...prev, 
+                        eventType: 'INTERNATIONAL_VIRTUAL_EVENT',
+                        qualificationRequired: false,
+                        qualificationSource: null,
+                        minimumQualificationScore: null
+                      }));
+                    }}
+                    className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
+                      newEvent.eventType === 'INTERNATIONAL_VIRTUAL_EVENT'
+                        ? theme === 'dark'
+                          ? 'bg-purple-600 border-purple-500 text-white'
+                          : 'bg-purple-500 border-purple-600 text-white'
+                        : theme === 'dark'
+                          ? 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    🌐 International
+                  </button>
+                </div>
+                <p className={`text-xs ${themeClasses.textMuted} mt-2`}>
+                  {newEvent.eventType === 'REGIONAL_EVENT' && 'Regional competition event. Open to all dancers.'}
+                  {newEvent.eventType === 'NATIONAL_EVENT' && 'National competition. Requires qualification from Regional Events (default: 75% minimum score).'}
+                  {newEvent.eventType === 'QUALIFIER_EVENT' && 'Qualifier event. Open to all dancers.'}
+                  {newEvent.eventType === 'INTERNATIONAL_VIRTUAL_EVENT' && 'International virtual event. Can configure custom qualification requirements.'}
+                </p>
+              </div>
+
+              {/* Event Mode Selection */}
+              <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-indigo-900/20 border-indigo-700/50' : 'bg-indigo-50 border-indigo-200'} ${themeClasses.cardRadius} border`}>
+                <label className={`block ${themeClasses.label} mb-3 font-semibold`}>
+                  Event Mode <span className="text-red-500">*</span>
+                </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <button
                     type="button"
-                    onClick={() => setNewEvent(prev => ({ ...prev, participationMode: 'live' }))}
+                    onClick={() => setNewEvent(prev => ({ ...prev, eventMode: 'LIVE', participationMode: 'live' }))}
                     className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
-                      newEvent.participationMode === 'live'
+                      newEvent.eventMode === 'LIVE'
                         ? theme === 'dark'
                           ? 'bg-blue-600 border-blue-500 text-white'
                           : 'bg-blue-500 border-blue-600 text-white'
@@ -2681,9 +2777,9 @@ function AdminDashboard() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setNewEvent(prev => ({ ...prev, participationMode: 'virtual' }))}
+                    onClick={() => setNewEvent(prev => ({ ...prev, eventMode: 'VIRTUAL', participationMode: 'virtual' }))}
                     className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
-                      newEvent.participationMode === 'virtual'
+                      newEvent.eventMode === 'VIRTUAL'
                         ? theme === 'dark'
                           ? 'bg-purple-600 border-purple-500 text-white'
                           : 'bg-purple-500 border-purple-600 text-white'
@@ -2696,9 +2792,9 @@ function AdminDashboard() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setNewEvent(prev => ({ ...prev, participationMode: 'hybrid' }))}
+                    onClick={() => setNewEvent(prev => ({ ...prev, eventMode: 'HYBRID', participationMode: 'hybrid' }))}
                     className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
-                      newEvent.participationMode === 'hybrid'
+                      newEvent.eventMode === 'HYBRID'
                         ? theme === 'dark'
                           ? 'bg-indigo-600 border-indigo-500 text-white'
                           : 'bg-indigo-500 border-indigo-600 text-white'
@@ -2711,11 +2807,133 @@ function AdminDashboard() {
                   </button>
                 </div>
                 <p className={`text-xs ${themeClasses.textMuted} mt-2`}>
-                  {newEvent.participationMode === 'live' && 'Only live in-person entries will be allowed during registration.'}
-                  {newEvent.participationMode === 'virtual' && 'Only virtual video submissions will be allowed during registration.'}
-                  {newEvent.participationMode === 'hybrid' && 'Both live and virtual entries will be allowed during registration.'}
+                  {newEvent.eventMode === 'LIVE' && 'Only live in-person entries will be allowed during registration.'}
+                  {newEvent.eventMode === 'VIRTUAL' && 'Only virtual video submissions will be allowed during registration.'}
+                  {newEvent.eventMode === 'HYBRID' && 'Both live and virtual entries will be allowed during registration.'}
                 </p>
               </div>
+
+              {/* Qualification Settings - Conditional */}
+              {(newEvent.eventType === 'NATIONAL_EVENT' || newEvent.eventType === 'INTERNATIONAL_VIRTUAL_EVENT') && (
+                <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-amber-900/20 border-amber-700/50' : 'bg-amber-50 border-amber-200'} ${themeClasses.cardRadius} border`}>
+                  <h3 className={`${themeClasses.heading3} mb-4 flex items-center gap-2`}>
+                    🎯 Qualification Requirements
+                  </h3>
+                  
+                  {newEvent.eventType === 'NATIONAL_EVENT' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={newEvent.qualificationRequired}
+                          onChange={(e) => setNewEvent(prev => ({ 
+                            ...prev, 
+                            qualificationRequired: e.target.checked,
+                            qualificationSource: e.target.checked ? 'REGIONAL' : null,
+                            minimumQualificationScore: e.target.checked ? 75 : null
+                          }))}
+                          className="mr-2"
+                        />
+                        <label className={themeClasses.label}>Require qualification from Regional Events</label>
+                      </div>
+                      
+                      {newEvent.qualificationRequired && (
+                        <div className="ml-6 space-y-3">
+                          <div>
+                            <label className={`block ${themeClasses.label} mb-2`}>Qualification Source</label>
+                            <select
+                              value={newEvent.qualificationSource || 'REGIONAL'}
+                              onChange={(e) => setNewEvent(prev => ({ 
+                                ...prev, 
+                                qualificationSource: e.target.value as any 
+                              }))}
+                              className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
+                            >
+                              <option value="REGIONAL">Regional Events</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className={`block ${themeClasses.label} mb-2`}>Minimum Qualification Score (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={newEvent.minimumQualificationScore || 75}
+                              onChange={(e) => setNewEvent(prev => ({ 
+                                ...prev, 
+                                minimumQualificationScore: parseInt(e.target.value) || 75 
+                              }))}
+                              className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
+                            />
+                            <p className={`text-xs ${themeClasses.textMuted} mt-1`}>
+                              Dancers must score at least this percentage in a Regional Event to qualify
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {newEvent.eventType === 'INTERNATIONAL_VIRTUAL_EVENT' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={newEvent.qualificationRequired}
+                          onChange={(e) => setNewEvent(prev => ({ 
+                            ...prev, 
+                            qualificationRequired: e.target.checked,
+                            qualificationSource: e.target.checked ? 'NONE' : null
+                          }))}
+                          className="mr-2"
+                        />
+                        <label className={themeClasses.label}>Require qualification</label>
+                      </div>
+                      
+                      {newEvent.qualificationRequired && (
+                        <div className="ml-6 space-y-3">
+                          <div>
+                            <label className={`block ${themeClasses.label} mb-2`}>Qualification Source</label>
+                            <select
+                              value={newEvent.qualificationSource || 'NONE'}
+                              onChange={(e) => setNewEvent(prev => ({ 
+                                ...prev, 
+                                qualificationSource: e.target.value as any,
+                                minimumQualificationScore: e.target.value === 'REGIONAL' || e.target.value === 'ANY_NATIONAL_LEVEL' ? 75 : null
+                              }))}
+                              className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
+                            >
+                              <option value="NONE">None (Open)</option>
+                              <option value="ANY_NATIONAL_LEVEL">Any National/Qualifier Event</option>
+                              <option value="MANUAL">Manual Qualification</option>
+                              <option value="CUSTOM">Custom Rules (Contact Admin)</option>
+                            </select>
+                          </div>
+                          
+                          {(newEvent.qualificationSource === 'REGIONAL' || newEvent.qualificationSource === 'ANY_NATIONAL_LEVEL') && (
+                            <div>
+                              <label className={`block ${themeClasses.label} mb-2`}>Minimum Qualification Score (%) (Optional)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={newEvent.minimumQualificationScore || ''}
+                                onChange={(e) => setNewEvent(prev => ({ 
+                                  ...prev, 
+                                  minimumQualificationScore: e.target.value ? parseInt(e.target.value) : null 
+                                }))}
+                                className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
+                                placeholder="75"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Basic Info Section */}
               <div className={`mb-6 p-6 border ${themeClasses.modalBorder} ${themeClasses.cardRadius} ${theme === 'dark' ? 'bg-gray-800/50' : 'bg-white'}`}>
@@ -2745,6 +2963,20 @@ function AdminDashboard() {
                     placeholder="Describe the event..."
                   />
                 </div>
+
+                  <div>
+                    <label className={`block ${themeClasses.label} mb-2`}>Region <span className="text-red-500">*</span></label>
+                    <select
+                      value={newEvent.region}
+                      onChange={(e) => setNewEvent(prev => ({ ...prev, region: e.target.value }))}
+                      className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
+                      required
+                    >
+                      {REGIONS.map((region) => (
+                        <option key={region} value={region}>{region}</option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div>
                     <label className={`block ${themeClasses.label} mb-2`}>Venue <span className="text-red-500">*</span></label>
@@ -3271,6 +3503,20 @@ function AdminDashboard() {
                     <option value="registration_closed">Registration Closed</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block ${themeClasses.label} mb-2`}>Region *</label>
+                  <select
+                    value={editEventData.region}
+                    onChange={(e) => setEditEventData(prev => ({ ...prev, region: e.target.value }))}
+                    className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
+                    required
+                  >
+                    {REGIONS.map((region) => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -4756,8 +5002,8 @@ function EventsTabContent({ events, setShowCreateEventModal, handleEditEvent, ha
               <thead className={themeClasses.tableHeader}>
                 <tr>
                   <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Event</th>
-                  <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden sm:table-cell`}>Region</th>
-                  <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden md:table-cell`}>Type</th>
+                  <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden sm:table-cell`}>Event Type</th>
+                  <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider hidden md:table-cell`}>Mode</th>
                   <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Date</th>
                   <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Status</th>
                   <th className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold ${themeClasses.tableHeaderText} uppercase tracking-wider`}>Actions</th>
@@ -4771,31 +5017,69 @@ function EventsTabContent({ events, setShowCreateEventModal, handleEditEvent, ha
                         <div className={`text-xs sm:text-sm font-bold ${themeClasses.textPrimary} leading-tight`}>{event.name}</div>
                         <div className={`text-xs sm:text-sm ${themeClasses.textSecondary} font-medium mt-1`}>{event.venue}</div>
                         <div className={`text-xs ${themeClasses.textMuted} sm:hidden mt-1`}>
-                          {event.region} • {event.participationMode ? event.participationMode.charAt(0).toUpperCase() + event.participationMode.slice(1) : 'Hybrid'} • {event.ageCategory}
+                          {(() => {
+                            const eventType = (event as any).eventType || 'REGIONAL_EVENT';
+                            const displayName = eventType === 'NATIONAL_EVENT' ? 'Nationals' 
+                              : eventType === 'REGIONAL_EVENT' ? 'Regional'
+                              : eventType === 'QUALIFIER_EVENT' ? 'Qualifier'
+                              : eventType === 'INTERNATIONAL_VIRTUAL_EVENT' ? 'International'
+                              : 'Regional';
+                            return displayName;
+                          })()} • {(() => {
+                            const eventMode = (event as any).eventMode || 'HYBRID';
+                            return eventMode === 'LIVE' ? 'Live' : eventMode === 'VIRTUAL' ? 'Virtual' : 'Hybrid';
+                          })()} • {event.ageCategory}
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium hidden sm:table-cell">{event.region}</td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
+                      {(() => {
+                        const eventType = (event as any).eventType || 'REGIONAL_EVENT';
+                        const displayName = eventType === 'NATIONAL_EVENT' ? 'Nationals' 
+                          : eventType === 'REGIONAL_EVENT' ? 'Regional'
+                          : eventType === 'QUALIFIER_EVENT' ? 'Qualifier'
+                          : eventType === 'INTERNATIONAL_VIRTUAL_EVENT' ? 'International'
+                          : 'Regional';
+                        
+                        return (
+                          <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full ${
+                            eventType === 'NATIONAL_EVENT'
+                              ? theme === 'dark' ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-100 text-purple-800'
+                              : eventType === 'REGIONAL_EVENT'
+                              ? theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'
+                              : eventType === 'QUALIFIER_EVENT'
+                              ? theme === 'dark' ? 'bg-yellow-900/80 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
+                              : eventType === 'INTERNATIONAL_VIRTUAL_EVENT'
+                              ? theme === 'dark' ? 'bg-blue-900/80 text-blue-200' : 'bg-blue-100 text-blue-800'
+                              : theme === 'dark' ? 'bg-gray-700/80 text-gray-200' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {displayName}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                       <div className="space-y-1">
-                        {/* Show Event Type (participationMode) instead of performanceType */}
-                        {event.participationMode ? (
-                          <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border ${
-                            event.participationMode === 'live' 
-                              ? 'bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 border-blue-200'
-                              : event.participationMode === 'virtual'
-                              ? 'bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 border-purple-200'
-                              : 'bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 border-indigo-200'
-                          }`}>
-                            {event.participationMode === 'live' ? '🎭' : 
-                             event.participationMode === 'virtual' ? '🎥' : 
-                             '🔀'} {event.participationMode.charAt(0).toUpperCase() + event.participationMode.slice(1)}
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border bg-gradient-to-r from-gray-50 to-gray-100 text-gray-600 border-gray-200">
-                            🎭 Hybrid
-                          </span>
-                        )}
+                        {/* Show Event Mode (LIVE, VIRTUAL, HYBRID) */}
+                        {(() => {
+                          // Check both eventMode and event_mode (in case of different naming)
+                          // Note: If eventMode is null/undefined, it defaults to 'HYBRID'
+                          // Existing events may need to be edited to set their eventMode
+                          const eventMode = (event as any).eventMode || (event as any).event_mode || 'HYBRID';
+                          return (
+                            <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-bold rounded-full border ${
+                              eventMode === 'LIVE'
+                                ? theme === 'dark' ? 'bg-blue-900/60 text-blue-200 border-blue-700/50' : 'bg-blue-50 text-blue-700 border-blue-200'
+                                : eventMode === 'VIRTUAL'
+                                ? theme === 'dark' ? 'bg-purple-900/60 text-purple-200 border-purple-700/50' : 'bg-purple-50 text-purple-700 border-purple-200'
+                                : theme === 'dark' ? 'bg-indigo-900/60 text-indigo-200 border-indigo-700/50' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                              {eventMode === 'LIVE' ? '🎭 Live' : 
+                               eventMode === 'VIRTUAL' ? '🎥 Virtual' : 
+                               '🔀 Hybrid'}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium">

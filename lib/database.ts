@@ -83,6 +83,42 @@ export const initializeDatabase = async () => {
     // Add number of judges column to events table
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS number_of_judges INTEGER DEFAULT 4`;
 
+    // Event Types & Qualification System - Add new columns to events table
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'REGIONAL_EVENT' CHECK (event_type IN ('REGIONAL_EVENT', 'NATIONAL_EVENT', 'QUALIFIER_EVENT', 'INTERNATIONAL_VIRTUAL_EVENT'))`;
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_mode TEXT NOT NULL DEFAULT 'HYBRID' CHECK (event_mode IN ('LIVE', 'VIRTUAL', 'HYBRID'))`;
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS qualification_required BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS qualification_source TEXT CHECK (qualification_source IN ('NONE', 'REGIONAL', 'ANY_NATIONAL_LEVEL', 'MANUAL', 'CUSTOM'))`;
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS minimum_qualification_score INTEGER`;
+
+    // Create event_manual_qualifications table
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS event_manual_qualifications (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        dancer_id TEXT NOT NULL,
+        added_by TEXT,
+        created_at TIMESTAMP DEFAULT now()
+      )
+    `;
+    await sqlClient`CREATE INDEX IF NOT EXISTS idx_event_manual_qualifications_event_id ON event_manual_qualifications(event_id)`;
+    await sqlClient`CREATE INDEX IF NOT EXISTS idx_event_manual_qualifications_dancer_id ON event_manual_qualifications(dancer_id)`;
+
+    // Create qualification_audit_logs table for tracking qualification-related actions
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS qualification_audit_logs (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        event_id TEXT,
+        dancer_id TEXT,
+        action_type TEXT NOT NULL,
+        action_details JSONB,
+        performed_by TEXT,
+        performed_at TIMESTAMP DEFAULT now()
+      )
+    `;
+    await sqlClient`CREATE INDEX IF NOT EXISTS idx_qualification_audit_logs_event_id ON qualification_audit_logs(event_id)`;
+    await sqlClient`CREATE INDEX IF NOT EXISTS idx_qualification_audit_logs_dancer_id ON qualification_audit_logs(dancer_id)`;
+    await sqlClient`CREATE INDEX IF NOT EXISTS idx_qualification_audit_logs_action_type ON qualification_audit_logs(action_type)`;
+
     // Phase 2: Virtual entry support columns
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS entry_type TEXT DEFAULT 'live'`;
     await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS video_external_url TEXT`;
@@ -2682,13 +2718,32 @@ export const db = {
       participationMode: event.participationMode
     });
     
+    // Determine default values for event type and mode based on event data
+    const eventType = (event as any).eventType || 'REGIONAL_EVENT';
+    const eventMode = (event as any).eventMode || 'HYBRID';
+    
+    // Auto-set qualification rules for NATIONAL_EVENT
+    let qualificationRequired = (event as any).qualificationRequired ?? false;
+    let qualificationSource = (event as any).qualificationSource || null;
+    let minimumQualificationScore = (event as any).minimumQualificationScore || null;
+    
+    if (eventType === 'NATIONAL_EVENT') {
+      qualificationRequired = true;
+      qualificationSource = qualificationSource || 'REGIONAL';
+      minimumQualificationScore = minimumQualificationScore || 75;
+    } else if (eventType === 'QUALIFIER_EVENT') {
+      qualificationRequired = false;
+      qualificationSource = null;
+    }
+    
     await sqlClient`
       INSERT INTO events (
         id, name, description, region, age_category, performance_type, event_date, event_end_date, 
         registration_deadline, venue, status, max_participants, entry_fee, created_by, created_at,
         registration_fee_per_dancer, solo_1_fee, solo_2_fee, solo_3_fee, solo_additional_fee,
         duo_trio_fee_per_dancer, group_fee_per_dancer, large_group_fee_per_dancer, currency,
-        participation_mode, certificate_template_url, number_of_judges
+        participation_mode, certificate_template_url, number_of_judges,
+        event_type, event_mode, qualification_required, qualification_source, minimum_qualification_score
       )
       VALUES (
         ${id}, ${event.name}, ${event.description}, ${event.region}, ${event.ageCategory}, 
@@ -2698,7 +2753,8 @@ export const db = {
         ${event.registrationFeePerDancer ?? 300}, ${event.solo1Fee ?? 400}, ${event.solo2Fee ?? 750}, 
         ${event.solo3Fee ?? 1050}, ${event.soloAdditionalFee ?? 100}, ${event.duoTrioFeePerDancer ?? 280},
         ${event.groupFeePerDancer ?? 220}, ${event.largeGroupFeePerDancer ?? 190}, ${event.currency || 'ZAR'},
-        ${event.participationMode || 'hybrid'}, ${event.certificateTemplateUrl || null}, ${numberOfJudges}
+        ${event.participationMode || 'hybrid'}, ${event.certificateTemplateUrl || null}, ${numberOfJudges},
+        ${eventType}, ${eventMode}, ${qualificationRequired}, ${qualificationSource}, ${minimumQualificationScore}
       )
     `;
     
@@ -2742,7 +2798,12 @@ export const db = {
       currency: row.currency || 'ZAR',
       participationMode: row.participation_mode || 'hybrid',
       certificateTemplateUrl: row.certificate_template_url || undefined,
-      numberOfJudges: row.number_of_judges != null ? parseInt(row.number_of_judges) : 4
+      numberOfJudges: row.number_of_judges != null ? parseInt(row.number_of_judges) : 4,
+      eventType: (row.event_type || 'REGIONAL_EVENT') as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT',
+      eventMode: (row.event_mode || 'HYBRID') as 'LIVE' | 'VIRTUAL' | 'HYBRID',
+      qualificationRequired: row.qualification_required ?? false,
+      qualificationSource: row.qualification_source || null,
+      minimumQualificationScore: row.minimum_qualification_score != null ? parseInt(row.minimum_qualification_score) : null
     })) as Event[];
   },
 
@@ -2779,7 +2840,12 @@ export const db = {
       currency: row.currency || 'ZAR',
       participationMode: row.participation_mode || 'hybrid',
       certificateTemplateUrl: row.certificate_template_url || undefined,
-      numberOfJudges: row.number_of_judges != null ? parseInt(row.number_of_judges) : 4
+      numberOfJudges: row.number_of_judges != null ? parseInt(row.number_of_judges) : 4,
+      eventType: (row.event_type || 'REGIONAL_EVENT') as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT',
+      eventMode: (row.event_mode || 'HYBRID') as 'LIVE' | 'VIRTUAL' | 'HYBRID',
+      qualificationRequired: row.qualification_required ?? false,
+      qualificationSource: row.qualification_source || null,
+      minimumQualificationScore: row.minimum_qualification_score != null ? parseInt(row.minimum_qualification_score) : null
     } as Event;
   },
 
@@ -4581,6 +4647,212 @@ export const db = {
       WHERE id = ${performanceId}
     `;
     return { success: true };
+  },
+
+  // Manual Qualifications Management
+  async addManualQualification(eventId: string, dancerId: string, addedBy: string) {
+    const sqlClient = getSql();
+    const id = `qual-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Check if already qualified
+    const existing = await sqlClient`
+      SELECT id FROM event_manual_qualifications 
+      WHERE event_id = ${eventId} AND dancer_id = ${dancerId}
+    ` as any[];
+    
+    if (existing.length > 0) {
+      throw new Error('Dancer is already manually qualified for this event');
+    }
+    
+    await sqlClient`
+      INSERT INTO event_manual_qualifications (id, event_id, dancer_id, added_by, created_at)
+      VALUES (${id}, ${eventId}, ${dancerId}, ${addedBy}, now())
+    `;
+    
+    // Log audit
+    await sqlClient`
+      INSERT INTO qualification_audit_logs (id, event_id, dancer_id, action_type, action_details, performed_by, performed_at)
+      VALUES (
+        ${`audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`},
+        ${eventId},
+        ${dancerId},
+        'MANUAL_QUALIFICATION_ADDED',
+        ${JSON.stringify({ eventId, dancerId })},
+        ${addedBy},
+        now()
+      )
+    `;
+    
+    return { id, eventId, dancerId, addedBy, createdAt: new Date().toISOString() };
+  },
+
+  async removeManualQualification(eventId: string, dancerId: string, removedBy: string) {
+    const sqlClient = getSql();
+    
+    await sqlClient`
+      DELETE FROM event_manual_qualifications 
+      WHERE event_id = ${eventId} AND dancer_id = ${dancerId}
+    `;
+    
+    // Log audit
+    await sqlClient`
+      INSERT INTO qualification_audit_logs (id, event_id, dancer_id, action_type, action_details, performed_by, performed_at)
+      VALUES (
+        ${`audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`},
+        ${eventId},
+        ${dancerId},
+        'MANUAL_QUALIFICATION_REMOVED',
+        ${JSON.stringify({ eventId, dancerId })},
+        ${removedBy},
+        now()
+      )
+    `;
+    
+    return { success: true };
+  },
+
+  async getManualQualifications(eventId: string) {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT 
+        emq.*,
+        d.name as dancer_name,
+        d.eodsa_id,
+        j.name as added_by_name
+      FROM event_manual_qualifications emq
+      LEFT JOIN dancers d ON d.id = emq.dancer_id
+      LEFT JOIN judges j ON j.id = emq.added_by
+      WHERE emq.event_id = ${eventId}
+      ORDER BY emq.created_at DESC
+    ` as any[];
+    
+    return result.map((row: any) => ({
+      id: row.id,
+      eventId: row.event_id,
+      dancerId: row.dancer_id,
+      dancerName: row.dancer_name || 'Unknown',
+      eodsaId: row.eodsa_id || 'N/A',
+      addedBy: row.added_by,
+      addedByName: row.added_by_name || 'Unknown',
+      createdAt: row.created_at
+    }));
+  },
+
+  async checkManualQualification(eventId: string, dancerId: string): Promise<boolean> {
+    const sqlClient = getSql();
+    const result = await sqlClient`
+      SELECT id FROM event_manual_qualifications 
+      WHERE event_id = ${eventId} AND dancer_id = ${dancerId}
+    ` as any[];
+    
+    return result.length > 0;
+  },
+
+  // Check if dancer has qualifying performance from regional events
+  async checkRegionalQualification(dancerId: string, minimumScore: number): Promise<boolean> {
+    const sqlClient = getSql();
+    
+    console.log(`[checkRegionalQualification] Checking qualification for dancerId: ${dancerId}, minimumScore: ${minimumScore}`);
+    
+    // Get dancer's EODSA ID
+    const dancerResult = await sqlClient`
+      SELECT eodsa_id FROM dancers WHERE id = ${dancerId}
+    ` as any[];
+    
+    if (dancerResult.length === 0) {
+      console.log(`[checkRegionalQualification] Dancer not found: ${dancerId}`);
+      return false;
+    }
+    const eodsaId = dancerResult[0].eodsa_id;
+    console.log(`[checkRegionalQualification] Found dancer EODSA ID: ${eodsaId}`);
+    
+    // Check for performances in REGIONAL_EVENT events with score >= minimumScore
+    // IMPORTANT: Use e.id = ee.event_id to ensure we're checking the correct event
+    const result = await sqlClient`
+      SELECT DISTINCT p.id
+      FROM performances p
+      JOIN event_entries ee ON ee.id = p.event_entry_id
+      JOIN events e ON e.id = ee.event_id
+      JOIN scores s ON s.performance_id = p.id
+      WHERE (
+        ee.eodsa_id = ${eodsaId}
+        OR ee.participant_ids::text LIKE ${`%${dancerId}%`}
+        OR ee.participant_ids::text LIKE ${`%${eodsaId}%`}
+      )
+      AND e.event_type = 'REGIONAL_EVENT'
+      AND p.scores_published = true
+      GROUP BY p.id
+      HAVING AVG(
+        s.technical_score + s.musical_score + s.performance_score + 
+        s.styling_score + s.overall_impression_score
+      ) >= ${minimumScore}
+      LIMIT 1
+    ` as any[];
+    
+    console.log(`[checkRegionalQualification] Query result count: ${result.length}`);
+    if (result.length > 0) {
+      console.log(`[checkRegionalQualification] ✅ Dancer HAS qualifying performance`);
+    } else {
+      console.log(`[checkRegionalQualification] ❌ Dancer does NOT have qualifying performance`);
+    }
+    
+    return result.length > 0;
+  },
+
+  // Check if dancer has qualifying performance from national/qualifier events
+  async checkNationalLevelQualification(dancerId: string, minimumScore?: number): Promise<boolean> {
+    const sqlClient = getSql();
+    
+    // Get dancer's EODSA ID
+    const dancerResult = await sqlClient`
+      SELECT eodsa_id FROM dancers WHERE id = ${dancerId}
+    ` as any[];
+    
+    if (dancerResult.length === 0) return false;
+    const eodsaId = dancerResult[0].eodsa_id;
+    
+    // Build query with optional minimum score
+    let query;
+    if (minimumScore !== undefined && minimumScore !== null) {
+      query = sqlClient`
+        SELECT DISTINCT p.id
+        FROM performances p
+        JOIN event_entries ee ON ee.id = p.event_entry_id
+        JOIN events e ON e.id = p.event_id
+        JOIN scores s ON s.performance_id = p.id
+        WHERE (
+          ee.eodsa_id = ${eodsaId}
+          OR ee.participant_ids::text LIKE ${`%${dancerId}%`}
+          OR ee.participant_ids::text LIKE ${`%${eodsaId}%`}
+        )
+        AND e.event_type IN ('NATIONAL_EVENT', 'QUALIFIER_EVENT')
+        AND p.scores_published = true
+        GROUP BY p.id
+        HAVING AVG(
+          s.technical_score + s.musical_score + s.performance_score + 
+          s.styling_score + s.overall_impression_score
+        ) >= ${minimumScore}
+        LIMIT 1
+      `;
+    } else {
+      query = sqlClient`
+        SELECT DISTINCT p.id
+        FROM performances p
+        JOIN event_entries ee ON ee.id = p.event_entry_id
+        JOIN events e ON e.id = p.event_id
+        WHERE (
+          ee.eodsa_id = ${eodsaId}
+          OR ee.participant_ids::text LIKE ${`%${dancerId}%`}
+          OR ee.participant_ids::text LIKE ${`%${eodsaId}%`}
+        )
+        AND e.event_type IN ('NATIONAL_EVENT', 'QUALIFIER_EVENT')
+        AND p.scores_published = true
+        LIMIT 1
+      `;
+    }
+    
+    const result = await query as any[];
+    return result.length > 0;
   }
 };
 

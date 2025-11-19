@@ -137,6 +137,8 @@ export default function PerformanceTypeEntryPage() {
   const [step, setStep] = useState(1); // 1: Event Selection, 2: Details, 3: Payment, 4: Review
   const [isDancersLoading, setIsDancersLoading] = useState(false);
   const [isEventsLoading, setIsEventsLoading] = useState(false);
+  const [qualificationBlocked, setQualificationBlocked] = useState(false);
+  const [qualificationError, setQualificationError] = useState<string | null>(null);
   const { showAlert } = useAlert();
 
   // Check if this is studio mode
@@ -245,14 +247,86 @@ export default function PerformanceTypeEntryPage() {
     if (preSelectedEventId && events.length > 0 && !formData.eventId) {
       const preSelected = events.find(e => e.id === preSelectedEventId);
       if (preSelected) {
+        // Set the event first
         setFormData(prev => ({
           ...prev,
           eventId: preSelectedEventId
         }));
-        setStep(2); // Skip event selection step
+        
+        // Check qualification if contestant is loaded
+        if (contestant && contestant.dancers && contestant.dancers.length > 0) {
+          checkQualificationForEvent(preSelectedEventId).then((qualified) => {
+            if (qualified) {
+              setStep(2);
+            } else {
+              // Reset event selection if not qualified
+              setFormData(prev => ({
+                ...prev,
+                eventId: ''
+              }));
+              setStep(1);
+            }
+          });
+        } else {
+          // If contestant not loaded yet, proceed to step 2 (check will happen when contestant loads)
+          setStep(2);
+        }
       }
     }
-  }, [preSelectedEventId, events, formData.eventId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preSelectedEventId, events, formData.eventId, contestant]);
+
+  // Check qualification for an event
+  const checkQualificationForEvent = async (eventId: string): Promise<boolean> => {
+    // Only check if we have a contestant with dancers
+    if (!contestant || !contestant.dancers || contestant.dancers.length === 0) {
+      // If no contestant yet, can't check - return true to allow (will check later)
+      return true;
+    }
+
+    // Get the primary dancer ID (first dancer)
+    const primaryDancerId = contestant.dancers[0].id;
+
+    try {
+      const response = await fetch(`/api/events/${eventId}/check-qualification?dancerId=${primaryDancerId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        if (!data.qualified) {
+          // Block entry
+          setQualificationBlocked(true);
+          setQualificationError(data.reason || 'You are not qualified to enter this event.');
+          showAlert(data.reason || 'You are not qualified to enter this event.', 'error');
+          return false;
+        } else {
+          // Qualification passed
+          setQualificationBlocked(false);
+          setQualificationError(null);
+          return true;
+        }
+      }
+
+      // If check failed, allow (server-side will catch it)
+      return true;
+    } catch (error) {
+      console.error('Error checking qualification:', error);
+      // On error, allow entry (server-side validation will catch it)
+      return true;
+    }
+  };
+
+  // Check qualification when contestant loads and event is already selected
+  useEffect(() => {
+    if (contestant && contestant.dancers && contestant.dancers.length > 0 && formData.eventId) {
+      checkQualificationForEvent(formData.eventId).then((qualified) => {
+        if (!qualified && step === 2) {
+          // Reset to step 1 if not qualified and currently on step 2
+          setStep(1);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contestant, formData.eventId]);
 
   useEffect(() => {
     if (formData.eventId && formData.mastery && formData.participantIds.length > 0) {
@@ -1191,7 +1265,7 @@ export default function PerformanceTypeEntryPage() {
     }
   };
 
-  const nextStep = () => {
+  const nextStep = async () => {
     if (step === 1 && !formData.eventId) {
       showAlert('Please select an event first', 'warning');
       return;
@@ -1213,6 +1287,14 @@ export default function PerformanceTypeEntryPage() {
         if (now > registrationDeadline) {
           showAlert('❌ Registration deadline has passed for this event. Please select a different event.', 'error');
           return;
+        }
+
+        // Check qualification before proceeding to step 2
+        if (contestant && contestant.dancers && contestant.dancers.length > 0) {
+          const qualified = await checkQualificationForEvent(formData.eventId);
+          if (!qualified) {
+            return; // Already showed error and blocked
+          }
         }
       }
     }
@@ -1297,7 +1379,7 @@ export default function PerformanceTypeEntryPage() {
             <p className="text-blue-200 text-sm">Check your email for Yoco card payment link or EFT details</p>
           </div>
           <div className="space-y-3">
-            {isStudioMode ? (
+            {isStudioMode && studioId ? (
               <>
                 <Link 
                   href={`/studio-dashboard?studioId=${studioId}`}
@@ -1538,10 +1620,44 @@ export default function PerformanceTypeEntryPage() {
               <div>
                 <h2 className="text-2xl font-bold text-white mb-6">Performance Details</h2>
                 
+                {/* Qualification Blocked Message */}
+                {qualificationBlocked && qualificationError && (
+                  <div className="mb-6 p-6 bg-gradient-to-r from-red-900/40 to-orange-900/40 border-2 border-red-500/50 rounded-xl">
+                    <div className="flex items-start space-x-4">
+                      <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-2xl">🚫</span>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-red-300 mb-2">Entry Not Allowed</h3>
+                        <p className="text-red-200 mb-4">{qualificationError}</p>
+                        <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4">
+                          <p className="text-red-200 text-sm font-semibold mb-2">What you need to do:</p>
+                          <ul className="text-red-200/90 text-sm space-y-1 list-disc list-inside">
+                            <li>Participate in a Regional Event first</li>
+                            <li>Achieve a minimum score of 75% in your performance</li>
+                            <li>Wait for scores to be published</li>
+                            <li>Then you'll be able to enter National Events</li>
+                          </ul>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setQualificationBlocked(false);
+                            setQualificationError(null);
+                            setFormData(prev => ({ ...prev, eventId: '' }));
+                            setStep(1);
+                          }}
+                          className="mt-4 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
+                        >
+                          Select Different Event
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 
                 {/* Participant Selection - Enhanced Multi-Select */}
-                  <div className="mb-6">
+                  <div className={`mb-6 ${qualificationBlocked ? 'opacity-50 pointer-events-none' : ''}`}>
                     <h3 className="text-lg font-semibold text-white mb-4">Select Participants</h3>
                     
                   {isDancersLoading ? (

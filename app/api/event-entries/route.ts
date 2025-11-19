@@ -144,6 +144,15 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+    
+    console.log(`[Qualification] Event retrieved: ${event.id} - ${event.name}`);
+    console.log(`[Qualification] Event raw data:`, JSON.stringify({
+      eventType: (event as any).eventType,
+      eventMode: (event as any).eventMode,
+      qualificationRequired: (event as any).qualificationRequired,
+      qualificationSource: (event as any).qualificationSource,
+      minimumQualificationScore: (event as any).minimumQualificationScore
+    }, null, 2));
 
     // Check if event is still accepting registrations
     const now = new Date();
@@ -162,6 +171,253 @@ export async function POST(request: NextRequest) {
         { error: 'Registration deadline has passed for this event' },
         { status: 400 }
       );
+    }
+
+    // Validate event mode vs entry type
+    const entryType = body.entryType || 'live';
+    const eventMode = (event as any).eventMode || 'HYBRID';
+    
+    if (eventMode === 'VIRTUAL' && entryType === 'live') {
+      return NextResponse.json(
+        { error: 'This event only accepts virtual entries. Live entries are not allowed.' },
+        { status: 400 }
+      );
+    }
+    
+    if (eventMode === 'LIVE' && entryType === 'virtual') {
+      return NextResponse.json(
+        { error: 'This event only accepts live entries. Virtual entries are not allowed.' },
+        { status: 400 }
+      );
+    }
+
+    // QUALIFICATION VALIDATION - Check if dancer meets qualification requirements
+    // Safety check: If event is NATIONAL_EVENT, automatically require qualification
+    let eventType = (event as any).eventType || 'REGIONAL_EVENT';
+    
+    console.log(`[Qualification] Event configuration check for event ${event.id} (${event.name}):`);
+    console.log(`  - eventType from DB: ${(event as any).eventType || 'NULL'}`);
+    console.log(`  - qualificationRequired from DB: ${(event as any).qualificationRequired}`);
+    console.log(`  - qualificationSource from DB: ${(event as any).qualificationSource || 'NULL'}`);
+    console.log(`  - minimumQualificationScore from DB: ${(event as any).minimumQualificationScore || 'NULL'}`);
+    
+    // Additional safety: If event name contains "national" but event_type is not set, treat as NATIONAL_EVENT
+    if (!(event as any).eventType && event.name && event.name.toLowerCase().includes('national')) {
+      console.warn(`⚠️ [Qualification] Event "${event.name}" (${event.id}) has "national" in name but event_type not set. Treating as NATIONAL_EVENT.`);
+      eventType = 'NATIONAL_EVENT';
+    }
+    
+    let qualificationRequired = (event as any).qualificationRequired ?? false;
+    
+    // Auto-enforce qualification for NATIONAL_EVENT if not explicitly set
+    if (eventType === 'NATIONAL_EVENT' && !qualificationRequired) {
+      console.warn(`⚠️ [Qualification] NATIONAL_EVENT "${event.name}" (${event.id}) has qualificationRequired=false. Auto-enforcing qualification.`);
+      qualificationRequired = true;
+      // Also ensure qualification_source is set
+      if (!(event as any).qualificationSource) {
+        (event as any).qualificationSource = 'REGIONAL';
+      }
+      if (!(event as any).minimumQualificationScore) {
+        (event as any).minimumQualificationScore = 75;
+      }
+    }
+    
+    console.log(`[Qualification] Final validation state:`);
+    console.log(`  - eventType: ${eventType}`);
+    console.log(`  - qualificationRequired: ${qualificationRequired}`);
+    
+    if (qualificationRequired) {
+      const qualificationSource = (event as any).qualificationSource || null;
+      const minimumQualificationScore = (event as any).minimumQualificationScore || null;
+      
+      console.log(`[Qualification] ✅ Qualification REQUIRED - source: ${qualificationSource}, minScore: ${minimumQualificationScore}`);
+      
+      // Get the first participant (primary dancer) for qualification check
+      const primaryDancerId = body.participantIds[0];
+      
+      // Log qualification check attempt
+      const { getSql } = await import('@/lib/database');
+      const sqlClient = getSql();
+      const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      try {
+        await sqlClient`
+          INSERT INTO qualification_audit_logs (id, event_id, dancer_id, action_type, action_details, performed_by, performed_at)
+          VALUES (
+            ${auditId},
+            ${body.eventId},
+            ${primaryDancerId},
+            'ENTRY_ATTEMPT',
+            ${JSON.stringify({ 
+              eventId: body.eventId, 
+              dancerId: primaryDancerId,
+              qualificationSource,
+              minimumQualificationScore,
+              entryType
+            })},
+            ${body.eodsaId || 'system'},
+            now()
+          )
+        `;
+      } catch (auditError) {
+        console.warn('Failed to log qualification audit:', auditError);
+      }
+      
+      if (qualificationSource === 'REGIONAL') {
+        if (minimumQualificationScore === null || minimumQualificationScore === undefined) {
+          console.error(`[Qualification] REGIONAL qualification required but minimumQualificationScore is null/undefined for event ${body.eventId}`);
+          return NextResponse.json(
+            { error: 'This event requires qualification from a Regional Event, but no minimum score is set. Please contact support.' },
+            { status: 400 }
+          );
+        }
+        
+        console.log(`[Qualification] Checking REGIONAL qualification for dancer ${primaryDancerId} (EODSA: ${body.eodsaId}) with minimum score ${minimumQualificationScore}`);
+        const hasQualification = await db.checkRegionalQualification(primaryDancerId, minimumQualificationScore);
+        console.log(`[Qualification] Qualification check result: ${hasQualification}`);
+        
+        if (!hasQualification) {
+          console.log(`[Qualification] ❌ BLOCKING entry - dancer ${primaryDancerId} does not have qualifying regional performance`);
+          // Log blocked entry
+          try {
+            await sqlClient`
+              INSERT INTO qualification_audit_logs (id, event_id, dancer_id, action_type, action_details, performed_by, performed_at)
+              VALUES (
+                ${`audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`},
+                ${body.eventId},
+                ${primaryDancerId},
+                'ENTRY_BLOCKED',
+                ${JSON.stringify({ 
+                  reason: 'REGIONAL_QUALIFICATION_FAILED',
+                  requiredScore: minimumQualificationScore,
+                  eventId: body.eventId
+                })},
+                ${body.eodsaId || 'system'},
+                now()
+              )
+            `;
+          } catch (auditError) {
+            console.warn('Failed to log blocked entry audit:', auditError);
+          }
+          
+          return NextResponse.json(
+            { 
+              error: `You must qualify from a Regional Event with a minimum score of ${minimumQualificationScore}% to enter this event. Please participate in a Regional Event first.`,
+              qualificationBlocked: true,
+              requiredScore: minimumQualificationScore,
+              qualificationSource: 'REGIONAL'
+            },
+            { status: 400 }
+          );
+        }
+      } else if (qualificationSource === 'ANY_NATIONAL_LEVEL') {
+        const hasQualification = await db.checkNationalLevelQualification(
+          primaryDancerId, 
+          minimumQualificationScore || undefined
+        );
+        
+        if (!hasQualification) {
+          // Log blocked entry
+          try {
+            await sqlClient`
+              INSERT INTO qualification_audit_logs (id, event_id, dancer_id, action_type, action_details, performed_by, performed_at)
+              VALUES (
+                ${`audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`},
+                ${body.eventId},
+                ${primaryDancerId},
+                'ENTRY_BLOCKED',
+                ${JSON.stringify({ 
+                  reason: 'NATIONAL_LEVEL_QUALIFICATION_FAILED',
+                  requiredScore: minimumQualificationScore,
+                  eventId: body.eventId
+                })},
+                ${body.eodsaId || 'system'},
+                now()
+              )
+            `;
+          } catch (auditError) {
+            console.warn('Failed to log blocked entry audit:', auditError);
+          }
+          
+          const scoreText = minimumQualificationScore 
+            ? ` with a minimum score of ${minimumQualificationScore}%`
+            : '';
+          
+          return NextResponse.json(
+            { 
+              error: `You must have participated in a National or Qualifier Event${scoreText} to enter this event.`,
+              qualificationBlocked: true,
+              requiredScore: minimumQualificationScore,
+              qualificationSource: 'ANY_NATIONAL_LEVEL'
+            },
+            { status: 400 }
+          );
+        }
+      } else if (qualificationSource === 'MANUAL') {
+        const hasQualification = await db.checkManualQualification(body.eventId, primaryDancerId);
+        
+        if (!hasQualification) {
+          // Log blocked entry
+          try {
+            await sqlClient`
+              INSERT INTO qualification_audit_logs (id, event_id, dancer_id, action_type, action_details, performed_by, performed_at)
+              VALUES (
+                ${`audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`},
+                ${body.eventId},
+                ${primaryDancerId},
+                'ENTRY_BLOCKED',
+                ${JSON.stringify({ 
+                  reason: 'MANUAL_QUALIFICATION_REQUIRED',
+                  eventId: body.eventId
+                })},
+                ${body.eodsaId || 'system'},
+                now()
+              )
+            `;
+          } catch (auditError) {
+            console.warn('Failed to log blocked entry audit:', auditError);
+          }
+          
+          return NextResponse.json(
+            { 
+              error: 'You must be manually qualified by an administrator to enter this event. Please contact support.',
+              qualificationBlocked: true,
+              qualificationSource: 'MANUAL'
+            },
+            { status: 400 }
+          );
+        }
+      } else if (qualificationSource === 'CUSTOM') {
+        // Log blocked entry - custom rules not implemented yet
+        try {
+          await sqlClient`
+            INSERT INTO qualification_audit_logs (id, event_id, dancer_id, action_type, action_details, performed_by, performed_at)
+            VALUES (
+              ${`audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`},
+              ${body.eventId},
+              ${primaryDancerId},
+              'ENTRY_BLOCKED',
+              ${JSON.stringify({ 
+                reason: 'CUSTOM_QUALIFICATION_REQUIRED',
+                eventId: body.eventId
+              })},
+              ${body.eodsaId || 'system'},
+              now()
+            )
+          `;
+        } catch (auditError) {
+          console.warn('Failed to log blocked entry audit:', auditError);
+        }
+        
+        return NextResponse.json(
+          { 
+            error: 'This event has custom qualification requirements. Please contact the administrator for more information.',
+            qualificationBlocked: true,
+            qualificationSource: 'CUSTOM'
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // UNIFIED SYSTEM VALIDATION: Check dancer eligibility

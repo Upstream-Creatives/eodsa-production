@@ -209,6 +209,8 @@ export default function CompetitionEntryPage() {
   const [showEftModal, setShowEftModal] = useState(false);
   const [eftInvoiceNumber, setEftInvoiceNumber] = useState('');
   const [showHelp, setShowHelp] = useState(true);
+  const [qualificationBlocked, setQualificationBlocked] = useState(false);
+  const [qualificationError, setQualificationError] = useState<string | null>(null);
   // Coachmark tour state
   const [isTourActive, setIsTourActive] = useState(true);
   const [tourStep, setTourStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -235,6 +237,14 @@ export default function CompetitionEntryPage() {
       loadEvent(eventId);
     }
   }, [region, eodsaId, studioId, eventId]);
+
+  // Check qualification when contestant loads and event is already loaded
+  useEffect(() => {
+    if (contestant && contestant.dancers && contestant.dancers.length > 0 && event && eventId) {
+      checkQualificationForEvent(eventId, event);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contestant, event, eventId]);
 
   // Auto-select current dancer when opening Solo form for independent dancers
   useEffect(() => {
@@ -459,12 +469,45 @@ export default function CompetitionEntryPage() {
         if (data.success) {
           const selectedEvent = data.events.find((e: Event) => e.id === id);
           setEvent(selectedEvent || null);
+          
+          // Check qualification if contestant is loaded
+          if (selectedEvent && contestant && contestant.dancers && contestant.dancers.length > 0) {
+            await checkQualificationForEvent(id, selectedEvent);
+          }
         }
       }
     } catch (error) {
       console.error('Failed to load event:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Check qualification for an event
+  const checkQualificationForEvent = async (eventId: string, eventData: Event) => {
+    if (!contestant || !contestant.dancers || contestant.dancers.length === 0) {
+      return;
+    }
+
+    const primaryDancerId = contestant.dancers[0].id;
+
+    try {
+      const response = await fetch(`/api/events/${eventId}/check-qualification?dancerId=${primaryDancerId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        if (!data.qualified) {
+          setQualificationBlocked(true);
+          setQualificationError(data.reason || 'You are not qualified to enter this event.');
+          error(data.reason || 'You are not qualified to enter this event.');
+        } else {
+          setQualificationBlocked(false);
+          setQualificationError(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking qualification:', error);
+      // On error, allow entry (server-side validation will catch it)
     }
   };
 
@@ -1773,7 +1816,40 @@ export default function CompetitionEntryPage() {
         </div>
       </div>
 
+      {/* Qualification Blocked Message */}
+      {qualificationBlocked && qualificationError && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-gradient-to-r from-red-900/40 to-orange-900/40 border-2 border-red-500/50 rounded-xl p-6">
+            <div className="flex items-start space-x-4">
+              <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-2xl">🚫</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-red-300 mb-2">Entry Not Allowed</h3>
+                <p className="text-red-200 mb-4">{qualificationError}</p>
+                <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4">
+                  <p className="text-red-200 text-sm font-semibold mb-2">What you need to do:</p>
+                  <ul className="text-red-200/90 text-sm space-y-1 list-disc list-inside">
+                    <li>Participate in a Regional Event first</li>
+                    <li>Achieve a minimum score of 75% in your performance</li>
+                    <li>Wait for scores to be published</li>
+                    <li>Then you'll be able to enter National Events</li>
+                  </ul>
+                </div>
+                <Link
+                  href={isStudioMode ? `/event-dashboard/${region}?studioId=${studioId}` : `/`}
+                  className="mt-4 inline-block px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
+                >
+                  Back to Events
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
+      {!qualificationBlocked && (
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Performance Type Selection and Forms */}
@@ -2658,6 +2734,7 @@ export default function CompetitionEntryPage() {
           />
         )}
       </div>
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && submissionResult && (
@@ -2724,7 +2801,7 @@ export default function CompetitionEntryPage() {
 
             {/* Action Buttons */}
             <div className="flex space-x-3">
-              {isStudioMode ? (
+              {isStudioMode && studioId ? (
                 <>
                   <button
                     onClick={() => {
@@ -2738,7 +2815,13 @@ export default function CompetitionEntryPage() {
                     Enter More Events
                   </button>
                   <button
-                    onClick={() => router.push(`/studio-dashboard?studioId=${studioId}`)}
+                    onClick={() => {
+                      if (studioId) {
+                        router.push(`/studio-dashboard?studioId=${studioId}`);
+                      } else {
+                        router.push('/');
+                      }
+                    }}
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold"
                   >
                     Studio Dashboard
