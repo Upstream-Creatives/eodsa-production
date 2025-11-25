@@ -1,20 +1,24 @@
 # 🚀 EODSA Deployment Setup - Official Guide
 
-## 📋 Repository & Branch Structure
+## ⚠️ IMPORTANT: Repository Naming Confusion
 
-### **PRODUCTION** 🟢
-- **Vercel Project**: `eodsa-demo`
-- **Repository**: `Upstream-Creatives/eodsa-production`
-- **Branch**: `main`
-- **URL**: `https://eodsa.vercel.app` (or your production domain)
-- **Purpose**: Live production environment
+**The repository names are confusing but here's the ACTUAL setup:**
 
 ### **STAGING** 🟡 (OFFICIAL STAGING ENVIRONMENT)
 - **Vercel Project**: `eodsa-stagingv2`
-- **Repository**: `Upstream-Creatives/eodsa-production`
-- **Branch**: `staging-v2` ⭐ **THIS IS THE STAGING BRANCH**
+- **Repository**: `Upstream-Creatives/eodsa-production` ⚠️ (Yes, "production" repo is used for STAGING!)
+- **Branch**: `staging-v2`
+- **Remote**: `staging`
 - **URL**: `https://eodsa-staging-v2.vercel.app`
 - **Purpose**: Testing environment before production
+
+### **PRODUCTION** 🟢 (LIVE PRODUCTION ENVIRONMENT)
+- **Vercel Project**: `eodsa-demo`
+- **Repository**: `Upstream-Creatives/eodsa-staging` ⚠️ (Yes, "staging" repo is used for PRODUCTION!)
+- **Branch**: `main`
+- **Remote**: `origin`
+- **URL**: `https://eodsa.vercel.app` (or your production domain)
+- **Purpose**: Live production environment
 
 ---
 
@@ -23,13 +27,14 @@
 Your local repository has two remotes:
 
 ```bash
-origin    → git@github.com:Upstream-Creatives/eodsa-staging.git
-staging   → git@github.com:Upstream-Creatives/eodsa-production.git
+origin    → git@github.com:Upstream-Creatives/eodsa-staging.git      (PRODUCTION)
+staging   → git@github.com:Upstream-Creatives/eodsa-production.git   (STAGING)
 ```
 
 ### ⚠️ Important Notes:
-- **`origin`** = Development repository (not used for deployments)
-- **`staging`** = Production repository (used for both staging AND production)
+- **`origin`** = `eodsa-staging` repository → Used for **PRODUCTION** deployments
+- **`staging`** = `eodsa-production` repository → Used for **STAGING** deployments
+- **Yes, the names are backwards!** This is due to historical reasons.
 
 ---
 
@@ -59,33 +64,29 @@ git push staging staging-v2
 
 ## 📤 How to Deploy to Production
 
-### Step 1: Switch to main branch
+### Step 1: Make sure you're on main branch
 ```bash
 git checkout main
 ```
 
-### Step 2: Merge staging-v2 into main (after testing)
+### Step 2: Push to origin remote (eodsa-staging repo)
 ```bash
-git merge staging-v2
+git push origin main
 ```
 
-### Step 3: Push to staging remote (yes, same remote!)
-```bash
-git push staging main
-```
-
-### Step 4: Vercel will auto-deploy
+### Step 3: Vercel will auto-deploy
 - Go to: https://vercel.com/angelosolis-projects/eodsa-demo
 - Check deployment status
+- Production URL: https://eodsa.vercel.app
 
 ---
 
 ## 🎯 Quick Reference
 
-| Environment | Vercel Project | Repository | Branch | URL |
-|------------|---------------|------------|-------|-----|
-| **STAGING** 🟡 | `eodsa-stagingv2` | `eodsa-production` | `staging-v2` | https://eodsa-staging-v2.vercel.app |
-| **PRODUCTION** 🟢 | `eodsa-demo` | `eodsa-production` | `main` | https://eodsa.vercel.app |
+| Environment | Vercel Project | Repository | Branch | Remote | URL |
+|------------|---------------|------------|--------|--------|-----|
+| **STAGING** 🟡 | `eodsa-stagingv2` | `eodsa-production` | `staging-v2` | `staging` | https://eodsa-staging-v2.vercel.app |
+| **PRODUCTION** 🟢 | `eodsa-demo` | `eodsa-staging` | `main` | `origin` | https://eodsa.vercel.app |
 
 ---
 
@@ -106,37 +107,31 @@ git remote -v
 git branch -vv
 ```
 
-### See what's different between branches
-```bash
-git diff staging-v2..main --name-only
-```
-
 ---
 
 ## ⚠️ Common Mistakes to Avoid
 
-1. ❌ **Don't push to `origin`** - That's the dev repo, not for deployments
-2. ✅ **Always push to `staging` remote** - This is the deployment repo
-3. ❌ **Don't confuse `eodsa-staging` repo with staging environment** - They're different!
-4. ✅ **Use `staging-v2` branch for staging** - This is the official staging branch
-5. ✅ **Use `main` branch for production** - This is the production branch
+1. ❌ **Don't push production to `staging` remote** - Use `origin` remote for production
+2. ❌ **Don't push staging to `origin` remote** - Use `staging` remote for staging
+3. ✅ **Remember: `origin` = Production, `staging` = Staging** (backwards from what you'd expect!)
+4. ✅ **Staging uses `eodsa-production` repo** (confusing but true)
+5. ✅ **Production uses `eodsa-staging` repo** (confusing but true)
 
 ---
 
-## 🆘 Troubleshooting
+## 🆘 Quick Deployment Commands
 
-### "Which branch should I use?"
-- **For testing/development**: `staging-v2` branch → pushes to `staging` remote
-- **For production**: `main` branch → pushes to `staging` remote
-
-### "Which remote should I push to?"
-- **Always push to `staging` remote** for deployments
-- `origin` remote is only for development work
-
-### "How do I know if I'm on the right branch?"
+### Deploy to Staging:
 ```bash
-git branch --show-current
-# Should show: staging-v2 (for staging) or main (for production)
+git checkout staging-v2
+git merge main  # if needed
+git push staging staging-v2
+```
+
+### Deploy to Production:
+```bash
+git checkout main
+git push origin main
 ```
 
 ---
@@ -148,14 +143,13 @@ git branch --show-current
 - [ ] On `staging-v2` branch
 - [ ] Merged latest from `main` (if needed)
 - [ ] Run `git push staging staging-v2`
-- [ ] Check Vercel dashboard for deployment
+- [ ] Check Vercel dashboard: https://vercel.com/angelosolis-projects/eodsa-staging-v2
 
 ### Before Deploying to Production:
 - [ ] All changes tested in staging
 - [ ] On `main` branch
-- [ ] Merged `staging-v2` into `main`
-- [ ] Run `git push staging main`
-- [ ] Check Vercel dashboard for deployment
+- [ ] Run `git push origin main`
+- [ ] Check Vercel dashboard: https://vercel.com/angelosolis-projects/eodsa-demo
 
 ---
 
@@ -163,7 +157,6 @@ git branch --show-current
 
 **STAGING = `staging-v2` branch in `eodsa-production` repo → `eodsa-stagingv2` Vercel project**
 
-**PRODUCTION = `main` branch in `eodsa-production` repo → `eodsa-demo` Vercel project**
+**PRODUCTION = `main` branch in `eodsa-staging` repo → `eodsa-demo` Vercel project**
 
-Both use the same repository (`eodsa-production`) but different branches!
-
+⚠️ **Yes, the repository names are backwards from what you'd expect!** This is the current setup and changing it would require reconfiguring Vercel projects.
