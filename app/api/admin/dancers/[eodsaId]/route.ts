@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { unifiedDb, db } from '@/lib/database';
+import { unifiedDb, db, getSql } from '@/lib/database';
 
 // Update dancer information (admin only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ eodsaId: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { eodsaId } = await params;
     const body = await request.json();
     const { updates, adminId } = body;
 
@@ -34,6 +34,21 @@ export async function PUT(
       );
     }
 
+    // Look up dancer by eodsaId to get internal id
+    const sqlClient = getSql();
+    const dancerResult = await sqlClient`
+      SELECT id FROM dancers WHERE eodsa_id = ${eodsaId}
+    ` as any[];
+    
+    if (dancerResult.length === 0) {
+      return NextResponse.json(
+        { error: 'Dancer not found' },
+        { status: 404 }
+      );
+    }
+
+    const dancerId = dancerResult[0].id;
+
     // Calculate age if dateOfBirth is being updated
     if (updates.dateOfBirth) {
       const birthDate = new Date(updates.dateOfBirth);
@@ -47,7 +62,7 @@ export async function PUT(
     }
 
     // Update dancer information
-    await unifiedDb.updateDancer(id, updates);
+    await unifiedDb.updateDancer(dancerId, updates);
 
     return NextResponse.json({
       success: true,
