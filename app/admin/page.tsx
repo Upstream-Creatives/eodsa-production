@@ -279,6 +279,19 @@ function AdminDashboard() {
   const [showStudioModal, setShowStudioModal] = useState(false);
   const [selectedStudioProfile, setSelectedStudioProfile] = useState<any>(null);
   const [loadingStudioProfile, setLoadingStudioProfile] = useState(false);
+  const [showEditDancerModal, setShowEditDancerModal] = useState(false);
+  const [editingDancer, setEditingDancer] = useState<Dancer | null>(null);
+  const [editDancerData, setEditDancerData] = useState({
+    name: '',
+    surname: '',
+    nationalId: '',
+    email: '',
+    phone: '',
+    guardianName: '',
+    guardianEmail: '',
+    guardianPhone: '',
+    dateOfBirth: ''
+  });
 
   // Edit event state
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -356,53 +369,75 @@ function AdminDashboard() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    try {
-      const [eventsRes, dancersRes, studiosRes, applicationsRes, clientsRes] = await Promise.all([
-        fetch('/api/events'),
-        fetch('/api/admin/dancers'),
-        fetch('/api/admin/studios'),
-        fetch('/api/admin/studio-applications'),
-        fetch('/api/clients')
-      ]);
-
-      // Handle events response
-      if (eventsRes.ok) {
-        const eventsData = await eventsRes.json();
-        // Handle events - check for both success flag and array format
-        if (eventsData.success && Array.isArray(eventsData.events)) {
-          setEvents(eventsData.events || []);
-        } else if (Array.isArray(eventsData)) {
-          // Fallback: if response is directly an array
-          setEvents(eventsData);
-        } else if (eventsData.success && !eventsData.events) {
-          // Success but no events array - might be empty or missing
-          console.warn('Events API returned success but no events array:', eventsData);
-          setEvents([]);
+    
+    // Progressive loading: Start all requests in parallel but handle responses as they arrive
+    const fetchPromises = [
+      fetch('/api/events').then(async (res) => {
+        if (res.ok) {
+          const eventsData = await res.json();
+          // Handle events - check for both success flag and array format
+          if (eventsData.success && Array.isArray(eventsData.events)) {
+            setEvents(eventsData.events || []);
+          } else if (Array.isArray(eventsData)) {
+            // Fallback: if response is directly an array
+            setEvents(eventsData);
+          } else if (eventsData.success && !eventsData.events) {
+            // Success but no events array - might be empty or missing
+            console.warn('Events API returned success but no events array:', eventsData);
+            setEvents([]);
+          } else {
+            console.error('Events data format error:', eventsData);
+            setEvents([]);
+          }
         } else {
-          console.error('Events data format error:', eventsData);
+          console.error('Failed to fetch events:', res.status, res.statusText);
+          const errorData = await res.json().catch(() => ({}));
+          console.error('Events error details:', errorData);
           setEvents([]);
         }
-      } else {
-        console.error('Failed to fetch events:', eventsRes.status, eventsRes.statusText);
-        const errorData = await eventsRes.json().catch(() => ({}));
-        console.error('Events error details:', errorData);
+      }).catch((error) => {
+        console.error('Error fetching events:', error);
         setEvents([]);
-      }
-
-      // Handle other responses
-      const dancersData = await dancersRes.json();
-      const studiosData = await studiosRes.json();
-      const applicationsData = await applicationsRes.json();
-      const clientsData = await clientsRes.json();
+      }),
       
-      if (dancersData.success) setDancers(dancersData.dancers);
-      if (studiosData.success) setStudios(studiosData.studios);
-      if (applicationsData.success) setStudioApplications(applicationsData.applications);
-      if (clientsData.success) setClients(clientsData.clients);
+      fetch('/api/admin/dancers').then(async (res) => {
+        const data = await res.json();
+        if (data.success) setDancers(data.dancers || []);
+      }).catch((error) => {
+        console.error('Error fetching dancers:', error);
+        setDancers([]);
+      }),
+      
+      fetch('/api/admin/studios').then(async (res) => {
+        const data = await res.json();
+        if (data.success) setStudios(data.studios || []);
+      }).catch((error) => {
+        console.error('Error fetching studios:', error);
+        setStudios([]);
+      }),
+      
+      fetch('/api/admin/studio-applications').then(async (res) => {
+        const data = await res.json();
+        if (data.success) setStudioApplications(data.applications || []);
+      }).catch((error) => {
+        console.error('Error fetching studio applications:', error);
+        setStudioApplications([]);
+      }),
+      
+      fetch('/api/clients').then(async (res) => {
+        const data = await res.json();
+        if (data.success) setClients(data.clients || []);
+      }).catch((error) => {
+        console.error('Error fetching clients:', error);
+        setClients([]);
+      })
+    ];
+
+    try {
+      // Wait for all requests to complete (or fail)
+      await Promise.allSettled(fetchPromises);
     } catch (error) {
       console.error('Error fetching data:', error);
-      // Ensure events is set to empty array on error
-      setEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -1349,6 +1384,98 @@ function AdminDashboard() {
     }
   };
 
+  const handleEditDancer = (dancer: Dancer) => {
+    // Split name into name and surname if possible
+    const nameParts = dancer.name.split(' ');
+    const firstName = nameParts[0] || '';
+    const surname = nameParts.slice(1).join(' ') || '';
+    
+    setEditingDancer(dancer);
+    setEditDancerData({
+      name: firstName,
+      surname: surname,
+      nationalId: dancer.nationalId || '',
+      email: dancer.email || '',
+      phone: dancer.phone || '',
+      guardianName: dancer.guardianName || '',
+      guardianEmail: dancer.guardianEmail || '',
+      guardianPhone: dancer.guardianPhone || '',
+      dateOfBirth: dancer.dateOfBirth || ''
+    });
+    setShowEditDancerModal(true);
+  };
+
+  const handleSaveDancer = async () => {
+    if (!editingDancer) return;
+
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        showAlert('Session expired. Please log in again.', 'error');
+        return;
+      }
+
+      const adminData = JSON.parse(session);
+      
+      // Combine name and surname
+      const fullName = `${editDancerData.name.trim()} ${editDancerData.surname.trim()}`.trim();
+      
+      if (!fullName || !editDancerData.nationalId) {
+        showAlert('Name and National ID are required.', 'warning');
+        return;
+      }
+
+      const updates: any = {
+        name: fullName,
+        nationalId: editDancerData.nationalId
+      };
+
+      if (editDancerData.dateOfBirth) {
+        updates.dateOfBirth = editDancerData.dateOfBirth;
+      }
+      if (editDancerData.email) {
+        updates.email = editDancerData.email;
+      }
+      if (editDancerData.phone) {
+        updates.phone = editDancerData.phone;
+      }
+      if (editDancerData.guardianName) {
+        updates.guardianName = editDancerData.guardianName;
+      }
+      if (editDancerData.guardianEmail) {
+        updates.guardianEmail = editDancerData.guardianEmail;
+      }
+      if (editDancerData.guardianPhone) {
+        updates.guardianPhone = editDancerData.guardianPhone;
+      }
+
+      const response = await fetch(`/api/admin/dancers/${editingDancer.eodsaId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          updates,
+          adminId: adminData.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showAlert('Dancer updated successfully!', 'success');
+        setShowEditDancerModal(false);
+        setEditingDancer(null);
+        fetchData(); // Refresh the data
+      } else {
+        showAlert(`Error: ${data.error || 'Unknown error occurred'}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error updating dancer:', error);
+      showAlert('Error updating dancer. Please check your connection and try again.', 'error');
+    }
+  };
+
   const handleApproveStudio = async (studioId: string) => {
     try {
       const session = localStorage.getItem('adminSession');
@@ -2008,6 +2135,7 @@ function AdminDashboard() {
             handleRejectDancer={handleRejectDancer}
             handleViewFinances={handleViewFinances}
             handleRegistrationFeeUpdate={handleRegistrationFeeUpdate}
+            handleEditDancer={handleEditDancer}
             theme={theme}
             themeClasses={themeClasses}
           />
@@ -3971,16 +4099,16 @@ function AdminDashboard() {
       {/* Financial Management Modal */}
       {showFinancialModal && selectedDancerFinances && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+          <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} max-w-2xl w-full max-h-[90vh] overflow-y-auto border ${themeClasses.cardBorder}`}>
+            <div className={`p-6 border-b ${themeClasses.cardBorder}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
                     <span className="text-white text-lg">💰</span>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold ${themeClasses.textPrimary}">Financial Overview</h2>
-                    <p className="${themeClasses.textSecondary}">{selectedDancerFinances.name} - {selectedDancerFinances.eodsaId}</p>
+                    <h2 className={`${themeClasses.heading2}`}>Financial Overview</h2>
+                    <p className={themeClasses.textSecondary}>{selectedDancerFinances.name} - {selectedDancerFinances.eodsaId}</p>
                   </div>
                 </div>
                 <button
@@ -3995,14 +4123,14 @@ function AdminDashboard() {
             <div className="p-6 space-y-6">
               {loadingFinances ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-                  <p className="${themeClasses.textSecondary}">Loading financial information...</p>
+                  <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-emerald-400' : 'border-emerald-600'} mx-auto mb-4`}></div>
+                  <p className={themeClasses.textSecondary}>Loading financial information...</p>
                 </div>
               ) : (
                 <>
                   {/* Registration Fee Section */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
+                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                    <h3 className={`${themeClasses.heading3} mb-3 flex items-center`}>
                       <span className="mr-2">📝</span>
                       Registration Fee
                     </h3>
@@ -4011,8 +4139,8 @@ function AdminDashboard() {
                         <span className={`text-sm ${themeClasses.textSecondary}`}>Status:</span>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           selectedDancerFinances.registrationFeePaid
-                            ? 'bg-green-100 text-green-800 border border-green-200'
-                            : 'bg-red-100 text-red-800 border border-red-200'
+                            ? theme === 'dark' ? 'bg-green-900/80 text-green-200 border border-green-700' : 'bg-green-100 text-green-800 border border-green-200'
+                            : theme === 'dark' ? 'bg-red-900/80 text-red-200 border border-red-700' : 'bg-red-100 text-red-800 border border-red-200'
                         }`}>
                           {selectedDancerFinances.registrationFeePaid ? '✅ Paid' : '❌ Not Paid'}
                         </span>
@@ -4021,7 +4149,7 @@ function AdminDashboard() {
                       {selectedDancerFinances.registrationFeePaid && selectedDancerFinances.registrationFeePaidAt && (
                         <div className="flex justify-between items-center">
                           <span className={`text-sm ${themeClasses.textSecondary}`}>Paid Date:</span>
-                          <span className="text-sm ${themeClasses.textPrimary}">
+                          <span className={`text-sm ${themeClasses.textPrimary}`}>
                             {new Date(selectedDancerFinances.registrationFeePaidAt).toLocaleDateString()}
                           </span>
                         </div>
@@ -4030,16 +4158,18 @@ function AdminDashboard() {
                       {selectedDancerFinances.registrationFeeMasteryLevel && (
                         <div className="flex justify-between items-center">
                           <span className={`text-sm ${themeClasses.textSecondary}`}>Mastery Level:</span>
-                          <span className="text-sm ${themeClasses.textPrimary}">
+                          <span className={`text-sm ${themeClasses.textPrimary}`}>
                             {selectedDancerFinances.registrationFeeMasteryLevel}
                           </span>
                         </div>
                       )}
                       
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span className="text-sm font-medium text-gray-700">Registration Fee Amount:</span>
+                      <div className={`flex justify-between items-center pt-2 border-t ${themeClasses.cardBorder}`}>
+                        <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Registration Fee Amount:</span>
                         <span className={`text-sm font-bold ${
-                          selectedDancerFinances.registrationFeePaid ? 'text-green-600' : 'text-red-600'
+                          selectedDancerFinances.registrationFeePaid 
+                            ? theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                            : theme === 'dark' ? 'text-red-400' : 'text-red-600'
                         }`}>
                           {selectedDancerFinances.registrationFeePaid ? 'R0.00' : `R${EODSA_FEES.REGISTRATION.Nationals.toFixed(2)}`}
                         </span>
@@ -4048,21 +4178,21 @@ function AdminDashboard() {
                   </div>
 
                   {/* Enhanced Balance Overview */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
+                  <div className={`${theme === 'dark' ? 'bg-blue-900/20' : 'bg-blue-50'} ${themeClasses.cardRadius} p-4 border ${theme === 'dark' ? 'border-blue-700/50' : 'border-blue-200'}`}>
+                    <h3 className={`${themeClasses.heading3} mb-3 flex items-center`}>
                       <span className="mr-2">💰</span>
                       Financial Summary
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white rounded-lg p-3">
-                        <div className="text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider">Total Paid</div>
-                        <div className="text-lg font-bold text-green-600">
+                      <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} p-3 border ${themeClasses.cardBorder}`}>
+                        <div className={`text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>Total Paid</div>
+                        <div className={`text-lg font-bold ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
                           R{selectedDancerFinances.financial?.totalPaid?.toFixed(2) || '0.00'}
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-3">
-                        <div className="text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider">Outstanding</div>
-                        <div className="text-lg font-bold text-red-600">
+                      <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} p-3 border ${themeClasses.cardBorder}`}>
+                        <div className={`text-xs font-medium ${themeClasses.textMuted} uppercase tracking-wider`}>Outstanding</div>
+                        <div className={`text-lg font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                           R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
                         </div>
                       </div>
@@ -4071,26 +4201,26 @@ function AdminDashboard() {
 
                   {/* Solo Entries Section */}
                   {selectedDancerFinances.entries?.soloCount > 0 && (
-                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                      <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
+                    <div className={`${theme === 'dark' ? 'bg-purple-900/20' : 'bg-purple-50'} ${themeClasses.cardRadius} p-4 border ${theme === 'dark' ? 'border-purple-700/50' : 'border-purple-200'}`}>
+                      <h3 className={`${themeClasses.heading3} mb-3 flex items-center`}>
                         <span className="mr-2">🕺</span>
                         Solo Entries ({selectedDancerFinances.entries.soloCount})
                       </h3>
                       <div className="space-y-3">
                         {selectedDancerFinances.entries.solo.map((entry: any, index: number) => (
-                          <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                          <div key={index} className={`${themeClasses.cardBg} ${themeClasses.cardRadius} p-3 border ${themeClasses.cardBorder}`}>
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{entry.itemName}</div>
                                 <div className={`text-xs ${themeClasses.textMuted}`}>{entry.eventName}</div>
-                                <div className="text-xs text-purple-600 font-medium mt-1">Solo Performance</div>
+                                <div className={`text-xs ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'} font-medium mt-1`}>Solo Performance</div>
                               </div>
                               <div className="text-right ml-4">
                                 <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>R{entry.calculatedFee?.toFixed(2) || '0.00'}</div>
                                 <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
                                   entry.paymentStatus === 'paid' 
-                                    ? 'bg-green-100 text-green-800 border border-green-200'
-                                    : 'bg-red-100 text-red-800 border border-red-200'
+                                    ? theme === 'dark' ? 'bg-green-900/80 text-green-200 border border-green-700' : 'bg-green-100 text-green-800 border border-green-200'
+                                    : theme === 'dark' ? 'bg-red-900/80 text-red-200 border border-red-700' : 'bg-red-100 text-red-800 border border-red-200'
                                 }`}>
                                   {entry.paymentStatus?.toUpperCase() || 'PENDING'}
                                 </span>
@@ -4104,49 +4234,51 @@ function AdminDashboard() {
 
                   {/* Group Entries Section */}
                   {selectedDancerFinances.entries?.groupCount > 0 && (
-                    <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                      <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
+                    <div className={`${theme === 'dark' ? 'bg-orange-900/20' : 'bg-orange-50'} ${themeClasses.cardRadius} p-4 border ${theme === 'dark' ? 'border-orange-700/50' : 'border-orange-200'}`}>
+                      <h3 className={`${themeClasses.heading3} mb-3 flex items-center`}>
                         <span className="mr-2">👥</span>
                         Group Entries ({selectedDancerFinances.entries.groupCount})
                       </h3>
                       <div className="space-y-4">
                         {selectedDancerFinances.entries.group.map((entry: any, index: number) => (
-                          <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                          <div key={index} className={`${themeClasses.cardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.cardBorder}`}>
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
                                 <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>{entry.itemName}</div>
                                 <div className={`text-xs ${themeClasses.textMuted}`}>{entry.eventName}</div>
                                 <div className="flex items-center space-x-2 mt-1">
                                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                                    entry.participationRole === 'duet' ? 'bg-blue-100 text-blue-800' :
-                                    entry.participationRole === 'trio' ? 'bg-green-100 text-green-800' :
-                                    'bg-orange-100 text-orange-800'
+                                    entry.participationRole === 'duet' 
+                                      ? theme === 'dark' ? 'bg-blue-900/80 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                      : entry.participationRole === 'trio'
+                                      ? theme === 'dark' ? 'bg-green-900/80 text-green-200' : 'bg-green-100 text-green-800'
+                                      : theme === 'dark' ? 'bg-orange-900/80 text-orange-200' : 'bg-orange-100 text-orange-800'
                                   }`}>
                                     {entry.participationRole.toUpperCase()}
                                   </span>
                                   {entry.isMainContestant && (
-                                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${theme === 'dark' ? 'bg-yellow-900/80 text-yellow-200' : 'bg-yellow-100 text-yellow-800'}`}>
                                       MAIN CONTESTANT
                                     </span>
                                   )}
                                 </div>
                               </div>
                               <div className="text-right ml-4">
-                                <div className="text-xs ${themeClasses.textMuted} mb-1">
+                                <div className={`text-xs ${themeClasses.textMuted} mb-1`}>
                                   {entry.isMainContestant ? 'Full Fee' : 'Your Share'}
                                 </div>
                                 <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>
                                   R{entry.dancerShare?.toFixed(2) || '0.00'}
                                 </div>
                                 {!entry.isMainContestant && (
-                                  <div className="text-xs text-gray-400">
+                                  <div className={`text-xs ${themeClasses.textMuted}`}>
                                     of R{entry.calculatedFee?.toFixed(2) || '0.00'}
                                   </div>
                                 )}
                                 <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full mt-1 ${
                                   entry.paymentStatus === 'paid' 
-                                    ? 'bg-green-100 text-green-800 border border-green-200'
-                                    : 'bg-red-100 text-red-800 border border-red-200'
+                                    ? theme === 'dark' ? 'bg-green-900/80 text-green-200 border border-green-700' : 'bg-green-100 text-green-800 border border-green-200'
+                                    : theme === 'dark' ? 'bg-red-900/80 text-red-200 border border-red-700' : 'bg-red-100 text-red-800 border border-red-200'
                                 }`}>
                                   {entry.paymentStatus?.toUpperCase() || 'PENDING'}
                                 </span>
@@ -4154,14 +4286,14 @@ function AdminDashboard() {
                             </div>
                             
                             {/* Group Members List */}
-                            <div className="border-t border-gray-100 pt-3">
-                              <div className="text-xs font-medium ${themeClasses.textSecondary} mb-2">Group Members:</div>
+                            <div className={`border-t ${themeClasses.cardBorder} pt-3`}>
+                              <div className={`text-xs font-medium ${themeClasses.textSecondary} mb-2`}>Group Members:</div>
                               <div className="flex flex-wrap gap-1">
                                 {entry.participantNames?.map((name: string, nameIndex: number) => (
                                   <span key={nameIndex} className={`inline-flex px-2 py-1 text-xs rounded-full ${
                                     name === selectedDancerFinances.name 
-                                      ? 'bg-blue-100 text-blue-800 font-medium border border-blue-200' 
-                                      : 'bg-gray-100 text-gray-700'
+                                      ? theme === 'dark' ? 'bg-blue-900/80 text-blue-200 font-medium border border-blue-700' : 'bg-blue-100 text-blue-800 font-medium border border-blue-200'
+                                      : theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
                                   }`}>
                                     {name === selectedDancerFinances.name ? `${name} (You)` : name}
                                   </span>
@@ -4176,18 +4308,18 @@ function AdminDashboard() {
 
                   {/* No Entries State */}
                   {(!selectedDancerFinances.entries?.totalEntries || selectedDancerFinances.entries.totalEntries === 0) && (
-                    <div className="bg-gray-50 rounded-lg p-4">
+                    <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
                       <div className="text-center py-6">
-                        <div className="text-gray-400 text-4xl mb-3">🎭</div>
-                        <h3 className="text-lg font-medium mb-2">No Event Entries</h3>
-                        <p className="${themeClasses.textSecondary} text-sm">This dancer hasn't registered for any competitions yet.</p>
+                        <div className={`${themeClasses.textMuted} text-4xl mb-3`}>🎭</div>
+                        <h3 className={`${themeClasses.heading3} mb-2`}>No Event Entries</h3>
+                        <p className={`${themeClasses.textSecondary} text-sm`}>This dancer hasn't registered for any competitions yet.</p>
                       </div>
                     </div>
                   )}
 
                   {/* Detailed Outstanding Breakdown */}
-                  <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
+                  <div className={`${theme === 'dark' ? 'bg-red-900/20' : 'bg-gradient-to-r from-red-50 to-orange-50'} ${themeClasses.cardRadius} p-4 border ${theme === 'dark' ? 'border-red-700/50' : 'border-red-200'}`}>
+                    <h3 className={`${themeClasses.heading3} mb-3 flex items-center`}>
                       <span className="mr-2">⚠️</span>
                       Outstanding Balance Breakdown
                     </h3>
@@ -4195,7 +4327,7 @@ function AdminDashboard() {
                       {/* Registration Fee */}
                       <div className="flex justify-between items-center">
                         <span className={`text-sm ${themeClasses.textSecondary}`}>Registration Fee:</span>
-                        <span className="text-sm font-medium text-red-600">
+                        <span className={`text-sm font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                           R{selectedDancerFinances.financial?.registrationFeeOutstanding?.toFixed(2) || '0.00'}
                         </span>
                       </div>
@@ -4204,14 +4336,14 @@ function AdminDashboard() {
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className={`text-sm ${themeClasses.textSecondary}`}>Solo Entries Outstanding:</span>
-                          <span className="text-sm font-medium text-red-600">
+                          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                             R{(selectedDancerFinances.entries?.solo?.filter((e: any) => e.paymentStatus !== 'paid')
                               .reduce((sum: number, entry: any) => sum + (entry.calculatedFee || 0), 0) || 0).toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className={`text-sm ${themeClasses.textSecondary}`}>Group Entries Outstanding:</span>
-                          <span className="text-sm font-medium text-red-600">
+                          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                             R{(selectedDancerFinances.entries?.group?.filter((e: any) => e.paymentStatus !== 'paid')
                               .reduce((sum: number, entry: any) => sum + (entry.dancerShare || 0), 0) || 0).toFixed(2)}
                           </span>
@@ -4219,25 +4351,25 @@ function AdminDashboard() {
                       </div>
                       
                       {/* Total */}
-                      <div className="flex justify-between items-center pt-3 border-t border-red-200">
-                        <span className="text-base font-bold ${themeClasses.textPrimary}">TOTAL OUTSTANDING:</span>
-                        <span className="text-xl font-bold text-red-600">
+                      <div className={`flex justify-between items-center pt-3 border-t ${theme === 'dark' ? 'border-red-700/50' : 'border-red-200'}`}>
+                        <span className={`text-base font-bold ${themeClasses.textPrimary}`}>TOTAL OUTSTANDING:</span>
+                        <span className={`text-xl font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                           R{selectedDancerFinances.financial?.totalOutstanding?.toFixed(2) || '0.00'}
                         </span>
                       </div>
                       
                       {/* Payment Progress */}
                       {selectedDancerFinances.entries?.totalEntries > 0 && (
-                        <div className="pt-3 border-t border-red-200">
+                        <div className={`pt-3 border-t ${theme === 'dark' ? 'border-red-700/50' : 'border-red-200'}`}>
                           <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-medium ${themeClasses.textSecondary}">Payment Progress:</span>
+                            <span className={`text-xs font-medium ${themeClasses.textSecondary}`}>Payment Progress:</span>
                             <span className={`text-xs ${themeClasses.textMuted}`}>
                               {selectedDancerFinances.entries.all?.filter((e: any) => e.paymentStatus === 'paid').length || 0} of {selectedDancerFinances.entries.totalEntries} entries paid
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className={`w-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
                             <div 
-                              className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                              className={`${theme === 'dark' ? 'bg-green-500' : 'bg-green-500'} h-2 rounded-full transition-all duration-300`}
                               style={{
                                 width: `${selectedDancerFinances.entries.totalEntries > 0 
                                   ? ((selectedDancerFinances.entries.all?.filter((e: any) => e.paymentStatus === 'paid').length || 0) / selectedDancerFinances.entries.totalEntries) * 100 
@@ -4251,8 +4383,8 @@ function AdminDashboard() {
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold ${themeClasses.textPrimary} mb-3 flex items-center">
+                  <div className={`${theme === 'dark' ? 'bg-blue-900/20' : 'bg-blue-50'} ${themeClasses.cardRadius} p-4 border ${theme === 'dark' ? 'border-blue-700/50' : 'border-blue-200'}`}>
+                    <h3 className={`${themeClasses.heading3} mb-3 flex items-center`}>
                       <span className="mr-2">⚡</span>
                       Quick Actions
                     </h3>
@@ -4262,10 +4394,10 @@ function AdminDashboard() {
                           setShowFinancialModal(false);
                           handleRegistrationFeeUpdate(selectedDancerFinances.id, !selectedDancerFinances.registrationFeePaid);
                         }}
-                        className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors border ${
                           selectedDancerFinances.registrationFeePaid
-                            ? 'bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-200'
-                            : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-200'
+                            ? theme === 'dark' ? 'bg-orange-900/80 text-orange-200 hover:bg-orange-800 border-orange-700' : 'bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-200'
+                            : theme === 'dark' ? 'bg-green-900/80 text-green-200 hover:bg-green-800 border-green-700' : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-200'
                         }`}
                       >
                         {selectedDancerFinances.registrationFeePaid ? 'Mark Registration Fee Unpaid' : 'Mark Registration Fee Paid'}
@@ -4274,6 +4406,183 @@ function AdminDashboard() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Dancer Modal */}
+      {showEditDancerModal && editingDancer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`${themeClasses.cardBg} ${themeClasses.cardRadius} ${themeClasses.cardShadow} max-w-2xl w-full max-h-[90vh] overflow-y-auto border ${themeClasses.cardBorder}`}>
+            <div className={`p-6 border-b ${themeClasses.cardBorder}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                    <span className="text-white text-lg">✏️</span>
+                  </div>
+                  <div>
+                    <h2 className={themeClasses.heading2}>Edit Dancer</h2>
+                    <p className={themeClasses.textSecondary}>{editingDancer.eodsaId}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowEditDancerModal(false);
+                    setEditingDancer(null);
+                  }}
+                  className={`${themeClasses.textMuted} ${theme === 'dark' ? 'hover:text-white hover:bg-gray-700/50' : 'hover:text-gray-900 hover:bg-gray-100'} p-2 rounded-lg transition-colors`}
+                >
+                  <span className="text-2xl">×</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Name */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editDancerData.name}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, name: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="First name"
+                  />
+                </div>
+
+                {/* Surname */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    Surname *
+                  </label>
+                  <input
+                    type="text"
+                    value={editDancerData.surname}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, surname: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="Surname"
+                  />
+                </div>
+
+                {/* National ID */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    National ID *
+                  </label>
+                  <input
+                    type="text"
+                    value={editDancerData.nationalId}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, nationalId: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="National ID"
+                  />
+                </div>
+
+                {/* Date of Birth */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={editDancerData.dateOfBirth}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, dateOfBirth: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editDancerData.email}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, email: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="Email address"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={editDancerData.phone}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, phone: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="Phone number"
+                  />
+                </div>
+
+                {/* Guardian Name */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    Guardian Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editDancerData.guardianName}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, guardianName: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="Guardian name"
+                  />
+                </div>
+
+                {/* Guardian Email */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    Guardian Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editDancerData.guardianEmail}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, guardianEmail: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="Guardian email"
+                  />
+                </div>
+
+                {/* Guardian Phone */}
+                <div>
+                  <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+                    Guardian Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={editDancerData.guardianPhone}
+                    onChange={(e) => setEditDancerData({ ...editDancerData, guardianPhone: e.target.value })}
+                    className={`w-full px-3 py-2 ${themeClasses.cardBg} border ${themeClasses.cardBorder} rounded-lg ${themeClasses.textPrimary} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
+                    placeholder="Guardian phone"
+                  />
+                </div>
+              </div>
+
+              <div className={`flex justify-end space-x-3 pt-4 border-t ${themeClasses.cardBorder}`}>
+                <button
+                  onClick={() => {
+                    setShowEditDancerModal(false);
+                    setEditingDancer(null);
+                  }}
+                  className={`px-4 py-2 ${themeClasses.buttonBase} ${themeClasses.buttonSecondary} rounded-lg`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDancer}
+                  className={`px-4 py-2 ${themeClasses.buttonBase} ${themeClasses.buttonPrimary} rounded-lg`}
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -5385,11 +5694,12 @@ interface DancersTabContentProps {
   handleRejectDancer: (dancerId: string) => void;
   handleViewFinances: (dancer: any) => void;
   handleRegistrationFeeUpdate: (dancerId: string, markAsPaid: boolean) => void;
+  handleEditDancer: (dancer: Dancer) => void;
   theme: string;
   themeClasses: any;
 }
 
-function DancersTabContent({ dancers, dancerSearchTerm, setDancerSearchTerm, dancerStatusFilter, setDancerStatusFilter, handleApproveDancer, handleRejectDancer, handleViewFinances, handleRegistrationFeeUpdate, theme, themeClasses }: DancersTabContentProps) {
+function DancersTabContent({ dancers, dancerSearchTerm, setDancerSearchTerm, dancerStatusFilter, setDancerStatusFilter, handleApproveDancer, handleRejectDancer, handleViewFinances, handleRegistrationFeeUpdate, handleEditDancer, theme, themeClasses }: DancersTabContentProps) {
   const filteredDancers = dancers
     .filter(d => {
       const matchesSearch = !dancerSearchTerm || 
@@ -5692,39 +6002,20 @@ function DancersTabContent({ dancers, dancerSearchTerm, setDancerSearchTerm, dan
                             </button>
                           </div>
                         ) : (
-                          <div className="space-y-2">
-                            <div className="text-xs">
-                              <span className={`font-medium ${themeClasses.textSecondary}`}>Reg Fee: </span>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                dancer.registrationFeePaid 
-                                  ? theme === 'dark' ? 'bg-green-900/80 text-green-200 border border-green-700' : 'bg-green-100 text-green-800 border border-green-200'
-                                  : theme === 'dark' ? 'bg-red-900/80 text-red-200 border border-red-700' : 'bg-red-100 text-red-800 border border-red-200'
-                              }`}>
-                                {dancer.registrationFeePaid ? '✅ Paid' : '❌ Not Paid'}
-                              </span>
-                            </div>
+                          <div className="flex flex-col space-y-1">
+                            <button
+                              onClick={() => handleViewFinances(dancer)}
+                              className={`w-full px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${theme === 'dark' ? 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border-blue-700' : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200'}`}
+                            >
+                              💰 View Finances
+                            </button>
                             
-                            <div className="flex flex-col space-y-1">
-                              <button
-                                onClick={() => handleViewFinances(dancer)}
-                                className={`w-full px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${theme === 'dark' ? 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border-blue-700' : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200'}`}
-                              >
-                                💰 View Finances
-                              </button>
-                              
-                              {dancer.approved && (
-                                <button
-                                  onClick={() => handleRegistrationFeeUpdate(dancer.id, !dancer.registrationFeePaid)}
-                                  className={`w-full px-3 py-1 text-xs font-medium rounded-lg transition-colors border ${
-                                    dancer.registrationFeePaid
-                                      ? theme === 'dark' ? 'bg-orange-900/80 text-orange-200 hover:bg-orange-800 border-orange-700' : 'bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-200'
-                                      : theme === 'dark' ? 'bg-green-900/80 text-green-200 hover:bg-green-800 border-green-700' : 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200'
-                                  }`}
-                                >
-                                  {dancer.registrationFeePaid ? 'Mark Reg Unpaid' : 'Mark Reg Paid'}
-                                </button>
-                              )}
-                            </div>
+                            <button
+                              onClick={() => handleEditDancer(dancer)}
+                              className={`w-full px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${theme === 'dark' ? 'bg-purple-900/80 text-purple-200 hover:bg-purple-800 border-purple-700' : 'bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200'}`}
+                            >
+                              ✏️ Edit Dancer
+                            </button>
                           </div>
                         )}
                       </div>

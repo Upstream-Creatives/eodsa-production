@@ -2,19 +2,99 @@ import { neon } from '@neondatabase/serverless';
 import type { Contestant, Performance, Judge, Score, Dancer, EventEntry, Ranking, Event } from './types';
 import { getMedalFromPercentage } from './types';
 
+// Custom fetch for Neon with better error handling and timeout
+function createNeonFetch() {
+  return async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Database connection timeout after 30 seconds. This suggests a network connectivity issue.');
+      }
+      throw error;
+    }
+  };
+}
+
 // Create database connection using Neon serverless driver
 // Only initialize if we have a DATABASE_URL (server-side only)
-let sql: ReturnType<typeof neon> | null = null;
+let sql: ReturnType<typeof neon> | any = null;
 let isInitialized = false;
 let initializationPromise: Promise<void> | null = null;
+let usePgFallback = false;
+
+// Create a pg wrapper that mimics Neon's template literal syntax
+function createPgWrapper(pgClient: any) {
+  const wrapper = function sqlTemplate(strings: TemplateStringsArray, ...values: any[]) {
+    let query = '';
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    for (let i = 0; i < strings.length; i++) {
+      query += strings[i];
+      if (i < values.length) {
+        query += `$${paramIndex}`;
+        params.push(values[i]);
+        paramIndex++;
+      }
+    }
+
+    return pgClient.query(query, params)
+      .then((result: any) => result.rows)
+      .catch((err: any) => {
+        console.error('❌ pg query error:', {
+          message: err?.message,
+          code: err?.code,
+          errno: err?.errno,
+          syscall: err?.syscall,
+          address: err?.address,
+          port: err?.port
+        });
+        throw err;
+      });
+  };
+  
+  // Add any additional properties that Neon might have
+  (wrapper as any).unsafe = wrapper;
+  
+  return wrapper as any;
+}
 
 export const getSql = () => {
   if (!sql) {
-    const databaseUrl = process.env.DATABASE_URL;
+    const databaseUrl = (process.env.NODE_ENV === 'development' && process.env.DATABASE_URL_UNPOOLED) 
+      ? process.env.DATABASE_URL_UNPOOLED 
+      : (process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED);
+    
     if (!databaseUrl) {
-      throw new Error('DATABASE_URL environment variable is not set');
+      const errorMsg = 'DATABASE_URL or DATABASE_URL_UNPOOLED environment variable is not set. Please check your .env.local file and ensure the dev server was restarted after adding environment variables.';
+      console.error('❌ Database Error:', errorMsg);
+      throw new Error(errorMsg);
     }
+    
+    // Use Neon serverless driver directly (same as staging)
+    // Since staging works with Neon serverless and uses the same DB,
+    // we should use the same connection method
+    console.log('🔧 Using Neon serverless driver (same as staging)');
+    const dbHost = databaseUrl.match(/@([^:/]+)/)?.[1] || 'unknown';
+    console.log('   Connecting to:', dbHost);
+    
+    try {
     sql = neon(databaseUrl);
+      console.log('✅ Neon serverless driver initialized');
+    } catch (error: any) {
+      console.error('❌ Failed to initialize Neon serverless driver:', error?.message || error);
+      throw new Error(`Failed to initialize database connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
   return sql;
 };
@@ -6115,6 +6195,9 @@ export const unifiedDb = {
     nationalId?: string;
     email?: string;
     phone?: string;
+    guardianName?: string;
+    guardianEmail?: string;
+    guardianPhone?: string;
   }) {
     const sqlClient = getSql();
     
@@ -6136,6 +6219,15 @@ export const unifiedDb = {
     }
     if (updates.phone !== undefined) {
       await sqlClient`UPDATE dancers SET phone = ${updates.phone} WHERE id = ${dancerId}`;
+    }
+    if (updates.guardianName !== undefined) {
+      await sqlClient`UPDATE dancers SET guardian_name = ${updates.guardianName} WHERE id = ${dancerId}`;
+    }
+    if (updates.guardianEmail !== undefined) {
+      await sqlClient`UPDATE dancers SET guardian_email = ${updates.guardianEmail} WHERE id = ${dancerId}`;
+    }
+    if (updates.guardianPhone !== undefined) {
+      await sqlClient`UPDATE dancers SET guardian_phone = ${updates.guardianPhone} WHERE id = ${dancerId}`;
     }
   },
 
