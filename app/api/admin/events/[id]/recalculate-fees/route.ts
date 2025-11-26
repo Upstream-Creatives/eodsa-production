@@ -104,26 +104,66 @@ export async function POST(
         }
 
         // Recalculate fee using event's actual configuration
-        // Note: calculateSmartEODSAFee will count existing entries in the database
-        // Since we're recalculating an existing entry, we need to temporarily exclude it
-        // by using a workaround: pass soloCount based on entries processed so far
-        // But actually, the function queries the database, so it will count the entry itself
-        // We need to let it calculate naturally - it will find existing entries excluding this one
-        // if we query before this entry was created. But since entries are sorted by date,
-        // entries processed before this one will be counted correctly.
+        // For solo entries, we've already calculated the correct soloCount
+        // But calculateSmartEODSAFee will query the database and find this entry too
+        // So we need to calculate fees directly based on event configuration and soloCount
         
-        // Actually, the issue is that calculateSmartEODSAFee counts ALL existing entries
-        // including the one we're recalculating. We need to pass the correct soloCount
-        // based on entries processed BEFORE this one.
-        const feeBreakdown = await calculateSmartEODSAFee(
-          entry.mastery || 'Water (Competitive)',
-          performanceType,
-          entry.participantIds || [],
-          {
-            soloCount: performanceType === 'Solo' ? soloCount : undefined,
-            eventId
+        let feeBreakdown: any;
+        
+        if (performanceType === 'Solo' && soloCount && event) {
+          // Calculate fees directly based on event configuration
+          const regFee = event.registrationFeePerDancer || 0;
+          const solo1Fee = event.solo1Fee || 0;
+          const solo2Fee = event.solo2Fee || 0;
+          const solo3Fee = event.solo3Fee || 0;
+          const soloAdditionalFee = event.soloAdditionalFee || 0;
+          
+          // Calculate performance fee based on solo count (incremental pricing)
+          let performanceFee = 0;
+          if (soloCount === 1) {
+            performanceFee = solo1Fee;
+          } else if (soloCount === 2 && solo2Fee > 0 && solo1Fee > 0) {
+            performanceFee = solo2Fee - solo1Fee; // Incremental cost for 2nd solo
+          } else if (soloCount === 3 && solo3Fee > 0 && solo2Fee > 0) {
+            performanceFee = solo3Fee - solo2Fee; // Incremental cost for 3rd solo
+          } else if (soloCount > 3) {
+            performanceFee = soloAdditionalFee;
           }
-        );
+          
+          // Check if registration fee should be charged (first entry for this dancer in this event)
+          // Count all entries (any type) for this dancer before this entry
+          const hasPreviousEntry = sortedEntries.some(e => {
+            if (e.id === entry.id) return false;
+            if (new Date(e.submittedAt).getTime() >= new Date(entry.submittedAt).getTime()) return false;
+            return e.eodsaId === entry.eodsaId || 
+                   e.contestantId === entry.contestantId ||
+                   (e.participantIds && entry.participantIds && 
+                    e.participantIds.length > 0 && entry.participantIds.length > 0 &&
+                    e.participantIds.some(id => entry.participantIds.includes(id)));
+          });
+          
+          const registrationFee = hasPreviousEntry ? 0 : regFee;
+          
+          feeBreakdown = {
+            performanceFee,
+            registrationFee,
+            totalFee: performanceFee + registrationFee,
+            breakdown: `Solo #${soloCount}`,
+            registrationBreakdown: registrationFee > 0 
+              ? 'Registration fee (first entry in this event)'
+              : 'Registration fee waived (already assigned on previous entry)'
+          };
+        } else {
+          // For non-solo entries, use calculateSmartEODSAFee
+          feeBreakdown = await calculateSmartEODSAFee(
+            entry.mastery || 'Water (Competitive)',
+            performanceType,
+            entry.participantIds || [],
+            {
+              eventId
+            }
+          );
+        }
 
         const newCalculatedFee = feeBreakdown.totalFee;
         const oldCalculatedFee = entry.calculatedFee;
