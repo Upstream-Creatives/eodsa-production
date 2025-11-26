@@ -142,15 +142,31 @@ export async function POST(request: NextRequest) {
     }
 
     if (recipientGroup === 'staff') {
-      // All internal staff/admin clients
-      const rows = await sqlClient`
+      // All internal staff/admin users:
+      // 1) clients table (admin-created dashboard accounts)
+      const clientRows = await sqlClient`
         SELECT DISTINCT email, name
         FROM clients
-        WHERE is_active = TRUE AND is_approved = TRUE
+        WHERE email IS NOT NULL AND email <> '' AND is_active = TRUE
       ` as any[];
 
-      for (const row of rows) {
-        if (!row.email) continue;
+      for (const row of clientRows) {
+        recipients.push({
+          email: row.email,
+          name: row.name || null
+        });
+      }
+
+      // 2) judges table with non-judge user_type (staff/admin/superadmin)
+      const judgeRows = await sqlClient`
+        SELECT DISTINCT email, name
+        FROM judges
+        WHERE email IS NOT NULL 
+          AND email <> '' 
+          AND user_type IN ('staff', 'admin', 'superadmin')
+      ` as any[];
+
+      for (const row of judgeRows) {
         recipients.push({
           email: row.email,
           name: row.name || null
