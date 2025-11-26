@@ -2060,6 +2060,14 @@ function AdminDashboard() {
                   <span className="hidden sm:inline">Score Approval</span>
                 </Link>
 
+                <Link 
+                  href="/backend"
+                  className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 ${themeClasses.buttonSecondary} rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 hover:shadow-md`}
+                >
+                  <span>🛠️</span>
+                  <span className="hidden sm:inline">Backend tools</span>
+                </Link>
+
                 <div className={`w-px h-6 ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
 
                 <ThemeToggle />

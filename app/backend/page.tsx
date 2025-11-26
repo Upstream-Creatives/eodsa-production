@@ -51,6 +51,19 @@ export default function BackendDashboard() {
                 <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">🎵</span>
                 <span className="text-xs text-indigo-400 font-medium">Sound Tech</span>
               </Link>
+              <Link href="/admin/notifications" className="flex flex-col items-center p-3 bg-emerald-600/20 rounded-lg hover:bg-emerald-600/30 transition-colors group">
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">📧</span>
+                <span className="text-xs text-emerald-400 font-medium text-center">Admin Notifications</span>
+              </Link>
+              <a
+                href="https://www.avalondance.co.za/event-type-manager"
+                target="_blank"
+                rel="noreferrer"
+                className="flex flex-col items-center p-3 bg-yellow-500/20 rounded-lg hover:bg-yellow-500/30 transition-colors group"
+              >
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">🗂️</span>
+                <span className="text-xs text-yellow-300 font-medium text-center">Event Type Manager</span>
+              </a>
             </div>
           </div>
 
