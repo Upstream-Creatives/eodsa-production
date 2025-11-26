@@ -101,16 +101,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Email system disabled for Phase 1
-    // if (email) {
-    //   try {
-    //     await emailService.sendDancerRegistrationEmail(name, email, result.eodsaId);
-    //     console.log('Registration email sent successfully to:', email);
-    //   } catch (emailError) {
-    //     console.error('Failed to send registration email:', emailError);
-    //     // Don't fail the registration if email fails
-    //   }
-    // }
+    // Send registration confirmation email
+    const emailToSend = email || guardianEmail;
+    if (emailToSend) {
+      try {
+        await emailService.sendDancerRegistrationEmail(name, emailToSend, result.eodsaId);
+        console.log('Registration email sent successfully to:', emailToSend);
+      } catch (emailError) {
+        console.error('Failed to send registration email:', emailError);
+        // Don't fail the registration if email fails
+      }
+    }
 
     return NextResponse.json({
       success: true,

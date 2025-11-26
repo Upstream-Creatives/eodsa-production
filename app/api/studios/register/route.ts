@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { studioDb, initializeDatabase } from "@/lib/database";
+import { emailService } from '@/lib/email';
 import bcrypt from 'bcryptjs';
 import { verifyRecaptcha, checkRateLimit, getClientIP } from '@/lib/recaptcha';
 
@@ -60,6 +61,20 @@ export async function POST(request: NextRequest) {
       address: address || '',
       phone: phone || ''
     });
+
+    // Send registration confirmation email
+    try {
+      await emailService.sendStudioRegistrationEmail(
+        name,
+        contactPerson,
+        email,
+        studio.registrationNumber
+      );
+      console.log('Studio registration email sent successfully to:', email);
+    } catch (emailError) {
+      console.error('Failed to send studio registration email:', emailError);
+      // Don't fail the registration if email fails
+    }
 
     return NextResponse.json({
       success: true,

@@ -10,10 +10,10 @@ export async function GET(request: NextRequest) {
         success: true,
         message: 'SMTP connection successful! Email system is ready.',
         connectionDetails: {
-          host: 'mail.upstreamcreatives.co.za',
-          port: 587,
-          secure: false,
-          from: 'devops@upstreamcreatives.co.za'
+          host: process.env.SMTP_HOST || 'mail.upstreamcreatives.co.za',
+          port: parseInt(process.env.SMTP_PORT || '587', 10),
+          secure: process.env.SMTP_SECURE === 'true',
+          from: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'
         }
       });
     } else {

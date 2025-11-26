@@ -1,18 +1,23 @@
 import nodemailer from 'nodemailer';
 
-// Email configuration
+// Email configuration from environment variables
 const EMAIL_CONFIG = {
-  host: 'mail.upstreamcreatives.co.za',
-  port: 587,
-  secure: false, // true for 465, false for other ports
+  host: process.env.SMTP_HOST || 'mail.upstreamcreatives.co.za',
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
   auth: {
-    user: 'devops@upstreamcreatives.co.za',
-    pass: 'ceTWgaQXrDTTCYQuRJg4' // Updated password from test-email.js
+    user: process.env.SMTP_USER || 'devops@upstreamcreatives.co.za',
+    pass: process.env.SMTP_PASSWORD || ''
   },
   tls: {
-    rejectUnauthorized: false // Accept self-signed certificates
+    rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'true' // Accept self-signed certificates by default
   }
 };
+
+// Validate required email configuration
+if (!process.env.SMTP_PASSWORD && !process.env.SMTP_USER) {
+  console.warn('⚠️  Email configuration incomplete. SMTP_PASSWORD and SMTP_USER should be set in .env.local');
+}
 
 // Create transporter
 const transporter = nodemailer.createTransport(EMAIL_CONFIG);
@@ -44,32 +49,23 @@ export const emailTemplates = {
             <h3 style="color: #667eea; margin: 0 0 15px 0;">Your EODSA Details:</h3>
             <p style="margin: 5px 0; color: #333;"><strong>EODSA ID:</strong> ${eodsaId}</p>
             <p style="margin: 5px 0; color: #333;"><strong>Name:</strong> ${name}</p>
-            <p style="margin: 5px 0; color: #333;"><strong>Status:</strong> Pending Admin Approval</p>
           </div>
           
-          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeaa7; margin: 20px 0;">
-            <p style="color: #856404; margin: 0; font-size: 14px;">
-              <strong>⚠️ Important:</strong> Your registration is pending admin approval. You will receive another email once approved and can then enter competitions.
+          <div style="background: #d1fae5; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+            <p style="color: #065f46; margin: 0; font-size: 16px; font-weight: bold;">
+              ✅ Your dancer registration is now active! You can immediately start participating in competitions.
             </p>
           </div>
           
-          <h3 style="color: #333; margin: 25px 0 15px 0;">Next Steps:</h3>
-          <ul style="color: #555; line-height: 1.8;">
-            <li>Wait for admin approval (you'll receive an email notification)</li>
-            <li>Once approved, use your EODSA ID to access the event dashboard</li>
-            <li>Browse and register for competitions in your region</li>
-            <li>Prepare your performances according to EODSA guidelines</li>
-          </ul>
-          
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dancer-dashboard?eodsaId=${eodsaId}" 
                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
-              Visit EODSA Portal
+              Access Your Dashboard
             </a>
           </div>
           
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            If you have any questions, please contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+            Need help? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #667eea;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -116,12 +112,18 @@ export const emailTemplates = {
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/studio-login" 
                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
-              Access Studio Dashboard
+              Login to Studio Dashboard
             </a>
           </div>
           
+          <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3; margin: 20px 0;">
+            <p style="color: #0d47a1; margin: 0; font-size: 14px;">
+              <strong>📧 Login Details:</strong> Use your email address (${email}) and the password you created during registration.
+            </p>
+          </div>
+          
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Need help? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+            Need help? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #667eea;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -166,7 +168,7 @@ export const emailTemplates = {
           </div>
           
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Questions? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #10b981;">devops@upstreamcreatives.co.za</a>
+            Questions? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #10b981;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -218,7 +220,7 @@ export const emailTemplates = {
           </div>
           
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Questions? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #f59e0b;">devops@upstreamcreatives.co.za</a>
+            Questions? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #f59e0b;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -264,7 +266,7 @@ export const emailTemplates = {
           </div>
           
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Questions about your entry? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #8b5cf6;">devops@upstreamcreatives.co.za</a>
+            Questions about your entry? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #8b5cf6;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -313,7 +315,7 @@ export const emailTemplates = {
           </p>
 
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Need help? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+            Need help? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #667eea;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -362,7 +364,7 @@ export const emailTemplates = {
           </ul>
 
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Questions? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #e91e63;">devops@upstreamcreatives.co.za</a>
+            Questions? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #e91e63;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -414,7 +416,7 @@ export const emailTemplates = {
           </ul>
 
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Need help? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+            Need help? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #667eea;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -433,7 +435,7 @@ export const emailTemplates = {
           <h2 style="color: #333; margin: 0 0 20px 0;">Congratulations ${dancerName}!</h2>
 
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
-            Your performance scores have been approved and your certificate is now available on your dashboard!
+            Your performance scores have been published and your certificate is now available on your dashboard!
           </p>
 
           <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 20px 0;">
@@ -455,7 +457,7 @@ export const emailTemplates = {
           </p>
 
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Questions? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+            Questions? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #667eea;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -474,7 +476,7 @@ export const emailTemplates = {
           <h2 style="color: #333; margin: 0 0 20px 0;">Hello ${studioName}!</h2>
 
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
-            A certificate is now available for one of your dancers. The performance scores have been approved and the certificate is ready to view.
+            A certificate is now available for one of your dancers. The performance scores have been published and the certificate is ready to view.
           </p>
 
           <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 20px 0;">
@@ -497,7 +499,7 @@ export const emailTemplates = {
           </p>
 
           <p style="color: #777; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #e9ecef; padding-top: 20px;">
-            Questions? Contact us at <a href="mailto:devops@upstreamcreatives.co.za" style="color: #667eea;">devops@upstreamcreatives.co.za</a>
+            Questions? Contact us at <a href="mailto:Mains@elementscentral.com" style="color: #667eea;">Mains@elementscentral.com</a>
           </p>
         </div>
       </div>
@@ -513,7 +515,7 @@ export const emailService = {
       const template = emailTemplates.dancerRegistration(name, eodsaId);
       
       await transporter.sendMail({
-        from: '"EODSA Registration" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Registration" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -533,7 +535,7 @@ export const emailService = {
       const template = emailTemplates.studioRegistration(studioName, contactPerson, registrationNumber, email);
       
       await transporter.sendMail({
-        from: '"EODSA Registration" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Registration" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -553,7 +555,7 @@ export const emailService = {
       const template = emailTemplates.dancerApproval(name, eodsaId);
       
       await transporter.sendMail({
-        from: '"EODSA Approvals" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Approvals" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -573,7 +575,7 @@ export const emailService = {
       const template = emailTemplates.dancerRejection(name, eodsaId, rejectionReason);
       
       await transporter.sendMail({
-        from: '"EODSA Registration" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Registration" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -593,7 +595,7 @@ export const emailService = {
       const template = emailTemplates.competitionEntry(name, eventName, itemName, performanceType, totalFee);
       
       await transporter.sendMail({
-        from: '"EODSA Competitions" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Competitions" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -613,7 +615,7 @@ export const emailService = {
       const emailTemplate = emailTemplates.passwordReset(name, resetToken, userType);
       
       const mailOptions = {
-        from: '"EODSA Password Reset" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Password Reset" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: emailTemplate.subject,
         html: emailTemplate.html
@@ -634,7 +636,7 @@ export const emailService = {
       const template = emailTemplates.certificateAchievement(name, percentage, medallion, certificateUrl);
 
       await transporter.sendMail({
-        from: '"EODSA Nationals 2025" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Nationals 2025" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -654,7 +656,7 @@ export const emailService = {
       const template = emailTemplates.certificateAvailable(dancerName, certificateUrl, performanceTitle, percentage, medallion);
 
       await transporter.sendMail({
-        from: '"EODSA" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -674,7 +676,7 @@ export const emailService = {
       const template = emailTemplates.certificateAvailableToStudio(studioName, dancerName, certificateUrl, performanceTitle, percentage, medallion);
 
       await transporter.sendMail({
-        from: '"EODSA" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -694,7 +696,7 @@ export const emailService = {
       const template = emailTemplates.studioPasswordRecovery(studioName, password);
       
       const mailOptions = {
-        from: '"EODSA Studio Support" <devops@upstreamcreatives.co.za>',
+        from: `"EODSA Studio Support" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'devops@upstreamcreatives.co.za'}>`,
         to: email,
         subject: template.subject,
         html: template.html
@@ -705,6 +707,73 @@ export const emailService = {
       return { success: true, messageId: result.messageId };
     } catch (error) {
       console.error('❌ Failed to send studio password email:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+
+  // Generic announcement email (admin notifications)
+  async sendAnnouncementEmail(to: string, subject: string, html: string) {
+    try {
+      const fromAddress = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'no_reply@elementscentral.com';
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://eodsa.vercel.app';
+
+      const wrappedHtml = `
+        <div style="background: #0f172a; padding: 32px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+          <div style="max-width: 640px; margin: 0 auto; background: #020617; border-radius: 18px; overflow: hidden; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.35);">
+            <div style="background: radial-gradient(circle at top left, #22c55e, #6366f1); padding: 24px 28px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(226, 232, 240, 0.9); font-weight: 600;">EODSA • Announcement</div>
+                <div style="font-size: 22px; margin-top: 8px; color: #f9fafb; font-weight: 700;">
+                  ${subject}
+                </div>
+              </div>
+              <div style="width: 40px; height: 40px; border-radius: 999px; border: 2px solid rgba(248, 250, 252, 0.8); display: flex; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.15);">
+                <span style="font-size: 20px;">📣</span>
+              </div>
+            </div>
+
+            <div style="padding: 26px 28px 8px 28px; background: linear-gradient(to bottom, #020617, #020617 80%, #020617);">
+              <div style="font-size: 14px; line-height: 1.7; color: #e5e7eb; margin-bottom: 18px;">
+                <!-- User content starts -->
+                ${html}
+                <!-- User content ends -->
+              </div>
+
+              <div style="margin-top: 24px; padding: 12px 14px; border-radius: 12px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.45);">
+                <div style="font-size: 12px; color: #9ca3af;">
+                  If you have any questions, please contact our support team at
+                  <a href="mailto:Mains@elementscentral.com" style="color: #4ade80; text-decoration: none; font-weight: 500;">Mains@elementscentral.com</a>.
+                </div>
+              </div>
+
+              <div style="margin-top: 20px; display: flex; justify-content: center;">
+                <a href="${appUrl}/admin" style="display: inline-block; padding: 10px 20px; border-radius: 999px; background: linear-gradient(to right, #22c55e, #4ade80); color: #022c22; font-size: 13px; font-weight: 600; text-decoration: none; letter-spacing: 0.06em; text-transform: uppercase;">
+                  Open Admin Dashboard
+                </a>
+              </div>
+            </div>
+
+            <div style="padding: 12px 24px 18px 24px; border-top: 1px solid rgba(30, 64, 175, 0.7); background: #020617;">
+              <div style="font-size: 11px; color: #6b7280; text-align: center;">
+                EODSA Competition Management • Sent from no_reply@elementscentral.com
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const mailOptions = {
+        from: `"EODSA Announcements" <${fromAddress}>`,
+        to,
+        subject,
+        html: wrappedHtml
+      };
+
+      const result = await transporter.sendMail(mailOptions);
+      console.log(`✅ Announcement email sent to ${to} - Message ID: ${result.messageId}`);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error(`❌ Failed to send announcement email to ${to}:`, error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   },
