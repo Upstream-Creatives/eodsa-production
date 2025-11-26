@@ -2539,86 +2539,75 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
             soloCount = data.details?.soloCount || (data.debug?.existingSoloCount !== undefined ? data.debug.existingSoloCount + 1 : 1);
           }
           
-          // CRITICAL: Use ACTUAL charged fee, not recalculated fee
-          // The entry.calculatedFee is what was actually charged at the time
-          const actualTotalFee = entry.calculatedFee;
-          const recalculatedTotalFee = (data.fees?.performanceFee || 0) + (data.fees?.registrationFee || 0);
-          
-          // Use the API response as the primary source, but validate against actual charged fee
+          // TRUST THE API RESPONSE - it calculates correctly based on event fees and solo count
+          // The API is the source of truth for what SHOULD be charged based on event configuration
           let actualPerformanceFee = data.fees?.performanceFee || 0;
           let actualRegistrationFee = data.fees?.registrationFee || 0;
+          const recalculatedTotalFee = actualPerformanceFee + actualRegistrationFee;
           
-          // If API response total doesn't match actual charged fee, try to reconcile
-          if (Math.abs(recalculatedTotalFee - actualTotalFee) > 0.01 && event) {
-            // API response doesn't match - try to reverse-engineer using event's actual fees
-            if (performanceType === 'Solo' && soloCount) {
-              // Use event's actual fees (no hardcoded defaults)
+          // The stored calculatedFee might be wrong (from old hardcoded calculations)
+          // So we use the API response which correctly calculates based on event fees
+          // Only use stored fee as a fallback if API doesn't return values
+          if (actualPerformanceFee === 0 && actualRegistrationFee === 0) {
+            // API didn't return fees - fallback to stored fee and try to reverse-engineer
+            const actualTotalFee = entry.calculatedFee;
+            
+            if (performanceType === 'Solo' && soloCount && event) {
               const regFee = event.registrationFeePerDancer || 0;
               const solo1Fee = event.solo1Fee || 0;
               const solo2Fee = event.solo2Fee || 0;
               const solo3Fee = event.solo3Fee || 0;
               const soloAdditionalFee = event.soloAdditionalFee || 0;
               
-              // Calculate what the performance fee should be based on solo count
+              // Calculate expected performance fee based on solo count
               let expectedPerformanceFee = 0;
               if (soloCount === 1) {
                 expectedPerformanceFee = solo1Fee;
               } else if (soloCount === 2 && solo2Fee > 0 && solo1Fee > 0) {
-                // Incremental cost for 2nd solo
-                expectedPerformanceFee = solo2Fee - solo1Fee;
+                expectedPerformanceFee = solo2Fee - solo1Fee; // Incremental
               } else if (soloCount === 3 && solo3Fee > 0 && solo2Fee > 0) {
-                // Incremental cost for 3rd solo
-                expectedPerformanceFee = solo3Fee - solo2Fee;
+                expectedPerformanceFee = solo3Fee - solo2Fee; // Incremental
               } else if (soloCount > 3) {
-                // Additional solo fee
                 expectedPerformanceFee = soloAdditionalFee;
               }
               
-              // Try combinations to match actual total
+              // Try to match stored fee
               if (Math.abs(actualTotalFee - (expectedPerformanceFee + regFee)) < 0.01) {
-                // Matches: performance fee + registration
                 actualPerformanceFee = expectedPerformanceFee;
                 actualRegistrationFee = regFee;
               } else if (Math.abs(actualTotalFee - expectedPerformanceFee) < 0.01) {
-                // Matches: performance fee only (registration waived)
                 actualPerformanceFee = expectedPerformanceFee;
                 actualRegistrationFee = 0;
               } else {
-                // Doesn't match expected - use API response or calculate from total
-                actualPerformanceFee = data.fees?.performanceFee || (actualTotalFee - (data.fees?.registrationFee || 0));
-                actualRegistrationFee = actualTotalFee - actualPerformanceFee;
-                if (actualRegistrationFee < 0) {
-                  actualRegistrationFee = 0;
-                  actualPerformanceFee = actualTotalFee;
-                }
+                // Fallback: use stored fee as performance fee, assume no registration
+                actualPerformanceFee = actualTotalFee;
+                actualRegistrationFee = 0;
               }
             } else {
-              // For non-solo, use API response or calculate from total
-              actualPerformanceFee = data.fees?.performanceFee || 0;
-              actualRegistrationFee = actualTotalFee - actualPerformanceFee;
-              if (actualRegistrationFee < 0) {
-                actualRegistrationFee = 0;
-                actualPerformanceFee = actualTotalFee;
-              }
+              // Non-solo fallback
+              actualPerformanceFee = actualTotalFee;
+              actualRegistrationFee = 0;
             }
-          } else {
-            // API response matches actual charged fee - use it directly
-            actualPerformanceFee = data.fees?.performanceFee || 0;
-            actualRegistrationFee = data.fees?.registrationFee || 0;
           }
           
-          // Build breakdown text based on actual fees
+          // Build breakdown text based on actual fees and solo count
           let breakdownText = data.fees?.breakdown || '';
           if (performanceType === 'Solo' && soloCount && event) {
             const currencySymbol = (event.currency === 'USD') ? '$' : (event.currency === 'EUR') ? '€' : (event.currency === 'GBP') ? '£' : 'R';
+            const solo1Fee = event.solo1Fee || 0;
+            const solo2Fee = event.solo2Fee || 0;
+            const solo3Fee = event.solo3Fee || 0;
+            
             if (soloCount === 1) {
-              breakdownText = `Solo Package (1 solo) - ${currencySymbol}${(event.solo1Fee || 0).toFixed(2)}`;
+              breakdownText = `1st Solo - ${currencySymbol}${solo1Fee.toFixed(2)}`;
             } else if (soloCount === 2) {
-              breakdownText = `Solo Package (2 solos total) - Previous: ${currencySymbol}${(event.solo1Fee || 0).toFixed(2)}`;
+              const incrementalFee = solo2Fee > solo1Fee ? solo2Fee - solo1Fee : actualPerformanceFee;
+              breakdownText = `2nd Solo (incremental) - ${currencySymbol}${incrementalFee.toFixed(2)} (2 solos package: ${currencySymbol}${solo2Fee.toFixed(2)} total, 1st solo: ${currencySymbol}${solo1Fee.toFixed(2)})`;
             } else if (soloCount === 3) {
-              breakdownText = `Solo Package (3 solos total) - Previous: ${currencySymbol}${(event.solo2Fee || 0).toFixed(2)}`;
+              const incrementalFee = solo3Fee > solo2Fee ? solo3Fee - solo2Fee : actualPerformanceFee;
+              breakdownText = `3rd Solo (incremental) - ${currencySymbol}${incrementalFee.toFixed(2)} (3 solos package: ${currencySymbol}${solo3Fee.toFixed(2)} total)`;
             } else {
-              breakdownText = `Solo Package (${soloCount} solos total)`;
+              breakdownText = `Solo #${soloCount} - ${currencySymbol}${actualPerformanceFee.toFixed(2)}`;
             }
           }
           
@@ -2632,7 +2621,7 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
           setBreakdown({
             performanceFee: actualPerformanceFee,
             registrationFee: actualRegistrationFee,
-            totalFee: actualTotalFee, // Always use the actual charged fee
+            totalFee: actualPerformanceFee + actualRegistrationFee, // Use recalculated total (API is source of truth)
             breakdown: breakdownText,
             registrationBreakdown: registrationBreakdownText,
             soloCount: performanceType === 'Solo' ? soloCount : undefined
