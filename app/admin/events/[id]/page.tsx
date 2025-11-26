@@ -2471,6 +2471,7 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
     breakdown: string;
     registrationBreakdown: string;
     soloCount?: number;
+    totalFeeDescription?: string;
   } | null>(null);
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
 
@@ -2511,43 +2512,100 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
           console.log('✅ Fee Breakdown Response:', data);
           
           // For solo entries, count existing solos EXCLUDING this entry
+          // IMPORTANT: Sort by submittedAt to get correct order, then count entries BEFORE this one
           let soloCount: number | undefined = undefined;
           if (performanceType === 'Solo' && entry && allEntries) {
-            // Count solo entries for this dancer in this event, excluding the current entry
+            // Get all solo entries for this dancer in this event, sorted by submission date
             const participantId = entry.participantIds?.[0];
-            const matchingSolos = allEntries.filter(e => {
-              // Must be same event, solo type, and not this entry
-              if (e.id === entry.id || e.eventId !== entry.eventId) return false;
-              
-              // Check if it's a solo (1 participant)
-              const eParticipantIds = Array.isArray(e.participantIds) ? e.participantIds : 
-                                      (typeof e.participantIds === 'string' ? JSON.parse(e.participantIds || '[]') : []);
-              if (eParticipantIds.length !== 1) return false;
-              
-              // Check if it matches this dancer
-              const eParticipantId = eParticipantIds[0];
-              return eParticipantId === participantId || 
-                     e.eodsaId === entry.eodsaId ||
-                     e.contestantId === entry.contestantId;
-            });
+            const allSolosForDancer = allEntries
+              .filter(e => {
+                // Must be same event, solo type
+                if (e.eventId !== entry.eventId) return false;
+                
+                // Check if it's a solo (1 participant)
+                const eParticipantIds = Array.isArray(e.participantIds) ? e.participantIds : 
+                                        (typeof e.participantIds === 'string' ? JSON.parse(e.participantIds || '[]') : []);
+                if (eParticipantIds.length !== 1) return false;
+                
+                // Check if it matches this dancer (comprehensive matching)
+                const eParticipantId = eParticipantIds[0];
+                return eParticipantId === participantId || 
+                       e.eodsaId === entry.eodsaId ||
+                       e.contestantId === entry.contestantId;
+              })
+              .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
             
-            // Solo number = existing solos + 1 (this entry)
-            soloCount = matchingSolos.length + 1;
-            console.log(`📊 Solo count calculation: ${matchingSolos.length} existing + 1 (this entry) = Solo #${soloCount}`);
+            // Find the index of this entry in the sorted list
+            const currentEntryIndex = allSolosForDancer.findIndex(e => e.id === entry.id);
+            
+            if (currentEntryIndex >= 0) {
+              // Solo number = index + 1 (1-based)
+              soloCount = currentEntryIndex + 1;
+              console.log(`📊 Solo count calculation: Entry is at index ${currentEntryIndex} in sorted list = Solo #${soloCount}`);
+            } else {
+              // Entry not found in list (shouldn't happen), count existing ones
+              const existingSolos = allSolosForDancer.filter(e => 
+                new Date(e.submittedAt).getTime() < new Date(entry.submittedAt).getTime()
+              );
+              soloCount = existingSolos.length + 1;
+              console.log(`📊 Solo count calculation (fallback): ${existingSolos.length} existing + 1 = Solo #${soloCount}`);
+            }
           } else if (performanceType === 'Solo') {
             // Fallback: use API response if we don't have allEntries
             soloCount = data.details?.soloCount || (data.debug?.existingSoloCount !== undefined ? data.debug.existingSoloCount + 1 : 1);
           }
           
-          // TRUST THE API RESPONSE - it calculates correctly based on event fees and solo count
-          // The API is the source of truth for what SHOULD be charged based on event configuration
-          let actualPerformanceFee = data.fees?.performanceFee || 0;
-          let actualRegistrationFee = data.fees?.registrationFee || 0;
+          // The API might return incorrect values because it counts the current entry in the database
+          // So we calculate fees directly based on the solo count we determined and event configuration
+          let actualPerformanceFee = 0;
+          let actualRegistrationFee = 0;
+          
+          if (performanceType === 'Solo' && soloCount && event) {
+            // Calculate fees directly based on event configuration and solo count
+            const regFee = event.registrationFeePerDancer || 0;
+            const solo1Fee = event.solo1Fee || 0;
+            const solo2Fee = event.solo2Fee || 0;
+            const solo3Fee = event.solo3Fee || 0;
+            const soloAdditionalFee = event.soloAdditionalFee || 0;
+            
+            // Calculate performance fee based on solo count (incremental pricing)
+            if (soloCount === 1) {
+              actualPerformanceFee = solo1Fee;
+            } else if (soloCount === 2 && solo2Fee > 0 && solo1Fee > 0) {
+              actualPerformanceFee = solo2Fee - solo1Fee; // Incremental cost for 2nd solo
+            } else if (soloCount === 3 && solo3Fee > 0 && solo2Fee > 0) {
+              actualPerformanceFee = solo3Fee - solo2Fee; // Incremental cost for 3rd solo
+            } else if (soloCount > 3) {
+              actualPerformanceFee = soloAdditionalFee;
+            }
+            
+            // Check if registration fee should be charged (first entry for this dancer in this event)
+            // Count all entries (any type) for this dancer before this entry
+            if (allEntries) {
+              const hasPreviousEntry = allEntries.some(e => {
+                if (e.id === entry.id) return false;
+                if (e.eventId !== entry.eventId) return false;
+                if (new Date(e.submittedAt).getTime() >= new Date(entry.submittedAt).getTime()) return false;
+                return e.eodsaId === entry.eodsaId || 
+                       e.contestantId === entry.contestantId ||
+                       (e.participantIds && entry.participantIds && 
+                        e.participantIds.length > 0 && entry.participantIds.length > 0 &&
+                        e.participantIds.some(id => entry.participantIds.includes(id)));
+              });
+              actualRegistrationFee = hasPreviousEntry ? 0 : regFee;
+            } else {
+              // Fallback: use API response
+              actualRegistrationFee = data.fees?.registrationFee || 0;
+            }
+          } else {
+            // For non-solo entries, use API response
+            actualPerformanceFee = data.fees?.performanceFee || 0;
+            actualRegistrationFee = data.fees?.registrationFee || 0;
+          }
+          
           const recalculatedTotalFee = actualPerformanceFee + actualRegistrationFee;
           
-          // The stored calculatedFee might be wrong (from old hardcoded calculations)
-          // So we use the API response which correctly calculates based on event fees
-          // Only use stored fee as a fallback if API doesn't return values
+          // Fallback: if we couldn't calculate, use API response
           if (actualPerformanceFee === 0 && actualRegistrationFee === 0) {
             // API didn't return fees - fallback to stored fee and try to reverse-engineer
             const actualTotalFee = entry.calculatedFee;
@@ -2618,13 +2676,30 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
             registrationBreakdownText = `Registration fee waived (already assigned on previous entry)`;
           }
           
+          // Build total fee description
+          let totalFeeDescription = '';
+          if (performanceType === 'Solo' && soloCount) {
+            if (soloCount === 1) {
+              totalFeeDescription = `1st Solo for this dancer in this event`;
+            } else if (soloCount === 2) {
+              totalFeeDescription = `2nd Solo for this dancer in this event`;
+            } else if (soloCount === 3) {
+              totalFeeDescription = `3rd Solo for this dancer in this event`;
+            } else {
+              totalFeeDescription = `Solo #${soloCount} for this dancer in this event`;
+            }
+          } else {
+            totalFeeDescription = data.fees?.breakdown || '';
+          }
+          
           setBreakdown({
             performanceFee: actualPerformanceFee,
             registrationFee: actualRegistrationFee,
-            totalFee: actualPerformanceFee + actualRegistrationFee, // Use recalculated total (API is source of truth)
+            totalFee: actualPerformanceFee + actualRegistrationFee, // Use calculated total based on event config
             breakdown: breakdownText,
             registrationBreakdown: registrationBreakdownText,
-            soloCount: performanceType === 'Solo' ? soloCount : undefined
+            soloCount: performanceType === 'Solo' ? soloCount : undefined,
+            totalFeeDescription
           });
         } else {
           const errorData = await response.json();
@@ -2689,7 +2764,7 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
           
           {breakdown.soloCount && (
             <div className={`text-xs ${themeClasses.textMuted} mt-2 pt-2 border-t border-gray-600/30`}>
-              Solo #{breakdown.soloCount} for this dancer in this event
+              {breakdown.totalFeeDescription || (breakdown.soloCount ? `Solo #${breakdown.soloCount} for this dancer in this event` : '')}
             </div>
           )}
         </div>
