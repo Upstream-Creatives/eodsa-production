@@ -206,7 +206,7 @@ function AdminNotificationsPageContent() {
   const isLight = theme === 'light';
 
   return (
-    <div className={`min-h-screen ${isLight ? 'bg-slate-50' : themeClasses.pageBackground}`}>
+    <div className={`min-h-screen ${isLight ? 'bg-slate-50' : themeClasses.mainBg}`}>
       <header
         className={`border-b backdrop-blur sticky top-0 z-20 ${
           isLight ? 'bg-white/90 border-slate-200' : 'bg-slate-950/80 border-slate-800/60'
@@ -241,7 +241,7 @@ function AdminNotificationsPageContent() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Recipients & filters */}
         <section
-          className={`${themeClasses.cardBackground} rounded-2xl shadow-lg border ${
+          className={`${themeClasses.cardBg} rounded-2xl shadow-lg border ${
             isLight ? 'border-slate-200' : 'border-slate-800/70'
           } p-4 sm:p-6 space-y-5`}
         >
@@ -379,7 +379,7 @@ function AdminNotificationsPageContent() {
 
         {/* Subject and body */}
         <section
-          className={`${themeClasses.cardBackground} rounded-2xl shadow-lg border ${
+          className={`${themeClasses.cardBg} rounded-2xl shadow-lg border ${
             isLight ? 'border-slate-200' : 'border-slate-800/70'
           } p-4 sm:p-6 space-y-5`}
         >
@@ -461,7 +461,7 @@ function AdminNotificationsPageContent() {
         {/* Preview */}
         {isPreviewing && (
           <section
-            className={`${themeClasses.cardBackground} rounded-2xl shadow-lg border ${
+            className={`${themeClasses.cardBg} rounded-2xl shadow-lg border ${
               isLight ? 'border-slate-200' : 'border-slate-800/70'
             } p-4 sm:p-6 space-y-4`}
           >
@@ -513,7 +513,7 @@ function AdminNotificationsPageContent() {
         {/* Audit of last send */}
         {lastResults && lastResults.length > 0 && (
           <section
-            className={`${themeClasses.cardBackground} rounded-2xl shadow-lg border ${
+            className={`${themeClasses.cardBg} rounded-2xl shadow-lg border ${
               isLight ? 'border-slate-200' : 'border-slate-800/70'
             } p-4 sm:p-6 space-y-4`}
           >
