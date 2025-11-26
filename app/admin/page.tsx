@@ -209,6 +209,7 @@ function AdminDashboard() {
   });
   const [certificateTemplateFile, setCertificateTemplateFile] = useState<File | null>(null);
   const [isUploadingCertificate, setIsUploadingCertificate] = useState(false);
+  const [certificateDimensionError, setCertificateDimensionError] = useState<string | null>(null);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
 
   // Client creation state
@@ -327,6 +328,7 @@ function AdminDashboard() {
   });
   const [editCertificateTemplateFile, setEditCertificateTemplateFile] = useState<File | null>(null);
   const [isUploadingEditCertificate, setIsUploadingEditCertificate] = useState(false);
+  const [editCertificateDimensionError, setEditCertificateDimensionError] = useState<string | null>(null);
   const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
   const [updateEventMessage, setUpdateEventMessage] = useState('');
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
@@ -623,6 +625,17 @@ function AdminDashboard() {
                   adminSession: session
                 }),
               });
+              
+              // Prompt to test certificate
+              const testCertificate = window.confirm(
+                '✅ Certificate template uploaded successfully!\n\n' +
+                'Would you like to test the certificate template now?\n\n' +
+                'This will open the certificate test page where you can preview how certificates will look with this template.'
+              );
+              
+              if (testCertificate) {
+                window.open(`/certificates/test?eventId=${data.event.id}`, '_blank');
+              }
             } else {
               console.error('Certificate upload error:', uploadData.error);
               setCreateEventMessage(`🎉 Event created successfully, but certificate template upload failed: ${uploadData.error}`);
@@ -896,6 +909,18 @@ function AdminDashboard() {
                   adminSession: session
                 }),
               });
+              
+              // Prompt to test certificate
+              const testCertificate = window.confirm(
+                '✅ Certificate template uploaded successfully!\n\n' +
+                'Would you like to test the certificate template now?\n\n' +
+                'This will open the certificate test page where you can preview how certificates will look with this template.'
+              );
+              
+              if (testCertificate) {
+                window.open(`/certificates/test?eventId=${editingEvent.id}`, '_blank');
+              }
+              
               setUpdateEventMessage('✅ Event updated successfully! Certificate template uploaded.');
             } else {
               console.error('Certificate upload error:', uploadData.error);
@@ -3321,14 +3346,53 @@ function AdminDashboard() {
 
               {/* Certificate Settings Section */}
               <div className={`mb-6 p-6 border ${themeClasses.modalBorder} ${themeClasses.cardRadius} ${theme === 'dark' ? 'bg-gray-800/50' : 'bg-white'}`}>
-                <h3 className={`${themeClasses.heading3} mb-4 flex items-center gap-2`}>
-                  🏆 Certificate Settings
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`${themeClasses.heading3} flex items-center gap-2`}>
+                    🏆 Certificate Settings
+                  </h3>
+                  <a
+                    href="/certificates/test"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`text-sm px-4 py-2 ${theme === 'dark' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-500 hover:bg-purple-600'} text-white rounded-lg transition-colors flex items-center gap-2`}
+                  >
+                    <span>🧪</span>
+                    <span>Test Certificate</span>
+                  </a>
+                </div>
+                
+                {/* Dimension Guide */}
+                <div className={`mb-4 p-4 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">ℹ️</span>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-300' : 'text-blue-800'} mb-1`}>
+                        Recommended Template Dimensions
+                      </p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
+                        For best results, upload a template with dimensions: <strong>904px × 1280px</strong> (width × height)
+                      </p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-blue-200/80' : 'text-blue-600'} mt-1`}>
+                        Templates with different dimensions may cause text positioning issues. The system will warn you if dimensions don't match.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <div>
                   <label className={`block ${themeClasses.label} mb-2`}>Upload Certificate Template (JPG/PNG)</label>
                   <p className={`text-xs ${themeClasses.textMuted} mb-3`}>
                     This will be used as the background for all certificates in this event. Only PNG and JPG files are accepted.
                   </p>
+                  
+                  {certificateDimensionError && (
+                    <div className={`mb-3 p-3 ${theme === 'dark' ? 'bg-yellow-900/30 border-yellow-700/50' : 'bg-yellow-50 border-yellow-200'} ${themeClasses.cardRadius} border`}>
+                      <p className={`text-sm ${theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                        ⚠️ {certificateDimensionError}
+                      </p>
+                    </div>
+                  )}
+                  
                   {certificateTemplateFile && (
                     <div className={`mb-3 p-3 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
                       <p className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'} mb-2`}>
@@ -3336,7 +3400,10 @@ function AdminDashboard() {
                       </p>
                       <button
                         type="button"
-                        onClick={() => setCertificateTemplateFile(null)}
+                        onClick={() => {
+                          setCertificateTemplateFile(null);
+                          setCertificateDimensionError(null);
+                        }}
                         className={`text-xs px-3 py-1 ${theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white rounded transition-colors`}
                       >
                         Remove
@@ -3346,7 +3413,7 @@ function AdminDashboard() {
                   <input
                     type="file"
                     accept=".png,.jpg,.jpeg"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
                         // Validate file type
@@ -3356,11 +3423,50 @@ function AdminDashboard() {
                         
                         if (!allowedTypes.includes(file.type) || !allowedExtensions.includes(fileExtension || '')) {
                           setCreateEventMessage('❌ Invalid file type. Only PNG or JPG files are allowed.');
+                          setCertificateDimensionError(null);
                           e.target.value = '';
                           return;
                         }
-                        setCertificateTemplateFile(file);
-                        setCreateEventMessage('');
+                        
+                        // Validate dimensions
+                        setCertificateDimensionError(null);
+                        try {
+                          const img = new Image();
+                          const objectUrl = URL.createObjectURL(file);
+                          
+                          img.onload = () => {
+                            URL.revokeObjectURL(objectUrl);
+                            const RECOMMENDED_WIDTH = 904;
+                            const RECOMMENDED_HEIGHT = 1280;
+                            const TOLERANCE = 10; // Allow 10px tolerance
+                            
+                            const widthMatch = Math.abs(img.width - RECOMMENDED_WIDTH) <= TOLERANCE;
+                            const heightMatch = Math.abs(img.height - RECOMMENDED_HEIGHT) <= TOLERANCE;
+                            
+                            if (!widthMatch || !heightMatch) {
+                              setCertificateDimensionError(
+                                `Template dimensions are ${img.width}px × ${img.height}px. Recommended: ${RECOMMENDED_WIDTH}px × ${RECOMMENDED_HEIGHT}px. Text positioning may be affected.`
+                              );
+                            } else {
+                              setCertificateDimensionError(null);
+                            }
+                            
+                            setCertificateTemplateFile(file);
+                            setCreateEventMessage('');
+                          };
+                          
+                          img.onerror = () => {
+                            URL.revokeObjectURL(objectUrl);
+                            setCreateEventMessage('❌ Failed to load image. Please try a different file.');
+                            e.target.value = '';
+                          };
+                          
+                          img.src = objectUrl;
+                        } catch (error) {
+                          console.error('Error validating image dimensions:', error);
+                          setCertificateTemplateFile(file);
+                          setCreateEventMessage('');
+                        }
                       }
                     }}
                     className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
@@ -3815,14 +3921,52 @@ function AdminDashboard() {
 
               {/* Certificate Settings Section */}
               <div className={`mt-8 p-6 border ${themeClasses.modalBorder} ${themeClasses.cardRadius} ${theme === 'dark' ? 'bg-gray-800/50' : 'bg-white'}`}>
-                <h3 className={`${themeClasses.heading3} mb-4 flex items-center gap-2`}>
-                  🏆 Certificate Settings
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`${themeClasses.heading3} flex items-center gap-2`}>
+                    🏆 Certificate Settings
+                  </h3>
+                  <a
+                    href="/certificates/test"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`text-sm px-4 py-2 ${theme === 'dark' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-500 hover:bg-purple-600'} text-white rounded-lg transition-colors flex items-center gap-2`}
+                  >
+                    <span>🧪</span>
+                    <span>Test Certificate</span>
+                  </a>
+                </div>
+                
+                {/* Dimension Guide */}
+                <div className={`mb-4 p-4 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">ℹ️</span>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-300' : 'text-blue-800'} mb-1`}>
+                        Recommended Template Dimensions
+                      </p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
+                        For best results, upload a template with dimensions: <strong>904px × 1280px</strong> (width × height)
+                      </p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-blue-200/80' : 'text-blue-600'} mt-1`}>
+                        Templates with different dimensions may cause text positioning issues. The system will warn you if dimensions don't match.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <div>
                   <label className={`block ${themeClasses.label} mb-2`}>Upload Certificate Template (JPG/PNG)</label>
                   <p className={`text-xs ${themeClasses.textMuted} mb-3`}>
                     This will be used as the background for all certificates in this event. Only PNG and JPG files are accepted.
                   </p>
+                  
+                  {editCertificateDimensionError && (
+                    <div className={`mb-3 p-3 ${theme === 'dark' ? 'bg-yellow-900/30 border-yellow-700/50' : 'bg-yellow-50 border-yellow-200'} ${themeClasses.cardRadius} border`}>
+                      <p className={`text-sm ${theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                        ⚠️ {editCertificateDimensionError}
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Current Template Preview */}
                   {editEventData.certificateTemplateUrl && !editCertificateTemplateFile && (
@@ -3917,7 +4061,7 @@ function AdminDashboard() {
                   <input
                     type="file"
                     accept=".png,.jpg,.jpeg"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
                         // Validate file type
@@ -3927,11 +4071,50 @@ function AdminDashboard() {
                         
                         if (!allowedTypes.includes(file.type) || !allowedExtensions.includes(fileExtension || '')) {
                           setUpdateEventMessage('❌ Invalid file type. Only PNG or JPG files are allowed.');
+                          setEditCertificateDimensionError(null);
                           e.target.value = '';
                           return;
                         }
-                        setEditCertificateTemplateFile(file);
-                        setUpdateEventMessage('');
+                        
+                        // Validate dimensions
+                        setEditCertificateDimensionError(null);
+                        try {
+                          const img = new Image();
+                          const objectUrl = URL.createObjectURL(file);
+                          
+                          img.onload = () => {
+                            URL.revokeObjectURL(objectUrl);
+                            const RECOMMENDED_WIDTH = 904;
+                            const RECOMMENDED_HEIGHT = 1280;
+                            const TOLERANCE = 10; // Allow 10px tolerance
+                            
+                            const widthMatch = Math.abs(img.width - RECOMMENDED_WIDTH) <= TOLERANCE;
+                            const heightMatch = Math.abs(img.height - RECOMMENDED_HEIGHT) <= TOLERANCE;
+                            
+                            if (!widthMatch || !heightMatch) {
+                              setEditCertificateDimensionError(
+                                `Template dimensions are ${img.width}px × ${img.height}px. Recommended: ${RECOMMENDED_WIDTH}px × ${RECOMMENDED_HEIGHT}px. Text positioning may be affected.`
+                              );
+                            } else {
+                              setEditCertificateDimensionError(null);
+                            }
+                            
+                            setEditCertificateTemplateFile(file);
+                            setUpdateEventMessage('');
+                          };
+                          
+                          img.onerror = () => {
+                            URL.revokeObjectURL(objectUrl);
+                            setUpdateEventMessage('❌ Failed to load image. Please try a different file.');
+                            e.target.value = '';
+                          };
+                          
+                          img.src = objectUrl;
+                        } catch (error) {
+                          console.error('Error validating image dimensions:', error);
+                          setEditCertificateTemplateFile(file);
+                          setUpdateEventMessage('');
+                        }
                       }
                     }}
                     className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}

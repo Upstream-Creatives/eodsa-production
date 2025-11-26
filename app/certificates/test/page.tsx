@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 export default function TestCertificatePage() {
+  const searchParams = useSearchParams();
+  const eventIdFromUrl = searchParams.get('eventId') || '';
+  
   const [formData, setFormData] = useState({
     dancerName: 'ANGELO SOLIS',
     percentage: 92,
@@ -11,7 +15,7 @@ export default function TestCertificatePage() {
     medallion: 'GOLD',
     date: '4 October 2025',
     email: 'solisangelo882@gmail.com',
-    eventId: '' // Optional: event ID for custom template
+    eventId: eventIdFromUrl // Optional: event ID for custom template
   });
   
   const [events, setEvents] = useState<Array<{id: string; name: string}>>([]);
@@ -27,6 +31,13 @@ export default function TestCertificatePage() {
       })
       .catch(err => console.error('Error fetching events:', err));
   }, []);
+  
+  // Update eventId if provided in URL
+  useEffect(() => {
+    if (eventIdFromUrl && eventIdFromUrl !== formData.eventId) {
+      setFormData(prev => ({ ...prev, eventId: eventIdFromUrl }));
+    }
+  }, [eventIdFromUrl]);
 
   const [showCertificate, setShowCertificate] = useState(false);
   const [sending, setSending] = useState(false);
