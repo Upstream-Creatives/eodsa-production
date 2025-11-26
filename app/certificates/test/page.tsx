@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function TestCertificatePage() {
+function TestCertificateContent() {
   const searchParams = useSearchParams();
   const eventIdFromUrl = searchParams.get('eventId') || '';
   
@@ -34,8 +34,13 @@ export default function TestCertificatePage() {
   
   // Update eventId if provided in URL
   useEffect(() => {
-    if (eventIdFromUrl && eventIdFromUrl !== formData.eventId) {
-      setFormData(prev => ({ ...prev, eventId: eventIdFromUrl }));
+    if (eventIdFromUrl) {
+      setFormData(prev => {
+        if (prev.eventId !== eventIdFromUrl) {
+          return { ...prev, eventId: eventIdFromUrl };
+        }
+        return prev;
+      });
     }
   }, [eventIdFromUrl]);
 
@@ -291,5 +296,17 @@ export default function TestCertificatePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TestCertificatePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    }>
+      <TestCertificateContent />
+    </Suspense>
   );
 }
