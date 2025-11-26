@@ -61,8 +61,9 @@ export async function POST(
       new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
     );
 
-    // Track solo counts per dancer
-    const soloCountsByDancer = new Map<string, number>();
+    // Track solo counts per dancer using comprehensive matching (eodsaId, contestantId, participantIds)
+    // This matches the logic used in calculateSmartEODSAFee
+    const soloCountsByDancerKey = new Map<string, number>();
 
     for (const entry of sortedEntries) {
       try {
@@ -73,22 +74,53 @@ export async function POST(
         else if (participantCount === 3) performanceType = 'Trio';
         else if (participantCount >= 4) performanceType = 'Group';
 
-        // For solo entries, determine solo count
+        // For solo entries, determine solo count using comprehensive matching
+        // IMPORTANT: Count entries BEFORE this one in the sorted list (by submitted date)
+        // This gives us the correct solo number for this entry
         let soloCount = 1;
         if (performanceType === 'Solo' && entry.participantIds && entry.participantIds.length === 1) {
-          const dancerId = entry.participantIds[0];
-          const currentCount = soloCountsByDancer.get(dancerId) || 0;
-          soloCount = currentCount + 1;
-          soloCountsByDancer.set(dancerId, soloCount);
+          // Count existing solos for this dancer (entries before current one in sorted list)
+          // Use comprehensive matching like calculateSmartEODSAFee does
+          const existingSolosForDancer = sortedEntries
+            .filter(e => {
+              // Must be a different entry (not the one we're recalculating)
+              if (e.id === entry.id) return false;
+              // Must be before current entry in submission order
+              if (new Date(e.submittedAt).getTime() >= new Date(entry.submittedAt).getTime()) return false;
+              // Must be solo
+              const eParticipantCount = e.participantIds?.length || 1;
+              if (eParticipantCount !== 1) return false;
+              // Must match dancer (using comprehensive matching: eodsaId, contestantId, or participantIds)
+              return e.eodsaId === entry.eodsaId || 
+                     e.contestantId === entry.contestantId ||
+                     (e.participantIds && e.participantIds.length === 1 && 
+                      entry.participantIds && entry.participantIds.length === 1 &&
+                      e.participantIds[0] === entry.participantIds[0]);
+            })
+            .length;
+          
+          soloCount = existingSolosForDancer + 1;
+          console.log(`📊 Entry ${entry.id} (${entry.itemName}): Found ${existingSolosForDancer} existing solos, this is solo #${soloCount}`);
         }
 
         // Recalculate fee using event's actual configuration
+        // Note: calculateSmartEODSAFee will count existing entries in the database
+        // Since we're recalculating an existing entry, we need to temporarily exclude it
+        // by using a workaround: pass soloCount based on entries processed so far
+        // But actually, the function queries the database, so it will count the entry itself
+        // We need to let it calculate naturally - it will find existing entries excluding this one
+        // if we query before this entry was created. But since entries are sorted by date,
+        // entries processed before this one will be counted correctly.
+        
+        // Actually, the issue is that calculateSmartEODSAFee counts ALL existing entries
+        // including the one we're recalculating. We need to pass the correct soloCount
+        // based on entries processed BEFORE this one.
         const feeBreakdown = await calculateSmartEODSAFee(
           entry.mastery || 'Water (Competitive)',
           performanceType,
           entry.participantIds || [],
           {
-            soloCount,
+            soloCount: performanceType === 'Solo' ? soloCount : undefined,
             eventId
           }
         );
