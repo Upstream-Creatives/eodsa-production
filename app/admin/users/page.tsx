@@ -658,7 +658,17 @@ function UsersPageContent() {
                     setUserForm({ 
                       ...userForm, 
                       userType: newType,
-                      staffPermissions: newType === 'staff' ? userForm.staffPermissions : undefined as any
+                      staffPermissions: newType === 'staff' 
+                        ? (userForm.staffPermissions || {
+                            announcer: false,
+                            backstage: false,
+                            media: false,
+                            runner: false,
+                            eventViewer: false,
+                            scoreApprover: false,
+                            judgeAccess: false
+                          })
+                        : undefined as any
                     });
                   }}
                   disabled={!canManageAdmins && (userForm.userType === 'admin' || userForm.userType === 'superadmin')}
@@ -697,14 +707,25 @@ function UsersPageContent() {
                       <label key={key} className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={userForm.staffPermissions[key as keyof typeof userForm.staffPermissions] || false}
-                          onChange={(e) => setUserForm({
-                            ...userForm,
-                            staffPermissions: {
-                              ...userForm.staffPermissions,
-                              [key]: e.target.checked
-                            }
-                          })}
+                          checked={(userForm.staffPermissions && userForm.staffPermissions[key as keyof typeof userForm.staffPermissions]) || false}
+                          onChange={(e) => {
+                            const currentPermissions = userForm.staffPermissions || {
+                              announcer: false,
+                              backstage: false,
+                              media: false,
+                              runner: false,
+                              eventViewer: false,
+                              scoreApprover: false,
+                              judgeAccess: false
+                            };
+                            setUserForm({
+                              ...userForm,
+                              staffPermissions: {
+                                ...currentPermissions,
+                                [key]: e.target.checked
+                              }
+                            });
+                          }}
                           className="w-4 h-4"
                         />
                         <span className="text-sm">{label}</span>
