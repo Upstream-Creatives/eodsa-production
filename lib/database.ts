@@ -1021,6 +1021,14 @@ export const db = {
       `;
     }
     
+    if (updates.calculatedFee !== undefined) {
+      await sqlClient`
+        UPDATE event_entries 
+        SET calculated_fee = ${updates.calculatedFee}
+        WHERE id = ${id}
+      `;
+    }
+    
         // PHASE 2: Handle music file updates
     if (updates.musicFileUrl !== undefined) {
       await sqlClient`

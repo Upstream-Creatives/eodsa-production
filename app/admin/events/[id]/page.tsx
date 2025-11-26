@@ -147,6 +147,7 @@ function EventParticipantsPage() {
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [entryModal, setEntryModal] = useState<EventEntry | null>(null);
   const [entryModalTab, setEntryModalTab] = useState<'overview' | 'dancers' | 'payment'>('overview');
+  const [recalculatingFees, setRecalculatingFees] = useState(false);
 
   // Determine performance type from participant count
   const getPerformanceType = (participantIds: string[]) => {
@@ -1126,6 +1127,62 @@ function EventParticipantsPage() {
     return entry.paymentStatus === 'paid' ? 0 : entry.calculatedFee;
   };
 
+  const handleRecalculateFees = async () => {
+    if (!eventId) return;
+    
+    const confirmed = window.confirm(
+      'This will recalculate fees for all entries in this event using the current event fee configuration. ' +
+      'This action cannot be undone. Continue?'
+    );
+    
+    if (!confirmed) return;
+    
+    setRecalculatingFees(true);
+    
+    try {
+      const session = localStorage.getItem('adminSession');
+      if (!session) {
+        showAlert('Session expired. Please log in again.', 'error');
+        return;
+      }
+      
+      const adminData = JSON.parse(session);
+      
+      const response = await fetch(`/api/admin/events/${eventId}/recalculate-fees`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminId: adminData.id
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showAlert(
+          `Successfully recalculated fees: ${result.updated} updated, ${result.unchanged} unchanged, ${result.errors} errors`,
+          'success'
+        );
+        
+        // Reload entries to show updated fees
+        const entriesResponse = await fetch(`/api/events/${eventId}/entries`);
+        if (entriesResponse.ok) {
+          const entriesData = await entriesResponse.json();
+          setEntries(entriesData.entries || []);
+        }
+      } else {
+        const error = await response.json();
+        showAlert(`Failed to recalculate fees: ${error.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error recalculating fees:', error);
+      showAlert('Failed to recalculate fees', 'error');
+    } finally {
+      setRecalculatingFees(false);
+    }
+  };
+
   if (isLoading) {
     const themeClasses = getThemeClasses(theme);
     return (
@@ -1503,6 +1560,32 @@ function EventParticipantsPage() {
                       {filteredEntries.filter(e => e.qualifiedForNationals).length} qualified
                     </div>
                   )}
+                  {entries.length > 0 && (
+                    <button
+                      onClick={handleRecalculateFees}
+                      disabled={recalculatingFees}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        recalculatingFees
+                          ? themeClasses.buttonDisabled
+                          : theme === 'dark'
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                          : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      } flex items-center space-x-2`}
+                      title="Recalculate fees for all entries using current event fee configuration"
+                    >
+                      {recalculatingFees ? (
+                        <>
+                          <div className={`w-4 h-4 border-2 ${theme === 'dark' ? 'border-white/30 border-t-white' : 'border-white/30 border-t-white'} rounded-full animate-spin`}></div>
+                          <span>Recalculating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>💰</span>
+                          <span>Recalculate Fees</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
               
@@ -1819,7 +1902,14 @@ function EventParticipantsPage() {
                       
                       <td className={themeClasses.tableCellPadding}>
                         <div className="space-y-1">
-                            <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>R{entry.calculatedFee.toFixed(2)}</div>
+                            {(() => {
+                              const currencySymbol = event?.currency === 'USD' ? '$' : event?.currency === 'EUR' ? '€' : event?.currency === 'GBP' ? '£' : 'R';
+                              return (
+                                <div className={`text-sm font-bold ${themeClasses.textPrimary}`}>
+                                  {currencySymbol}{entry.calculatedFee.toFixed(2)}
+                                </div>
+                              );
+                            })()}
                             <span className={`${themeClasses.badgeBase} border ${getStatusBadge(entry.paymentStatus)}`}>
                               {entry.paymentStatus.toUpperCase()}
                             </span>
@@ -2095,22 +2185,29 @@ function EventParticipantsPage() {
             <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-5 border ${themeClasses.metricCardBorder}`}>
               <h3 className={`${themeClasses.heading3} mb-4`}>Current Status</h3>
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Entry Fee:</span>
-                  <span className={`text-base font-bold ${themeClasses.textPrimary}`}>R{selectedEntry.calculatedFee.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Status:</span>
-                  <span className={`${themeClasses.badgeBase} border ${getStatusBadge(selectedEntry.paymentStatus)}`}>
-                    {selectedEntry.paymentStatus.toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Outstanding:</span>
-                  <span className={`text-base font-bold ${getOutstandingBalance(selectedEntry) > 0 ? (theme === 'dark' ? 'text-red-400' : 'text-red-600') : (theme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
-                    R{getOutstandingBalance(selectedEntry).toFixed(2)}
-                  </span>
-                </div>
+                {(() => {
+                  const currencySymbol = event?.currency === 'USD' ? '$' : event?.currency === 'EUR' ? '€' : event?.currency === 'GBP' ? '£' : 'R';
+                  return (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Entry Fee:</span>
+                        <span className={`text-base font-bold ${themeClasses.textPrimary}`}>{currencySymbol}{selectedEntry.calculatedFee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Status:</span>
+                        <span className={`${themeClasses.badgeBase} border ${getStatusBadge(selectedEntry.paymentStatus)}`}>
+                          {selectedEntry.paymentStatus.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Outstanding:</span>
+                        <span className={`text-base font-bold ${getOutstandingBalance(selectedEntry) > 0 ? (theme === 'dark' ? 'text-red-400' : 'text-red-600') : (theme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
+                          {currencySymbol}{getOutstandingBalance(selectedEntry).toFixed(2)}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
                 {selectedEntry.paymentReference && (
                   <div className={`flex justify-between items-center pt-2 border-t ${themeClasses.cardBorder}`}>
                     <span className={`text-sm font-medium ${themeClasses.textSecondary}`}>Reference:</span>
@@ -2320,24 +2417,29 @@ function EventParticipantsPage() {
 
             {entryModalTab === 'payment' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
-                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Total Fee</div>
-                    <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>R{entryModal.calculatedFee.toFixed(2)}</div>
-                  </div>
-                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
-                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Status</div>
-                    <div className={`${themeClasses.badgeBase} border ${getStatusBadge(entryModal.paymentStatus)}`}>
-                      {entryModal.paymentStatus.toUpperCase()}
+                {(() => {
+                  const currencySymbol = event?.currency === 'USD' ? '$' : event?.currency === 'EUR' ? '€' : event?.currency === 'GBP' ? '£' : 'R';
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                        <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Total Fee</div>
+                        <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{currencySymbol}{entryModal.calculatedFee.toFixed(2)}</div>
+                      </div>
+                      <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                        <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Status</div>
+                        <div className={`${themeClasses.badgeBase} border ${getStatusBadge(entryModal.paymentStatus)}`}>
+                          {entryModal.paymentStatus.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
+                        <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Outstanding</div>
+                        <div className={`text-lg font-bold ${getOutstandingBalance(entryModal) > 0 ? (theme === 'dark' ? 'text-red-400' : 'text-red-600') : (theme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
+                          {currencySymbol}{getOutstandingBalance(entryModal).toFixed(2)}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
-                    <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Outstanding</div>
-                    <div className={`text-lg font-bold ${getOutstandingBalance(entryModal) > 0 ? (theme === 'dark' ? 'text-red-400' : 'text-red-600') : (theme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
-                      R{getOutstandingBalance(entryModal).toFixed(2)}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Fee Breakdown */}
                 <FeeBreakdownComponent entry={entryModal} event={event} allEntries={entries} />
@@ -2442,37 +2544,56 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
           const actualTotalFee = entry.calculatedFee;
           const recalculatedTotalFee = (data.fees?.performanceFee || 0) + (data.fees?.registrationFee || 0);
           
-          // Reverse-engineer the breakdown from the actual charged fee
-          // For solo entries, try to determine what was charged
+          // Use the API response as the primary source, but validate against actual charged fee
           let actualPerformanceFee = data.fees?.performanceFee || 0;
           let actualRegistrationFee = data.fees?.registrationFee || 0;
           
-          if (performanceType === 'Solo' && event) {
-            // Try to reverse-engineer based on actual total and event fees
-            const regFee = event.registrationFeePerDancer || 175;
-            const solo1Fee = event.solo1Fee || 550;
-            const solo2Fee = event.solo2Fee || 942;
-            const solo3Fee = event.solo3Fee || 1256;
-            
-            // Check if total matches common combinations
-            if (Math.abs(actualTotalFee - (solo1Fee + regFee)) < 0.01) {
-              // First solo with registration
-              actualPerformanceFee = solo1Fee;
-              actualRegistrationFee = regFee;
-            } else if (Math.abs(actualTotalFee - solo1Fee) < 0.01) {
-              // First solo without registration (already had entry)
-              actualPerformanceFee = solo1Fee;
-              actualRegistrationFee = 0;
-            } else if (Math.abs(actualTotalFee - (solo2Fee - solo1Fee)) < 0.01) {
-              // Second solo (incremental)
-              actualPerformanceFee = solo2Fee - solo1Fee;
-              actualRegistrationFee = 0;
-            } else if (Math.abs(actualTotalFee - (solo3Fee - solo2Fee)) < 0.01) {
-              // Third solo (incremental)
-              actualPerformanceFee = solo3Fee - solo2Fee;
-              actualRegistrationFee = 0;
+          // If API response total doesn't match actual charged fee, try to reconcile
+          if (Math.abs(recalculatedTotalFee - actualTotalFee) > 0.01 && event) {
+            // API response doesn't match - try to reverse-engineer using event's actual fees
+            if (performanceType === 'Solo' && soloCount) {
+              // Use event's actual fees (no hardcoded defaults)
+              const regFee = event.registrationFeePerDancer || 0;
+              const solo1Fee = event.solo1Fee || 0;
+              const solo2Fee = event.solo2Fee || 0;
+              const solo3Fee = event.solo3Fee || 0;
+              const soloAdditionalFee = event.soloAdditionalFee || 0;
+              
+              // Calculate what the performance fee should be based on solo count
+              let expectedPerformanceFee = 0;
+              if (soloCount === 1) {
+                expectedPerformanceFee = solo1Fee;
+              } else if (soloCount === 2 && solo2Fee > 0 && solo1Fee > 0) {
+                // Incremental cost for 2nd solo
+                expectedPerformanceFee = solo2Fee - solo1Fee;
+              } else if (soloCount === 3 && solo3Fee > 0 && solo2Fee > 0) {
+                // Incremental cost for 3rd solo
+                expectedPerformanceFee = solo3Fee - solo2Fee;
+              } else if (soloCount > 3) {
+                // Additional solo fee
+                expectedPerformanceFee = soloAdditionalFee;
+              }
+              
+              // Try combinations to match actual total
+              if (Math.abs(actualTotalFee - (expectedPerformanceFee + regFee)) < 0.01) {
+                // Matches: performance fee + registration
+                actualPerformanceFee = expectedPerformanceFee;
+                actualRegistrationFee = regFee;
+              } else if (Math.abs(actualTotalFee - expectedPerformanceFee) < 0.01) {
+                // Matches: performance fee only (registration waived)
+                actualPerformanceFee = expectedPerformanceFee;
+                actualRegistrationFee = 0;
+              } else {
+                // Doesn't match expected - use API response or calculate from total
+                actualPerformanceFee = data.fees?.performanceFee || (actualTotalFee - (data.fees?.registrationFee || 0));
+                actualRegistrationFee = actualTotalFee - actualPerformanceFee;
+                if (actualRegistrationFee < 0) {
+                  actualRegistrationFee = 0;
+                  actualPerformanceFee = actualTotalFee;
+                }
+              }
             } else {
-              // Use recalculated values but note the discrepancy
+              // For non-solo, use API response or calculate from total
               actualPerformanceFee = data.fees?.performanceFee || 0;
               actualRegistrationFee = actualTotalFee - actualPerformanceFee;
               if (actualRegistrationFee < 0) {
@@ -2481,24 +2602,21 @@ function FeeBreakdownComponent({ entry, event, allEntries }: { entry: EventEntry
               }
             }
           } else {
-            // For non-solo, use recalculated or estimate
+            // API response matches actual charged fee - use it directly
             actualPerformanceFee = data.fees?.performanceFee || 0;
-            actualRegistrationFee = actualTotalFee - actualPerformanceFee;
-            if (actualRegistrationFee < 0) {
-              actualRegistrationFee = 0;
-              actualPerformanceFee = actualTotalFee;
-            }
+            actualRegistrationFee = data.fees?.registrationFee || 0;
           }
           
           // Build breakdown text based on actual fees
           let breakdownText = data.fees?.breakdown || '';
-          if (performanceType === 'Solo' && soloCount) {
+          if (performanceType === 'Solo' && soloCount && event) {
+            const currencySymbol = (event.currency === 'USD') ? '$' : (event.currency === 'EUR') ? '€' : (event.currency === 'GBP') ? '£' : 'R';
             if (soloCount === 1) {
-              breakdownText = `Solo Package (1 solo)`;
+              breakdownText = `Solo Package (1 solo) - ${currencySymbol}${(event.solo1Fee || 0).toFixed(2)}`;
             } else if (soloCount === 2) {
-              breakdownText = `Solo Package (2 solos total) - Previous: R${event?.solo1Fee || 550}`;
+              breakdownText = `Solo Package (2 solos total) - Previous: ${currencySymbol}${(event.solo1Fee || 0).toFixed(2)}`;
             } else if (soloCount === 3) {
-              breakdownText = `Solo Package (3 solos total) - Previous: R${event?.solo2Fee || 942}`;
+              breakdownText = `Solo Package (3 solos total) - Previous: ${currencySymbol}${(event.solo2Fee || 0).toFixed(2)}`;
             } else {
               breakdownText = `Solo Package (${soloCount} solos total)`;
             }
