@@ -19,9 +19,11 @@ function TestCertificateContent() {
   });
   
   const [events, setEvents] = useState<Array<{id: string; name: string}>>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   
   // Fetch events on mount
   useEffect(() => {
+    setLoadingEvents(true);
     fetch('/api/events')
       .then(res => res.json())
       .then(data => {
@@ -29,7 +31,12 @@ function TestCertificateContent() {
           setEvents(data.events);
         }
       })
-      .catch(err => console.error('Error fetching events:', err));
+      .catch(err => {
+        console.error('Error fetching events:', err);
+      })
+      .finally(() => {
+        setLoadingEvents(false);
+      });
   }, []);
   
   // Update eventId if provided in URL
@@ -224,18 +231,32 @@ function TestCertificateContent() {
                 <label className="block text-white text-sm font-bold mb-2">
                   Event ID (Optional - for custom template)
                 </label>
-                <select
-                  value={formData.eventId}
-                  onChange={(e) => handleInputChange('eventId', e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-600"
-                >
-                  <option value="">Use Default Template</option>
-                  {events.map(event => (
-                    <option key={event.id} value={event.id}>{event.name}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.eventId}
+                    onChange={(e) => handleInputChange('eventId', e.target.value)}
+                    disabled={loadingEvents}
+                    className={`w-full px-4 py-2 bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-600 ${
+                      loadingEvents ? 'opacity-50 cursor-wait' : ''
+                    }`}
+                  >
+                    <option value="">
+                      {loadingEvents ? 'Loading events...' : 'Use Default Template'}
+                    </option>
+                    {events.map(event => (
+                      <option key={event.id} value={event.id}>{event.name}</option>
+                    ))}
+                  </select>
+                  {loadingEvents && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Select an event to use its custom certificate template
+                  {loadingEvents 
+                    ? 'Loading events...' 
+                    : 'Select an event to use its custom certificate template'}
                 </p>
               </div>
 
