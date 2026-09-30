@@ -239,11 +239,13 @@ function AdminDashboard() {
  numberOfJudges: 4, // Default to 4 judges
  certificateTemplateUrl: '' as string | undefined,
  // Event Types & Qualification System
- eventType: 'REGIONAL_EVENT' as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT',
+ eventType: 'REGIONAL_EVENT' as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT' | 'AUDITION_EVENT',
  eventMode: 'HYBRID' as 'LIVE' | 'VIRTUAL' | 'HYBRID',
  qualificationRequired: false,
  qualificationSource: null as 'NONE' | 'REGIONAL' | 'ANY_NATIONAL_LEVEL' | 'MANUAL' | 'CUSTOM' | null,
- minimumQualificationScore: null as number | null
+ minimumQualificationScore: null as number | null,
+ auditionPaymentType: 'free' as 'free' | 'paid',
+ auditionFlatFee: 0
  });
  const [certificateTemplateFile, setCertificateTemplateFile] = useState<File | null>(null);
  const [isUploadingCertificate, setIsUploadingCertificate] = useState(false);
@@ -365,11 +367,13 @@ function AdminDashboard() {
  numberOfJudges: 4,
  certificateTemplateUrl: undefined as string | undefined,
  // Event Types & Qualification System
- eventType: 'REGIONAL_EVENT' as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT',
+ eventType: 'REGIONAL_EVENT' as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT' | 'AUDITION_EVENT',
  eventMode: 'HYBRID' as 'LIVE' | 'VIRTUAL' | 'HYBRID',
  qualificationRequired: false,
  qualificationSource: null as 'NONE' | 'REGIONAL' | 'ANY_NATIONAL_LEVEL' | 'MANUAL' | 'CUSTOM' | null,
- minimumQualificationScore: null as number | null
+ minimumQualificationScore: null as number | null,
+ auditionPaymentType: 'free' as 'free' | 'paid',
+ auditionFlatFee: 0
  });
  const [editCertificateTemplateFile, setEditCertificateTemplateFile] = useState<File | null>(null);
  const [isUploadingEditCertificate, setIsUploadingEditCertificate] = useState(false);
@@ -767,7 +771,9 @@ function AdminDashboard() {
  eventMode: 'HYBRID',
  qualificationRequired: false,
  qualificationSource: null,
- minimumQualificationScore: null
+ minimumQualificationScore: null,
+ auditionPaymentType: 'free',
+ auditionFlatFee: 0
  });
  setCertificateTemplateFile(null);
  fetchData();
@@ -874,7 +880,9 @@ function AdminDashboard() {
  eventMode: (event as any).eventMode || 'HYBRID',
  qualificationRequired: (event as any).qualificationRequired ?? false,
  qualificationSource: (event as any).qualificationSource || null,
- minimumQualificationScore: (event as any).minimumQualificationScore || null
+ minimumQualificationScore: (event as any).minimumQualificationScore || null,
+ auditionPaymentType: (event as any).auditionPaymentType === 'paid' ? 'paid' : 'free',
+ auditionFlatFee: (event as any).auditionFlatFee || 0
  });
  setEditCertificateTemplateFile(null);
  setUpdateEventMessage('');
@@ -2957,13 +2965,45 @@ function AdminDashboard() {
  }`}
  > International
  </button>
+ <button
+ type="button" onClick={() => {
+ setNewEvent(prev => ({
+ ...prev,
+ eventType: 'AUDITION_EVENT',
+ eventMode: 'VIRTUAL',
+ participationMode: 'virtual',
+ qualificationRequired: false,
+ qualificationSource: null,
+ minimumQualificationScore: null,
+ venue: 'Virtual',
+ discountEnabled: false,
+ soloPrice: 0,
+ duetPrice: 0,
+ groupPrice: 0,
+ registrationFee: 0,
+ auditionPaymentType: 'free',
+ auditionFlatFee: 0
+ }));
+ }}
+ className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
+ newEvent.eventType === 'AUDITION_EVENT'
+ ? theme === 'dark'
+ ? 'bg-rose-600 border-rose-500 text-white'
+ : 'bg-rose-500 border-rose-600 text-white'
+ : theme === 'dark'
+ ? 'bg-black/40 border-gray-600 text-gray-300 hover:bg-gray-700'
+ : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+ }`}
+ > Audition
+ </button>
  </div>
  <p className={`text-xs ${themeClasses.textMuted} mt-2`}> {newEvent.eventType === 'REGIONAL_EVENT' && 'Regional competition event. Open to all dancers.'}
  {newEvent.eventType === 'NATIONAL_EVENT' && 'National competition. Requires qualification from Regional Events (default: 75% minimum score).'}
  {newEvent.eventType === 'QUALIFIER_EVENT' && 'Qualifier event. Open to all dancers.'}
  {newEvent.eventType === 'INTERNATIONAL_VIRTUAL_EVENT' && 'International virtual event. Can configure custom qualification requirements.'}
+ {newEvent.eventType === 'AUDITION_EVENT' && 'Virtual audition. No venue. Set the entry as free or a single flat fee. Scores stay private to admin and judges.'}
  </p>
- </div> {/* Event Mode Selection */}
+ </div> {newEvent.eventType !== 'AUDITION_EVENT' && ( /* Event Mode Selection */
  <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-indigo-900/20 border-indigo-700/50' : 'bg-indigo-50 border-indigo-200'} ${themeClasses.cardRadius} border`}>
  <label className={`block ${themeClasses.label} mb-3 font-semibold`}> Event Mode <span className="text-red-500">*</span>
  </label>
@@ -3012,7 +3052,24 @@ function AdminDashboard() {
  {newEvent.eventMode === 'VIRTUAL' && 'Only virtual video submissions will be allowed during registration.'}
  {newEvent.eventMode === 'HYBRID' && 'Both live and virtual entries will be allowed during registration.'}
  </p>
- </div> {/* Qualification Settings - Conditional */}
+ </div> )}
+ {newEvent.eventType === 'AUDITION_EVENT' && (
+ <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-rose-900/20 border-rose-700/50' : 'bg-rose-50 border-rose-200'} ${themeClasses.cardRadius} border`}>
+ <h3 className={`${themeClasses.heading3} mb-2`}>Audition payment</h3>
+ <p className={`text-xs ${themeClasses.textMuted} mb-4`}>Auditions are virtual only. Choose free entry, or one flat amount per entry. Discounts and tiered pricing do not apply.</p>
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+ <button type="button" onClick={() => setNewEvent(prev => ({ ...prev, auditionPaymentType: 'free', auditionFlatFee: 0 }))} className={`px-4 py-3 rounded-xl border-2 font-medium ${newEvent.auditionPaymentType !== 'paid' ? (theme === 'dark' ? 'bg-green-600 border-green-500 text-white' : 'bg-green-500 border-green-600 text-white') : (theme === 'dark' ? 'bg-black/40 border-gray-600 text-gray-300' : 'bg-white border-gray-300 text-gray-700')}`}>Free</button>
+ <button type="button" onClick={() => setNewEvent(prev => ({ ...prev, auditionPaymentType: 'paid' }))} className={`px-4 py-3 rounded-xl border-2 font-medium ${newEvent.auditionPaymentType === 'paid' ? (theme === 'dark' ? 'bg-rose-600 border-rose-500 text-white' : 'bg-rose-500 border-rose-600 text-white') : (theme === 'dark' ? 'bg-black/40 border-gray-600 text-gray-300' : 'bg-white border-gray-300 text-gray-700')}`}>Paid</button>
+ </div>
+ {newEvent.auditionPaymentType === 'paid' && (
+ <div>
+ <label className={`block ${themeClasses.label} mb-2`}>Flat amount per entry (ZAR) <span className="text-red-500">*</span></label>
+ <input type="number" min="0.01" step="0.01" required value={newEvent.auditionFlatFee || ''} onChange={(e) => setNewEvent(prev => ({ ...prev, auditionFlatFee: parseFloat(e.target.value) || 0 }))} className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.textPrimary}`} placeholder="e.g. 150" />
+ </div>
+ )}
+ </div>
+ )}
+ {/* Qualification Settings - Conditional */}
  {(newEvent.eventType === 'NATIONAL_EVENT' || newEvent.eventType === 'INTERNATIONAL_VIRTUAL_EVENT') && (
  <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-amber-900/20 border-amber-700/50' : 'bg-amber-50 border-amber-200'} ${themeClasses.cardRadius} border`}>
  <h3 className={`${themeClasses.heading3} mb-4 flex items-center gap-2`}> Qualification Requirements</h3> {newEvent.eventType === 'NATIONAL_EVENT' && (
@@ -3134,7 +3191,8 @@ function AdminDashboard() {
  > {REGIONS.map((region) => (
  <option key={region} value={region}>{region}</option> ))}
  </select>
- </div>  <div>
+ </div>  {newEvent.eventType !== 'AUDITION_EVENT' && (
+ <div>
  <label className={`block ${themeClasses.label} mb-2`}>Venue <span className="text-red-500">*</span></label>
  <input
  type="text" value={newEvent.venue}
@@ -3142,7 +3200,8 @@ function AdminDashboard() {
  className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
  required
  placeholder="e.g., Johannesburg Civic Theatre" />
- </div>  <div>
+ </div>
+ )}  <div>
  <label className={`block ${themeClasses.label} mb-2 font-semibold`}>Number of Judges <span className="text-red-500">*</span></label>
  <input
  type="number" min="1" max="10" value={newEvent.numberOfJudges}
@@ -3186,7 +3245,7 @@ function AdminDashboard() {
  </p>
  </div>
  </div>
- </div> {/* Fee Configuration Section */}
+ </div> {newEvent.eventType !== 'AUDITION_EVENT' && ( /* Fee Configuration Section */
  <div className={`mb-6 p-6 border-2 ${theme === 'dark' ? 'border-indigo-700/50 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50/50'} ${themeClasses.cardRadius}`}>
  <h3 className={`${themeClasses.heading3} mb-4 flex items-center gap-2`}> Fee Configuration (Flat Pricing)</h3>
  <div className={`mb-4 p-3 border ${themeClasses.modalBorder} ${themeClasses.cardRadius}`}>
@@ -3305,7 +3364,8 @@ function AdminDashboard() {
  <div><input type="number" min="0" step="0.01" value={newEvent.largeGroupFeePerDancer || ''} onChange={(e) => setNewEvent(prev => ({ ...prev, largeGroupFeePerDancer: parseFloat(e.target.value) || 0 }))} className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.textPrimary}`} placeholder="Legacy large_group_fee_per_dancer" /><p className={`text-xs ${themeClasses.textMuted} mt-1`}>Legacy large-group fee per dancer</p></div>
  </div>
  </div>
- </div> {/* Certificate Settings Section */}
+ </div> )}
+ {newEvent.eventType !== 'AUDITION_EVENT' && ( /* Certificate Settings Section */
  <div className={`mb-6 p-6 border ${themeClasses.modalBorder} ${themeClasses.cardRadius} ${theme === 'dark' ? 'bg-[rgba(17,17,17,0.72)]' : 'bg-white'}`}>
  <div className="flex items-center justify-between mb-4">
  <h3 className={`${themeClasses.heading3} flex items-center gap-2`}> Certificate Settings</h3>
@@ -3410,7 +3470,8 @@ function AdminDashboard() {
  className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
  />
  </div>
- </div> {createEventMessage && (
+ </div> )}
+ {createEventMessage && (
  <div className={`mt-6 p-4 ${themeClasses.cardRadius} font-medium animate-slideIn border ${
  createEventMessage.includes('Error') 
  ? theme === 'dark'
@@ -3500,9 +3561,47 @@ function AdminDashboard() {
  </p>
  </div> )}
 
- {/* Event Type Selection */}
  <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
- <label className={`block ${themeClasses.label} mb-3`}> Event Type <span className="text-red-500">*</span> {editingEvent && (editingEvent as any).participationMode !== editEventData.participationMode && (
+ <label className={`block ${themeClasses.label} mb-3 font-semibold`}>Event Type</label>
+ <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+ {([
+ ['REGIONAL_EVENT', 'Regional'],
+ ['NATIONAL_EVENT', 'National'],
+ ['QUALIFIER_EVENT', 'Qualifier'],
+ ['INTERNATIONAL_VIRTUAL_EVENT', 'International'],
+ ['AUDITION_EVENT', 'Audition']
+ ] as const).map(([value, label]) => (
+ <button key={value} type="button" onClick={() => setEditEventData(prev => ({
+ ...prev,
+ eventType: value,
+ ...(value === 'AUDITION_EVENT' ? {
+ eventMode: 'VIRTUAL' as const,
+ participationMode: 'virtual' as const,
+ qualificationRequired: false,
+ qualificationSource: null,
+ minimumQualificationScore: null,
+ venue: 'Virtual',
+ discountEnabled: false
+ } : {})
+ }))} className={`px-3 py-3 rounded-xl border-2 text-sm font-medium ${editEventData.eventType === value ? (theme === 'dark' ? 'bg-rose-600 border-rose-500 text-white' : 'bg-rose-500 border-rose-600 text-white') : (theme === 'dark' ? 'bg-black/40 border-gray-600 text-gray-300' : 'bg-white border-gray-300 text-gray-700')}`}>{label}</button>
+ ))}
+ </div>
+ {editEventData.eventType === 'AUDITION_EVENT' && (
+ <div className="mt-4 space-y-3">
+ <p className={`text-xs ${themeClasses.textMuted}`}>Auditions are virtual only. Venue is hidden. Choose free entry or one flat fee. No discounts.</p>
+ <div className="grid grid-cols-2 gap-3">
+ <button type="button" onClick={() => setEditEventData(prev => ({ ...prev, auditionPaymentType: 'free', auditionFlatFee: 0 }))} className={`px-4 py-2 rounded-lg border ${editEventData.auditionPaymentType !== 'paid' ? 'bg-green-600 text-white border-green-500' : 'border-gray-500'}`}>Free</button>
+ <button type="button" onClick={() => setEditEventData(prev => ({ ...prev, auditionPaymentType: 'paid' }))} className={`px-4 py-2 rounded-lg border ${editEventData.auditionPaymentType === 'paid' ? 'bg-rose-600 text-white border-rose-500' : 'border-gray-500'}`}>Paid</button>
+ </div>
+ {editEventData.auditionPaymentType === 'paid' && (
+ <input type="number" min="0.01" step="0.01" required value={editEventData.auditionFlatFee || ''} onChange={(e) => setEditEventData(prev => ({ ...prev, auditionFlatFee: parseFloat(e.target.value) || 0 }))} className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.textPrimary}`} placeholder="Flat amount per entry (ZAR)" />
+ )}
+ </div>
+ )}
+ </div>
+ {editEventData.eventType !== 'AUDITION_EVENT' && (
+ <div className={`mb-6 p-4 ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} ${themeClasses.cardRadius} border`}>
+ <label className={`block ${themeClasses.label} mb-3`}> Participation Mode <span className="text-red-500">*</span> {editingEvent && (editingEvent as any).participationMode !== editEventData.participationMode && (
  <span className="ml-2 text-yellow-600 text-xs">( Changing event type)</span> )}
  </label>
  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -3550,7 +3649,8 @@ function AdminDashboard() {
  {editEventData.participationMode === 'virtual' && 'Only virtual video submissions will be allowed during registration.'}
  {editEventData.participationMode === 'hybrid' && 'Both live and virtual entries will be allowed during registration.'}
  </p>
- </div>  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+ </div> )}
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
  <div>
  <label className={`block ${themeClasses.label} mb-2`}>Event Name *</label>
  <input
@@ -3636,7 +3736,8 @@ function AdminDashboard() {
  > {REGIONS.map((region) => (
  <option key={region} value={region}>{region}</option> ))}
  </select>
- </div>  <div className="md:col-span-2">
+ </div>  {editEventData.eventType !== 'AUDITION_EVENT' && (
+ <div className="md:col-span-2">
  <label className={`block ${themeClasses.label} mb-2`}>Venue *</label>
  <input
  type="text" value={editEventData.venue}
@@ -3644,7 +3745,8 @@ function AdminDashboard() {
  className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} transition-all duration-200`}
  required
  />
- </div>  <div className="md:col-span-2">
+ </div>
+ )}  <div className="md:col-span-2">
  <label className={`block ${themeClasses.label} mb-2`}>Description</label>
  <textarea
  value={editEventData.description}
@@ -3653,7 +3755,7 @@ function AdminDashboard() {
  className={`w-full px-4 py-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary} placeholder:${themeClasses.textMuted} transition-all duration-200`}
  placeholder="Event description (optional)" />
  </div>
- </div> {/* Fee Configuration Section */}
+ </div> {editEventData.eventType !== 'AUDITION_EVENT' && ( /* Fee Configuration Section */
  <div className={`mt-8 p-6 border-2 ${theme === 'dark' ? 'border-green-700/50 bg-green-900/20' : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'} ${themeClasses.cardRadius}`}>
  <h3 className={`${themeClasses.heading3} mb-4 flex items-center space-x-2`}> Fee Configuration (Flat Pricing)</h3>
  <div className={`mb-4 p-3 border ${themeClasses.modalBorder} ${themeClasses.cardRadius}`}>
@@ -3772,7 +3874,8 @@ function AdminDashboard() {
  <div><input type="number" min="0" step="0.01" value={editEventData.largeGroupFeePerDancer} onChange={(e) => setEditEventData(prev => ({ ...prev, largeGroupFeePerDancer: parseFloat(e.target.value) || 0 }))} className={`w-full px-4 py-2 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.textPrimary}`} placeholder="Legacy large_group_fee_per_dancer" /><p className={`text-xs ${themeClasses.textMuted} mt-1`}>Legacy large-group fee per dancer</p></div>
  </div>
  </div>
- </div> {/* Certificate Settings Section */}
+ </div> )}
+ {editEventData.eventType !== 'AUDITION_EVENT' && ( /* Certificate Settings Section */
  <div className={`mt-8 p-6 border ${themeClasses.modalBorder} ${themeClasses.cardRadius} ${theme === 'dark' ? 'bg-[rgba(17,17,17,0.72)]' : 'bg-white'}`}>
  <div className="flex items-center justify-between mb-4">
  <h3 className={`${themeClasses.heading3} flex items-center gap-2`}> Certificate Settings</h3>
@@ -3944,7 +4047,8 @@ function AdminDashboard() {
  <p className={`text-xs ${themeClasses.textMuted} mt-2`}> {editEventData.certificateTemplateUrl ? 'Select a new file to replace the current template.' : 'Upload a template to use as the background for certificates in this event.'}
  </p>
  </div>
- </div> {updateEventMessage && (
+ </div> )}
+ {updateEventMessage && (
  <div className={`mt-6 p-4 ${themeClasses.cardRadius} font-medium animate-slideIn border ${
  updateEventMessage.includes('Error') 
  ? theme === 'dark'
@@ -5067,6 +5171,7 @@ function EventsTabContent({
  : eventType === 'REGIONAL_EVENT' ? 'Regional'
  : eventType === 'QUALIFIER_EVENT' ? 'Qualifier'
  : eventType === 'INTERNATIONAL_VIRTUAL_EVENT' ? 'International'
+ : eventType === 'AUDITION_EVENT' ? 'Audition'
  : 'Regional';
  return displayName;
  })()} • {(() => {
@@ -5082,6 +5187,7 @@ function EventsTabContent({
  : eventType === 'REGIONAL_EVENT' ? 'Regional'
  : eventType === 'QUALIFIER_EVENT' ? 'Qualifier'
  : eventType === 'INTERNATIONAL_VIRTUAL_EVENT' ? 'International'
+ : eventType === 'AUDITION_EVENT' ? 'Audition'
  : 'Regional';
  
  return (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSql } from '@/lib/database';
+import { ensureAuditionSchema, getSql } from '@/lib/database';
 import { validateBatchEntryFees, createBatchTransactionRecords, prepareEntriesForBatchCreation, markBatchRegistrationCharged } from '@/lib/payment-validation';
 import {
   findExistingEntryIdForLine,
@@ -10,6 +10,7 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureAuditionSchema();
     const body = await request.json();
     const {
       eventId,
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
               approved, qualified_for_nationals, item_number, item_name, choreographer, mastery, 
               item_style, estimated_duration, entry_type, music_file_url, music_file_name, 
               video_file_url, video_file_name, video_external_url, video_external_type, performance_type,
-              entry_line_key
+              entry_line_key, suitability_statement
             )
             VALUES (
               ${entryId}, ${entry.eventId}, ${entry.contestantId}, ${entry.eodsaId}, 
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
               ${entry.musicFileUrl || null}, ${entry.musicFileName || null}, 
               ${entry.videoFileUrl || null}, ${entry.videoFileName || null},
               ${entry.videoExternalUrl || null}, ${entry.videoExternalType || null},
-              ${entry.performanceType || null}, ${entryLineKey}
+              ${entry.performanceType || null}, ${entryLineKey}, ${entry.suitabilityStatement || null}
             )
           `;
 

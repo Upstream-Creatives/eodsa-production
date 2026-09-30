@@ -46,6 +46,7 @@ interface CompetitionEntry {
  id: string;
  eventId: string;
  eventName: string;
+ eventType?: string;
  region: string;
  eventDate: string;
  venue: string;
@@ -1656,6 +1657,12 @@ export default function StudioDashboardPage() {
  </Link> )}
  </div> ) : (
  <div className="divide-y divide-gray-700"> {getFilteredEntries().map((entry) => (
+ entry.eventType === 'AUDITION_EVENT' ? (
+ <div key={entry.id} className="p-4 sm:p-6">
+ <h4 className="text-lg font-semibold text-white">{entry.eventName}</h4>
+ <p className="mt-2 text-sm text-emerald-300">Entry Submitted</p>
+ </div>
+ ) : (
  <div key={entry.id} className="p-4 sm:p-6 hover:bg-gray-700/30 transition-colors">
  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
  <div className="flex-1 min-w-0">
@@ -1725,7 +1732,8 @@ export default function StudioDashboardPage() {
  </div>
  </div>
  </div>
- </div> ))}
+ </div>
+ ) ))}
  </div> )}
  </div> )}
 
@@ -1754,6 +1762,12 @@ export default function StudioDashboardPage() {
  <p className="text-sm">When an admin archives an event, those entries appear here.</p>
  </div> ) : (
  <div className="divide-y divide-gray-700"> {getFilteredHistoryEntries().map((entry) => (
+ entry.eventType === 'AUDITION_EVENT' ? (
+ <div key={entry.id} className="p-4 sm:p-6">
+ <h4 className="text-lg font-semibold text-white">{entry.eventName}</h4>
+ <p className="mt-2 text-sm text-emerald-300">Entry Submitted</p>
+ </div>
+ ) : (
  <div key={entry.id} className="p-4 sm:p-6">
  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
  <div className="flex-1 min-w-0">
@@ -1792,7 +1806,8 @@ export default function StudioDashboardPage() {
  <div className="text-xs text-gray-500 italic"> Read-only historical record
  </div>
  </div>
- </div> ))}
+ </div>
+ ) ))}
  </div> )}
  </div> )}
 

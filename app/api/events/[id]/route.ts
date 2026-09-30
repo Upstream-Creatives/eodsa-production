@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/database';
+import { db, ensureAuditionSchema } from '@/lib/database';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -41,6 +41,7 @@ export async function PUT(
     const { id } = await params;
     const eventId = id;
     const body = await request.json();
+    await ensureAuditionSchema(sql as any);
 
     // Admin authentication check
     const authHeader = request.headers.get('authorization');
@@ -73,7 +74,8 @@ export async function PUT(
 
     // First check if event exists
     const [existingEvent] = await sql`
-      SELECT id, name FROM events WHERE id = ${eventId}
+      SELECT id, name, event_type, venue, audition_payment_type, audition_flat_fee, event_date, registration_deadline
+      FROM events WHERE id = ${eventId}
     `;
 
     if (!existingEvent) {
@@ -92,7 +94,8 @@ export async function PUT(
       'largeGroupFeePerDancer', 'currency', 'soloPrice', 'duetPrice', 'groupPrice',
       'discountEnabled', 'discountMinEntries', 'discountAmount', 'registrationFee',
       'participationMode', 'certificateTemplateUrl',
-      'eventType', 'eventMode', 'qualificationRequired', 'qualificationSource', 'minimumQualificationScore', 'numberOfJudges'
+      'eventType', 'eventMode', 'qualificationRequired', 'qualificationSource', 'minimumQualificationScore', 'numberOfJudges',
+      'auditionPaymentType', 'auditionFlatFee'
     ];
 
     // Filter only allowed fields from the request body
@@ -152,8 +155,39 @@ export async function PUT(
       'qualificationSource': 'qualification_source',
       'minimumQualificationScore': 'minimum_qualification_score',
       'numberOfJudges': 'number_of_judges',
+      'auditionPaymentType': 'audition_payment_type',
+      'auditionFlatFee': 'audition_flat_fee',
     };
     
+    const nextEventType = updateData.eventType || existingEvent.event_type || existingEvent.eventType;
+    if (nextEventType !== 'AUDITION_EVENT') {
+      delete updateData.auditionPaymentType;
+      delete updateData.auditionFlatFee;
+    }
+
+    if (nextEventType === 'AUDITION_EVENT') {
+      updateData.eventType = 'AUDITION_EVENT';
+      updateData.eventMode = 'VIRTUAL';
+      updateData.participationMode = 'virtual';
+      updateData.qualificationRequired = false;
+      updateData.qualificationSource = null;
+      updateData.minimumQualificationScore = null;
+      updateData.venue = updateData.venue || existingEvent.venue || 'Virtual';
+      updateData.discountEnabled = false;
+      const paymentType = updateData.auditionPaymentType === 'paid' ? 'paid' : (updateData.auditionPaymentType === 'free' ? 'free' : (existingEvent.audition_payment_type || 'free'));
+      updateData.auditionPaymentType = paymentType;
+      const flatFee = paymentType === 'paid'
+        ? Number(updateData.auditionFlatFee ?? existingEvent.audition_flat_fee ?? 0)
+        : 0;
+      if (paymentType === 'paid' && flatFee <= 0) {
+        return NextResponse.json(
+          { success: false, error: 'Paid auditions need a flat entry amount greater than zero' },
+          { status: 400 }
+        );
+      }
+      updateData.auditionFlatFee = flatFee;
+    }
+
     Object.entries(updateData).forEach(([key, value]) => {
       // Use manual mapping if available, otherwise use regex conversion
       const dbField = fieldMapping[key] || key.replace(/([A-Z])/g, '_$1').toLowerCase();
@@ -207,7 +241,9 @@ export async function PUT(
         qualification_required = COALESCE(${updates.qualification_required !== undefined ? updates.qualification_required : null}, qualification_required),
         qualification_source = COALESCE(${updates.qualification_source !== undefined ? updates.qualification_source : null}, qualification_source),
         minimum_qualification_score = COALESCE(${updates.minimum_qualification_score !== undefined ? updates.minimum_qualification_score : null}, minimum_qualification_score),
-        number_of_judges = COALESCE(${updates.number_of_judges !== undefined ? updates.number_of_judges : null}, number_of_judges)
+        number_of_judges = COALESCE(${updates.number_of_judges !== undefined ? updates.number_of_judges : null}, number_of_judges),
+        audition_payment_type = COALESCE(${updates.audition_payment_type !== undefined ? updates.audition_payment_type : null}, audition_payment_type),
+        audition_flat_fee = COALESCE(${updates.audition_flat_fee !== undefined ? updates.audition_flat_fee : null}, audition_flat_fee)
       WHERE id = ${eventId}
       RETURNING *
     `;

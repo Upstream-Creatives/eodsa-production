@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
     const performances = await sqlClient`
       SELECT p.id as performance_id, p.event_entry_id, p.scores_published
       FROM performances p
+      JOIN events e ON e.id = p.event_id
       WHERE p.event_entry_id = ANY(${entryIds})
+        AND COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
     ` as any[];
 
     if (performances.length === 0) {

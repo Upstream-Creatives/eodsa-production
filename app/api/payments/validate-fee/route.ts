@@ -25,11 +25,31 @@ export async function POST(request: NextRequest) {
     const sql = getSql();
     const [event] = await sql`
       SELECT solo_price, duet_price, group_price, discount_enabled, discount_min_entries, discount_amount,
-             registration_fee, registration_fee_per_dancer
+             registration_fee, registration_fee_per_dancer, event_type, audition_payment_type, audition_flat_fee
       FROM events
       WHERE id = ${eventId}
     ` as any[];
     if (!event) throw new Error(`Event ${eventId} not found`);
+
+    if (event.event_type === 'AUDITION_EVENT') {
+      const flat = event.audition_payment_type === 'paid' ? Number(event.audition_flat_fee) || 0 : 0;
+      const difference = clientSentTotal !== undefined ? Math.abs(clientSentTotal - flat) : 0;
+      const mismatchDetected = clientSentTotal !== undefined && difference > 0.01;
+      return NextResponse.json({
+        success: true,
+        computedFee: flat,
+        registrationFee: 0,
+        entryFee: flat,
+        registrationCharged: false,
+        registrationWasAlreadyCharged: true,
+        entryCount: Array.isArray(participantIds) ? participantIds.length : 1,
+        breakdown: flat > 0 ? `Audition flat fee ${flat}` : 'Free audition',
+        warnings: [],
+        mismatchDetected,
+        mismatchReason: mismatchDetected ? `Client sent ${clientSentTotal}, computed ${flat}` : undefined,
+        isValid: !mismatchDetected
+      });
+    }
 
     const registrationFeePerDancer = resolveEventRegistrationFee(event);
 

@@ -122,6 +122,38 @@ export const generateStudioRegistrationId = () => {
   return `${letter}${digits}`;
 };
 
+/** Adds Audition event type, payment toggle, and suitability response columns. Idempotent. */
+export async function ensureAuditionSchema(sqlClient: ReturnType<typeof getSql> = getSql()) {
+  await sqlClient`
+    DO $$
+    DECLARE r record;
+    BEGIN
+      FOR r IN
+        SELECT con.conname
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        WHERE rel.relname = 'events'
+          AND con.contype = 'c'
+          AND pg_get_constraintdef(con.oid) ILIKE '%event_type%'
+      LOOP
+        EXECUTE format('ALTER TABLE events DROP CONSTRAINT %I', r.conname);
+      END LOOP;
+
+      ALTER TABLE events ADD CONSTRAINT events_event_type_check
+        CHECK (event_type IN (
+          'REGIONAL_EVENT',
+          'NATIONAL_EVENT',
+          'QUALIFIER_EVENT',
+          'INTERNATIONAL_VIRTUAL_EVENT',
+          'AUDITION_EVENT'
+        ));
+    END $$;
+  `;
+  await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS audition_payment_type TEXT`;
+  await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS audition_flat_fee DECIMAL(10,2) DEFAULT 0`;
+  await sqlClient`ALTER TABLE event_entries ADD COLUMN IF NOT EXISTS suitability_statement TEXT`;
+}
+
 // Initialize database tables for Phase 1 - only runs once per server instance
 export const initializeDatabase = async () => {
   // Skip full schema migration after the first successful run.
@@ -207,7 +239,8 @@ export const initializeDatabase = async () => {
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS number_of_judges INTEGER DEFAULT 4`;
 
     // Event Types & Qualification System - Add new columns to events table
-    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'REGIONAL_EVENT' CHECK (event_type IN ('REGIONAL_EVENT', 'NATIONAL_EVENT', 'QUALIFIER_EVENT', 'INTERNATIONAL_VIRTUAL_EVENT'))`;
+    await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'REGIONAL_EVENT' CHECK (event_type IN ('REGIONAL_EVENT', 'NATIONAL_EVENT', 'QUALIFIER_EVENT', 'INTERNATIONAL_VIRTUAL_EVENT', 'AUDITION_EVENT'))`;
+    await ensureAuditionSchema(sqlClient);
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS event_mode TEXT NOT NULL DEFAULT 'HYBRID' CHECK (event_mode IN ('LIVE', 'VIRTUAL', 'HYBRID'))`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS qualification_required BOOLEAN NOT NULL DEFAULT FALSE`;
     await sqlClient`ALTER TABLE events ADD COLUMN IF NOT EXISTS qualification_source TEXT CHECK (qualification_source IN ('NONE', 'REGIONAL', 'ANY_NATIONAL_LEVEL', 'MANUAL', 'CUSTOM'))`;
@@ -697,8 +730,10 @@ function mapEventRow(row: any): Event {
     participationMode: row.participation_mode || 'hybrid',
     certificateTemplateUrl: row.certificate_template_url || undefined,
     numberOfJudges: row.number_of_judges != null ? parseInt(row.number_of_judges) : 4,
-    eventType: (row.event_type || 'REGIONAL_EVENT') as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT',
+    eventType: (row.event_type || 'REGIONAL_EVENT') as 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT' | 'AUDITION_EVENT',
     eventMode: (row.event_mode || 'HYBRID') as 'LIVE' | 'VIRTUAL' | 'HYBRID',
+    auditionPaymentType: row.audition_payment_type === 'paid' || row.audition_payment_type === 'free' ? row.audition_payment_type : null,
+    auditionFlatFee: row.audition_flat_fee != null ? parseFloat(row.audition_flat_fee) : 0,
     qualificationRequired: row.qualification_required ?? false,
     qualificationSource: row.qualification_source || null,
     minimumQualificationScore: row.minimum_qualification_score != null ? parseInt(row.minimum_qualification_score) : null,
@@ -871,6 +906,7 @@ export const db = {
   // Event Entries
   async createEventEntry(eventEntry: Omit<EventEntry, 'id' | 'submittedAt'>) {
     const sqlClient = getSql();
+    await ensureAuditionSchema(sqlClient);
     const id = Date.now().toString();
     const submittedAt = new Date().toISOString();
     const entryLineKey =
@@ -883,7 +919,7 @@ export const db = {
           id, event_id, contestant_id, eodsa_id, participant_ids, calculated_fee, payment_status, submitted_at,
           approved, qualified_for_nationals, item_number, item_name, choreographer, mastery, item_style, estimated_duration,
           entry_type, music_file_url, music_file_name, video_file_url, video_file_name, video_external_url, video_external_type,
-          performance_type, age_category, entry_line_key
+          performance_type, age_category, entry_line_key, suitability_statement
         )
         VALUES (
           ${id}, ${eventEntry.eventId}, ${eventEntry.contestantId}, ${eventEntry.eodsaId}, ${JSON.stringify(eventEntry.participantIds)},
@@ -893,7 +929,7 @@ export const db = {
           ${eventEntry.entryType || 'live'}, ${eventEntry.musicFileUrl || null}, ${eventEntry.musicFileName || null},
           ${eventEntry.videoFileUrl || null}, ${eventEntry.videoFileName || null}, ${eventEntry.videoExternalUrl || null},
           ${eventEntry.videoExternalType || null}, ${(eventEntry as any).performanceType || null}, ${(eventEntry as any).ageCategory || null},
-          ${entryLineKey}
+          ${entryLineKey}, ${(eventEntry as any).suitabilityStatement || null}
         )
       `;
       
@@ -934,7 +970,7 @@ export const db = {
                 id, event_id, contestant_id, eodsa_id, participant_ids, calculated_fee, payment_status, submitted_at,
                 approved, qualified_for_nationals, item_number, item_name, choreographer, mastery, item_style, estimated_duration,
                 entry_type, music_file_url, music_file_name, video_file_url, video_file_name, video_external_url, video_external_type,
-                performance_type, age_category, entry_line_key
+                performance_type, age_category, entry_line_key, suitability_statement
               )
               VALUES (
                 ${id}, ${eventEntry.eventId}, ${eventEntry.contestantId}, ${eventEntry.eodsaId}, ${JSON.stringify(eventEntry.participantIds)},
@@ -944,7 +980,7 @@ export const db = {
                 ${eventEntry.entryType || 'live'}, ${eventEntry.musicFileUrl || null}, ${eventEntry.musicFileName || null},
                 ${eventEntry.videoFileUrl || null}, ${eventEntry.videoFileName || null}, ${eventEntry.videoExternalUrl || null},
                 ${eventEntry.videoExternalType || null}, ${(eventEntry as any).performanceType || null}, ${(eventEntry as any).ageCategory || null},
-                ${entryLineKey}
+                ${entryLineKey}, ${(eventEntry as any).suitabilityStatement || null}
               )
             `;
 
@@ -1036,6 +1072,7 @@ export const db = {
       videoFileName: row.video_file_name,
       videoExternalUrl: row.video_external_url,
       videoExternalType: row.video_external_type,
+      suitabilityStatement: row.suitability_statement || undefined,
       performanceType: row.performance_type,
       ageCategory: row.age_category,
       paymentId: row.payment_id || undefined
@@ -1992,8 +2029,9 @@ export const db = {
     
       // Calculate age categories for all results first
       const { calculateAgeCategoryForEntry } = await import('./age-category-calculator');
+      const publicResult = (result as any[]).filter((row: any) => row.event_type !== 'AUDITION_EVENT');
       const resultsWithAgeCategories = await Promise.all(
-        result.map(async (row: any) => {
+        publicResult.map(async (row: any) => {
           let calculatedAgeCategory = row.age_category;
           
           // Try to calculate age category from participant_ids if available
@@ -2215,6 +2253,7 @@ export const db = {
         JOIN performances p ON e.id = p.event_id
         LEFT JOIN scores s ON p.id = s.performance_id
         WHERE p.scores_published = true
+          AND COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
         GROUP BY e.id, e.name, e.region, e.age_category, e.performance_type, e.event_date, e.venue
         HAVING COUNT(DISTINCT s.id) > 0
         ORDER BY e.event_date DESC, e.name
@@ -3021,6 +3060,7 @@ export const db = {
         ${dancerId ? sqlClient`OR ee.participant_ids::text LIKE ${`%${dancerId}%`}` : sqlClient``}
       )
       AND p.scores_published = true
+      AND COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
       ORDER BY s.submitted_at DESC
     ` as any[];
 
@@ -3047,6 +3087,7 @@ export const db = {
   // NEW: Event management methods
   async createEvent(event: Omit<Event, 'id' | 'createdAt'>) {
     const sqlClient = getSql();
+    await ensureAuditionSchema(sqlClient);
     
     // Ensure event_end_date column exists (migration check)
     try {
@@ -3144,7 +3185,19 @@ export const db = {
     
     // Determine default values for event type and mode based on event data
     const eventType = (event as any).eventType || 'REGIONAL_EVENT';
-    const eventMode = (event as any).eventMode || 'HYBRID';
+    let eventMode = (event as any).eventMode || 'HYBRID';
+    let participationMode = event.participationMode || 'hybrid';
+    let auditionPaymentType = (event as any).auditionPaymentType || null;
+    let auditionFlatFee = (event as any).auditionFlatFee != null ? Number((event as any).auditionFlatFee) : 0;
+    if (eventType === 'AUDITION_EVENT') {
+      eventMode = 'VIRTUAL';
+      participationMode = 'virtual';
+      auditionPaymentType = auditionPaymentType === 'paid' ? 'paid' : 'free';
+      auditionFlatFee = auditionPaymentType === 'paid' ? Math.max(0, auditionFlatFee) : 0;
+    } else {
+      auditionPaymentType = null;
+      auditionFlatFee = 0;
+    }
     
     // Auto-set qualification rules for NATIONAL_EVENT
     let qualificationRequired = (event as any).qualificationRequired ?? false;
@@ -3155,9 +3208,10 @@ export const db = {
       qualificationRequired = true;
       qualificationSource = qualificationSource || 'REGIONAL';
       minimumQualificationScore = minimumQualificationScore || 75;
-    } else if (eventType === 'QUALIFIER_EVENT') {
+    } else if (eventType === 'QUALIFIER_EVENT' || eventType === 'AUDITION_EVENT') {
       qualificationRequired = false;
       qualificationSource = null;
+      minimumQualificationScore = null;
     }
     
     await sqlClient`
@@ -3168,20 +3222,22 @@ export const db = {
         duo_trio_fee_per_dancer, group_fee_per_dancer, large_group_fee_per_dancer, currency,
         solo_price, duet_price, group_price, discount_enabled, discount_min_entries, discount_amount, registration_fee,
         participation_mode, certificate_template_url, number_of_judges,
-        event_type, event_mode, qualification_required, qualification_source, minimum_qualification_score
+        event_type, event_mode, qualification_required, qualification_source, minimum_qualification_score,
+        audition_payment_type, audition_flat_fee
       )
       VALUES (
         ${id}, ${event.name}, ${event.description}, ${event.region}, ${event.ageCategory}, 
         ${event.performanceType}, ${event.eventDate}, ${event.eventEndDate || null}, 
-        ${event.registrationDeadline}, ${event.venue}, ${event.status}, ${event.maxParticipants || null}, 
+        ${event.registrationDeadline}, ${eventType === 'AUDITION_EVENT' ? (event.venue || 'Virtual') : event.venue}, ${event.status}, ${event.maxParticipants || null}, 
         ${event.entryFee}, ${event.createdBy}, ${createdAt},
         ${event.registrationFeePerDancer ?? 300}, ${event.solo1Fee ?? 400}, ${event.solo2Fee ?? 750}, 
         ${event.solo3Fee ?? 1050}, ${event.soloAdditionalFee ?? 100}, ${event.duoTrioFeePerDancer ?? 280},
         ${event.groupFeePerDancer ?? 220}, ${event.largeGroupFeePerDancer ?? 190}, ${event.currency || 'ZAR'},
         ${(event as any).soloPrice ?? 0}, ${(event as any).duetPrice ?? 0}, ${(event as any).groupPrice ?? 0},
         ${(event as any).discountEnabled ?? false}, ${(event as any).discountMinEntries ?? 0}, ${(event as any).discountAmount ?? 0}, ${(event as any).registrationFee ?? 0},
-        ${event.participationMode || 'hybrid'}, ${event.certificateTemplateUrl || null}, ${numberOfJudges},
-        ${eventType}, ${eventMode}, ${qualificationRequired}, ${qualificationSource}, ${minimumQualificationScore}
+        ${participationMode}, ${event.certificateTemplateUrl || null}, ${numberOfJudges},
+        ${eventType}, ${eventMode}, ${qualificationRequired}, ${qualificationSource}, ${minimumQualificationScore},
+        ${auditionPaymentType}, ${auditionFlatFee}
       )
     `;
     
@@ -6177,7 +6233,7 @@ export const unifiedDb = {
     // Get all event entries for these dancers AND entries created directly by the studio
     // QUERY BOTH event_entries AND nationals_event_entries tables
     const regularEntries = await sqlClient`
-      SELECT ee.*, e.name as event_name, e.region, e.event_date, e.venue, e.performance_type,
+      SELECT ee.*, e.name as event_name, e.region, e.event_date, e.venue, e.performance_type, e.event_type,
              COALESCE(e.is_archived, false) as is_archived,
              COALESCE(c.name, d.name, 'Studio Entry') as contestant_name, 
              CASE 
@@ -6203,6 +6259,7 @@ export const unifiedDb = {
              e.event_date, 
              e.venue, 
              e.performance_type,
+             e.event_type,
              COALESCE(e.is_archived, false) as is_archived,
              COALESCE(c.name, d.name, 'Studio Entry') as contestant_name, 
              CASE 
@@ -6257,6 +6314,7 @@ export const unifiedDb = {
             id: row.id,
             eventId: row.event_id,
             eventName: row.event_name,
+            eventType: row.event_type || 'REGIONAL_EVENT',
             region: row.region,
             eventDate: row.event_date,
             venue: row.venue,

@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
           ...entry,
           eventId,
           eventName: event?.name || 'Unknown Event',
+          eventType: event?.eventType || null,
           eventDate: event?.eventDate || null,
           venue: event?.venue || 'TBD',
           region: event?.region || null,

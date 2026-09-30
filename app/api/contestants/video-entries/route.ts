@@ -19,9 +19,17 @@ export async function GET(request: NextRequest) {
     }
 
     const contestantEntries = await getAllContestantEntriesForDancer(eodsaId);
-    const entriesNeedingVideo = contestantEntries.filter(isVirtualEntry);
+    const eventsForFilter = await db.getAllEvents();
+    const auditionEventIds = new Set(
+      eventsForFilter.filter((event) => event.eventType === 'AUDITION_EVENT').map((event) => event.id)
+    );
+    const entriesNeedingVideo = contestantEntries.filter((entry) => {
+      if (!isVirtualEntry(entry)) return false;
+      const eventId = normalizeEntryEventId(entry);
+      return !!eventId && !auditionEventIds.has(eventId);
+    });
     
-    const events = await db.getAllEvents();
+    const events = eventsForFilter;
 
     const entriesWithDetails = entriesNeedingVideo.map((entry) => {
       try {

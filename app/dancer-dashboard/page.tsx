@@ -804,6 +804,14 @@ function CompetitionEntriesSection({ dancerSession, selectedEventId, events, onE
  </div> ) : (
  <div className="p-6">
  <div className="space-y-6"> {filteredEntries.map((entry) => {
+ if (entry.eventType === 'AUDITION_EVENT') {
+ return (
+ <div key={entry.id} className="bg-black/40 rounded-xl p-4 sm:p-6 border border-gray-600">
+ <h4 className="text-lg font-bold text-white">{entry.eventName}</h4>
+ <p className="mt-2 text-sm text-emerald-300">Entry Submitted</p>
+ </div>
+ );
+ }
  const isGroupEntry = entry.participantIds && entry.participantIds.length > 1;
  const isOwner = entry.eodsaId === dancerSession.eodsaId;
  const performanceType = isGroupEntry 

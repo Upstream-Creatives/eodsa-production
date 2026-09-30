@@ -103,6 +103,7 @@ interface EventEntry {
  videoFileName?: string;
  videoExternalUrl?: string;
  videoExternalType?: 'youtube' | 'vimeo' | 'other';
+ suitabilityStatement?: string;
  // Studio information
  studioName?: string;
  studioId?: string;
@@ -2138,6 +2139,18 @@ function EventParticipantsPage() {
  <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Mastery / Style</div>
  <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{entryModal.mastery} • {entryModal.itemStyle}</div>
  </div>
+ {entryModal.suitabilityStatement && (
+ <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder} md:col-span-2`}>
+ <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Why they are suitable</div>
+ <div className={`text-base ${themeClasses.textPrimary} whitespace-pre-wrap`}>{entryModal.suitabilityStatement}</div>
+ </div>
+ )}
+ {entryModal.videoExternalUrl && (
+ <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder} md:col-span-2`}>
+ <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Video link</div>
+ <a href={entryModal.videoExternalUrl} target="_blank" rel="noopener noreferrer" className="text-base text-[var(--chrome-mid)] break-all">{entryModal.videoExternalUrl}</a>
+ </div>
+ )}
  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
  <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Submitted</div>
  <div className={`text-lg font-bold ${themeClasses.textPrimary}`}>{new Date(entryModal.submittedAt).toLocaleDateString()}</div>

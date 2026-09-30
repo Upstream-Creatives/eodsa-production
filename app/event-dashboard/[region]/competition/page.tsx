@@ -225,6 +225,7 @@ interface PerformanceEntry {
  videoFileName?: string;
  videoExternalUrl?: string;
  videoExternalType?: 'youtube' | 'vimeo' | 'other';
+ suitabilityStatement?: string;
  // Fee validation properties (added during validation)
  entryFee?: number;
  registrationFee?: number;
@@ -279,7 +280,8 @@ export default function CompetitionEntryPage() {
  musicFileName: '',
  // For Virtual entries - video file or URL
  videoExternalUrl: '',
- videoExternalType: 'youtube' as 'youtube' | 'vimeo' | 'other'
+ videoExternalType: 'youtube' as 'youtube' | 'vimeo' | 'other',
+ suitabilityStatement: ''
  });
  const [savedForms, setSavedForms] = useState<Record<string, typeof currentForm>>({});
  const [isSubmitting, setIsSubmitting] = useState(false);
@@ -782,6 +784,9 @@ export default function CompetitionEntryPage() {
  };
 
  const calculateEntryFee = async (performanceType: string, participantIds: string[]) => {
+ if ((event as any)?.eventType === 'AUDITION_EVENT') {
+ return (event as any).auditionPaymentType === 'paid' ? Number((event as any).auditionFlatFee) || 0 : 0;
+ }
  if (event) {
  const cfg = {
  soloPrice: (event as any).soloPrice,
@@ -1025,7 +1030,8 @@ export default function CompetitionEntryPage() {
  musicFileUrl: '',
  musicFileName: '',
  videoExternalUrl: '',
- videoExternalType: 'youtube' as 'youtube' | 'vimeo' | 'other'
+ videoExternalType: 'youtube' as 'youtube' | 'vimeo' | 'other',
+ suitabilityStatement: ''
  });
  }
  };
@@ -1142,6 +1148,17 @@ export default function CompetitionEntryPage() {
  return;
  }
 
+ if ((event as any)?.eventType === 'AUDITION_EVENT') {
+ if (!currentForm.suitabilityStatement?.trim()) {
+ alert('Please explain why you would be suitable for this opportunity.');
+ return;
+ }
+ if (!currentForm.videoExternalUrl?.trim()) {
+ alert('A video link is required for this audition.');
+ return;
+ }
+ }
+
  const limits = getParticipantLimits(showAddForm);
  if (currentForm.participantIds.length < limits.min || currentForm.participantIds.length > limits.max) {
  // Add some visual feedback that the form is invalid
@@ -1177,6 +1194,7 @@ export default function CompetitionEntryPage() {
  id: `entry-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
  performanceType: showAddForm as 'Solo' | 'Duet' | 'Trio' | 'Group',
  ...currentForm,
+ entryType: (event as any)?.eventType === 'AUDITION_EVENT' ? 'virtual' : currentForm.entryType,
  participants,
  fee
  };
@@ -1231,6 +1249,15 @@ export default function CompetitionEntryPage() {
 
  const calculateTotalFee = async () => {
  setIsCalculatingFee(true);
+ if ((event as any)?.eventType === 'AUDITION_EVENT') {
+ const flat = (event as any).auditionPaymentType === 'paid' ? Number((event as any).auditionFlatFee) || 0 : 0;
+ const total = flat * entries.length;
+ const pricingResult = { subtotal: total, discount: 0, performanceFee: total, registrationFee: 0, total };
+ setRegistrationUi({ participantsNeedingReg: 0, participantsAlreadyRegistered: 0, cartParticipantCount: 0 });
+ setTotalFeeCalculation(pricingResult);
+ setIsCalculatingFee(false);
+ return pricingResult;
+ }
  const existingParticipantIds = buildAlreadyRegisteredParticipantSet(
  existingDbEntries,
  availableDancers
@@ -1313,8 +1340,59 @@ export default function CompetitionEntryPage() {
  // Include entries to account for session solo count
  }, [showAddForm, currentForm.participantIds, currentForm.mastery, studioInfo, eventId, entries]);
 
+ const submitFreeAudition = async () => {
+ setIsSubmitting(true);
+ try {
+ const dancerId = isStudioMode ? studioInfo?.id : contestant?.id;
+ const payerEodsaId = isStudioMode ? studioInfo?.registrationNumber : contestant?.eodsaId;
+ for (const entry of entries) {
+ const entryEodsaId = entry.performanceType === 'Solo' && entry.participantIds.length === 1
+ ? entry.participantIds[0]
+ : payerEodsaId;
+ const response = await fetch('/api/event-entries', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ eventId,
+ contestantId: dancerId,
+ eodsaId: entryEodsaId,
+ participantIds: entry.participantIds,
+ calculatedFee: 0,
+ paymentStatus: 'paid',
+ itemName: entry.itemName,
+ choreographer: entry.choreographer,
+ mastery: entry.mastery,
+ itemStyle: entry.itemStyle,
+ estimatedDuration: parseFloat(entry.estimatedDuration.replace(':', '.')) || 2,
+ entryType: 'virtual',
+ videoExternalUrl: entry.videoExternalUrl || null,
+ videoExternalType: entry.videoExternalType || 'other',
+ performanceType: entry.performanceType,
+ suitabilityStatement: entry.suitabilityStatement
+ })
+ });
+ if (!response.ok) {
+ const errorData = await response.json().catch(() => ({}));
+ throw new Error(errorData.error || 'Failed to submit audition entry');
+ }
+ }
+ setEntries([]);
+ setSubmissionResult({ entries: entries.length, totalFee: 0 });
+ setShowSuccessModal(true);
+ success('Audition entry submitted');
+ } catch (submitError: any) {
+ error(submitError.message || 'Failed to submit audition entry');
+ } finally {
+ setIsSubmitting(false);
+ }
+ };
+
  const handleProceedToPayment = async () => {
  if (entries.length === 0 || isSubmitting) return;
+ if ((event as any)?.eventType === 'AUDITION_EVENT' && (event as any).auditionPaymentType !== 'paid') {
+ await submitFreeAudition();
+ return;
+ }
  setShowPaymentMethodModal(true);
  };
 
@@ -1367,6 +1445,7 @@ export default function CompetitionEntryPage() {
  videoExternalUrl: entry.videoExternalUrl || null,
  videoExternalType: entry.videoExternalType || null,
  performanceType: entry.performanceType,
+ suitabilityStatement: entry.suitabilityStatement || null,
  clientLineId: entry.id
  };
  });
@@ -1547,6 +1626,7 @@ export default function CompetitionEntryPage() {
  videoExternalUrl: entry.videoExternalUrl || null,
  videoExternalType: entry.videoExternalType || null,
  performanceType: entry.performanceType,
+ suitabilityStatement: entry.suitabilityStatement || null,
  clientLineId: entry.id
  };
  });
@@ -1654,6 +1734,9 @@ export default function CompetitionEntryPage() {
  </div> );
 }
 
+ const isAudition = event?.eventType === 'AUDITION_EVENT';
+ const auditionIsFree = isAudition && event?.auditionPaymentType !== 'paid';
+
  // Helper function to get currency symbol from event
  const getCurrencySymbol = () => {
  const currency = event?.currency || 'ZAR';
@@ -1758,7 +1841,10 @@ export default function CompetitionEntryPage() {
  {/* Main Content */}
  {!qualificationBlocked && (
  <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
- <EventPricingPanel event={event} className="mb-6 lg:hidden" compact />
+ {!isAudition && <EventPricingPanel event={event} className="mb-6 lg:hidden" compact />}
+ {isAudition && (
+ <p className="mb-6 text-sm text-slate-300 lg:hidden">{auditionIsFree ? 'This audition is free.' : `Flat entry fee: R${Number(event.auditionFlatFee || 0).toFixed(2)}`}</p>
+ )}
  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8"> {/* Left Column - Performance Type Selection and Forms */}
  <div className="lg:col-span-2"> {/* Performance Type Selection */}
  <div ref={typeSelectionRef} className="glass-panel rounded-2xl border border-[rgba(192,192,192,0.22)] p-6 mb-8">
@@ -1991,7 +2077,7 @@ export default function CompetitionEntryPage() {
  </div>
  </div> )}
  </div>
- </div> {/* PHASE 2: Live vs Virtual Entry Toggle */}
+ </div> {!isAudition && ( /* PHASE 2: Live vs Virtual Entry Toggle */
  <div ref={entryTypeRef}>
  <label className="block text-sm font-semibold text-slate-300 mb-3"> Entry Type *</label>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -2046,7 +2132,24 @@ export default function CompetitionEntryPage() {
  <p className="text-sm text-[var(--chrome-light)]">  <strong>Live Event:</strong> This event only accepts live in-person performances. Virtual submissions are not available.
  </p>
  </div> )}
- </div> {/* Conditional Fields Based on Entry Type */}
+ </div> )}
+ {isAudition && (
+ <div className="space-y-3">
+ <p className="text-sm text-slate-300">This audition is virtual. Add your video link and tell us why you are suitable.</p>
+ <div>
+ <label className="block text-sm font-semibold text-slate-300 mb-2">Why do you think you would be suitable for this opportunity? *</label>
+ <textarea
+ required
+ rows={5}
+ value={currentForm.suitabilityStatement}
+ onChange={(e) => setCurrentForm({ ...currentForm, suitabilityStatement: e.target.value, entryType: 'virtual' })}
+ className="w-full p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[rgba(192,192,192,0.45)]"
+ placeholder="Write your response here"
+ />
+ </div>
+ </div>
+ )}
+ {/* Conditional Fields Based on Entry Type */}
  {currentForm.entryType === 'live' && (
  <div ref={musicSectionRef}>
  <label className="block text-sm font-semibold text-slate-300 mb-3"> Music File Upload (Optional)
@@ -2071,7 +2174,7 @@ export default function CompetitionEntryPage() {
  />
  </div> )}
 
- {currentForm.entryType === 'virtual' && (
+ {(isAudition || currentForm.entryType === 'virtual') && (
  <div className="space-y-4">
  <div>
  <label className="block text-sm font-semibold text-slate-300 mb-3"> Video Platform
@@ -2085,8 +2188,8 @@ export default function CompetitionEntryPage() {
  <option value="other"> Other Platform</option>
  </select>
  </div>  <div>
- <label className="block text-sm font-semibold text-slate-300 mb-3"> 🔗 Video URL (Optional)
- <span className="text-xs text-slate-400 block mt-1 font-normal"> You can upload your video later through your dashboard
+ <label className="block text-sm font-semibold text-slate-300 mb-3"> 🔗 Video URL {isAudition ? '*' : '(Optional)'}
+ <span className="text-xs text-slate-400 block mt-1 font-normal"> {isAudition ? 'YouTube, Vimeo, or Google Drive link' : 'You can upload your video later through your dashboard'}
  </span> {(currentForm.videoExternalUrl.includes('drive.google.com') || currentForm.videoExternalType === 'other') && (
  <div className="mt-2 flex items-start gap-2 p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg">
  <span className="text-xs text-blue-400 mt-0.5"></span>
@@ -2311,6 +2414,8 @@ export default function CompetitionEntryPage() {
  !currentForm.itemName ||
  !currentForm.itemStyle ||
  !currentForm.mastery ||
+ (isAudition && !currentForm.suitabilityStatement?.trim()) ||
+ (isAudition && !currentForm.videoExternalUrl?.trim()) ||
  currentForm.participantIds.length === 0 ||
  currentForm.participantIds.length < getParticipantLimits(showAddForm).min ||
  currentForm.participantIds.length > getParticipantLimits(showAddForm).max
@@ -2462,7 +2567,7 @@ export default function CompetitionEntryPage() {
  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
  <span>Calculating Fee...</span>
  </div> ) : (
- 'Proceed to Payment'
+ auditionIsFree ? 'Submit Entry' : 'Proceed to Payment'
  )}
  </button>
  </div> {/* Event Details & Pricing */}
@@ -2472,10 +2577,13 @@ export default function CompetitionEntryPage() {
  <div className="space-y-2 text-sm text-slate-300">
  <p><strong>Date:</strong> {event?.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'TBD'}</p>
  <p><strong>Time:</strong> {event?.eventDate ? new Date(event.eventDate).toLocaleTimeString() : 'TBD'}</p>
- <p><strong>Venue:</strong> {event?.venue || 'TBD'}</p>
+ {!isAudition && <p><strong>Venue:</strong> {event?.venue || 'TBD'}</p>}
  <p><strong>Registration Deadline:</strong> {event?.registrationDeadline ? new Date(event.registrationDeadline).toLocaleDateString() : 'TBD'}</p>
  </div>
- </div> {event && <EventPricingPanel event={event} compact className="hidden lg:block" />}
+ </div> {event && !isAudition && <EventPricingPanel event={event} compact className="hidden lg:block" />}
+ {isAudition && (
+ <p className="text-sm text-slate-300">{auditionIsFree ? 'This audition is free. Your entry is confirmed when you submit.' : `Entry fee: R${Number(event?.auditionFlatFee || 0).toFixed(2)} per entry.`}</p>
+ )}
  </div>
  </div>
  </div> {/* Guided Tour Overlay */}

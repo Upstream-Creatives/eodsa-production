@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN performances p ON p.id = c.performance_id
         LEFT JOIN events e ON e.id = p.event_id
         WHERE c.dancer_id = ${dancerId}
+          AND COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
         ORDER BY c.created_at DESC
       `;
     } else if (eodsaId) {
@@ -68,7 +69,9 @@ export async function GET(request: NextRequest) {
         LEFT JOIN performances p ON p.id = c.performance_id
         LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
         LEFT JOIN events e ON e.id = p.event_id
-        WHERE c.eodsa_id = ${eodsaId}
+        WHERE COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
+          AND (
+          c.eodsa_id = ${eodsaId}
            OR EXISTS (
              SELECT 1 FROM dancers d 
              WHERE d.eodsa_id = ${eodsaId} 
@@ -83,6 +86,7 @@ export async function GET(request: NextRequest) {
                         WHERE pid::text = ${eodsaId}
                       )))
            ))
+          )
         ORDER BY c.created_at DESC
       `;
     } else {
@@ -112,6 +116,7 @@ export async function GET(request: NextRequest) {
         FROM certificates c
         LEFT JOIN performances p ON p.id = c.performance_id
         LEFT JOIN events e ON e.id = p.event_id
+        WHERE COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
         ORDER BY c.created_at DESC
       `;
     }

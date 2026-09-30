@@ -5,7 +5,7 @@
  */
 
 import { createTransactionRecord } from './transaction-records';
-import { getSql } from './database';
+import { ensureAuditionSchema, getSql } from './database';
 import {
   calculateEventPricing,
   collectRegistrationKeys,
@@ -47,17 +47,55 @@ export async function computeBatchEntryPricing(
   eventId: string
 ): Promise<BatchPricingResult> {
   const sql = getSql();
+  await ensureAuditionSchema(sql);
   const normalizedEntries = Array.isArray(entries) ? entries : [];
 
   const eventRows = await sql`
     SELECT solo_price, duet_price, group_price, discount_enabled, discount_min_entries, discount_amount,
-           registration_fee, registration_fee_per_dancer
+           registration_fee, registration_fee_per_dancer, event_type, audition_payment_type, audition_flat_fee
     FROM events
     WHERE id = ${eventId}
   ` as any[];
   if (!eventRows.length) throw new Error(`Event ${eventId} not found`);
 
   const event = eventRows[0];
+  if (event.event_type === 'AUDITION_EVENT') {
+    const flat = event.audition_payment_type === 'paid' ? Number(event.audition_flat_fee) || 0 : 0;
+    const validations: EntryFeeValidation[] = normalizedEntries.map((entry, i) => ({
+      entryIndex: i,
+      entry,
+      computedFee: flat,
+      clientSentFee: entry.calculatedFee || 0,
+      registrationFee: 0,
+      entryFee: flat,
+      registrationCharged: false,
+      registrationWasAlreadyCharged: false,
+      entryCount: getParticipantCount(entry),
+      breakdown: flat > 0 ? `Audition flat fee ${flat}` : 'Free audition',
+      warnings: [],
+      isValid: true,
+      mismatchDetected: false,
+    }));
+    return {
+      totalComputedFee: flat * normalizedEntries.length,
+      registrationTotal: 0,
+      registrationFeePerDancer: 0,
+      alreadyRegistered: new Set<string>(),
+      pricing: {
+        itemizedEntries: normalizedEntries.map((entry, index) => ({
+          index,
+          type: entry.performanceType || 'Audition',
+          price: flat,
+        })),
+        subtotal: flat * normalizedEntries.length,
+        discount: 0,
+        registrationTotal: 0,
+        total: flat * normalizedEntries.length,
+        entryDiscounts: normalizedEntries.map(() => 0),
+      },
+      validations,
+    };
+  }
   const registrationFeePerDancer = resolveEventRegistrationFee(event);
 
   const allParticipantIds = new Set<string>();

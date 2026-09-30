@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
     const allEntries = await unifiedDb.getStudioEntries(studioId);
     
     // Filter for virtual entries that don't have video yet
-    const entriesNeedingVideo = allEntries.filter(entry => entry.entryType === 'virtual' && !entry.videoFileUrl && !entry.videoExternalUrl
+    const entriesNeedingVideo = allEntries.filter(entry =>
+      entry.entryType === 'virtual' &&
+      entry.eventType !== 'AUDITION_EVENT' &&
+      !entry.videoFileUrl &&
+      !entry.videoExternalUrl
     );
 
     // Enhance entries with additional details

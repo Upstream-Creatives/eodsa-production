@@ -29,6 +29,7 @@ export interface PendingBatchEntry {
   musicFileName?: string | null;
   videoExternalUrl?: string | null;
   videoExternalType?: string | null;
+  suitabilityStatement?: string | null;
   performanceType?: string;
   clientLineId?: string;
 }
@@ -289,6 +290,7 @@ export async function reconcileBatchEntriesFromPending(
           entry.videoExternalType && ['youtube', 'vimeo', 'other'].includes(entry.videoExternalType)
             ? (entry.videoExternalType as 'youtube' | 'vimeo' | 'other')
             : undefined,
+        suitabilityStatement: entry.suitabilityStatement || undefined,
         performanceType: entry.performanceType,
         entryLineKey: fingerprint,
       } as Parameters<typeof db.createEventEntry>[0]);

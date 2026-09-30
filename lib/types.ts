@@ -103,8 +103,11 @@ export interface Event {
   // NEW: Number of judges for this event
   numberOfJudges?: number;
   // NEW: Event Types & Qualification System
-  eventType?: 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT';
+  eventType?: 'REGIONAL_EVENT' | 'NATIONAL_EVENT' | 'QUALIFIER_EVENT' | 'INTERNATIONAL_VIRTUAL_EVENT' | 'AUDITION_EVENT';
   eventMode?: 'LIVE' | 'VIRTUAL' | 'HYBRID';
+  /** Audition only: free bypasses payment; paid is one flat fee per entry. */
+  auditionPaymentType?: 'free' | 'paid' | null;
+  auditionFlatFee?: number;
   qualificationRequired?: boolean;
   qualificationSource?: 'NONE' | 'REGIONAL' | 'ANY_NATIONAL_LEVEL' | 'MANUAL' | 'CUSTOM' | null;
   minimumQualificationScore?: number | null;
@@ -150,6 +153,12 @@ export interface EventEntry {
   videoFileName?: string;
   videoExternalUrl?: string; // YouTube/Vimeo URL
   videoExternalType?: 'youtube' | 'vimeo' | 'other';
+  /** Audition entries: required written response. */
+  suitabilityStatement?: string;
+}
+
+export function isAuditionEvent(eventType?: string | null): boolean {
+  return eventType === 'AUDITION_EVENT';
 }
 
 export interface Performance {

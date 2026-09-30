@@ -80,9 +80,12 @@ export async function GET(
       LEFT JOIN event_entries ee ON ee.id = p.event_entry_id
       LEFT JOIN scores s ON s.performance_id = p.id
       LEFT JOIN certificates cert ON cert.performance_id = p.id
-      WHERE (p.participant_names IS NOT NULL AND p.participant_names::text ILIKE '%' || ${bio.name} || '%')
+      WHERE COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
+      AND (
+        (p.participant_names IS NOT NULL AND p.participant_names::text ILIKE '%' || ${bio.name} || '%')
          OR (ee.participant_ids IS NOT NULL AND ee.participant_ids::text ILIKE '%' || ${bio.id} || '%')
          OR (ee.participant_ids IS NOT NULL AND ee.participant_ids::text ILIKE '%' || ${bio.eodsa_id} || '%')
+      )
       GROUP BY 
         p.id, e.id, ee.id, cert.id
       ORDER BY e.event_date DESC NULLS LAST, p.item_number ASC NULLS LAST

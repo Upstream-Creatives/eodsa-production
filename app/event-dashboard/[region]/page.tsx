@@ -77,6 +77,12 @@ export default function NationalsEventsPage() {
  classes: 'bg-blue-500/20 text-blue-200 border border-blue-400/40',
  };
  }
+ if (tier === 'AUDITION_EVENT') {
+ return {
+ label: 'Audition',
+ classes: 'bg-rose-500/20 text-rose-200 border border-rose-400/40',
+ };
+ }
  if (tier === 'QUALIFIER_EVENT') {
  return {
  label: `${event.region} Qualifier`,
@@ -369,10 +375,12 @@ export default function NationalsEventsPage() {
  <p className="text-xl lg:text-2xl font-bold text-[var(--chrome-mid)]">{new Date(event.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
  <p className="text-xs lg:text-sm text-slate-400 uppercase tracking-wide">Event Date</p>
  </div>
+ {(event as any).eventType !== 'AUDITION_EVENT' && (
  <div className="text-center">
  <p className="text-xl lg:text-2xl font-bold text-[var(--chrome-mid)]">{event.venue}</p>
  <p className="text-xs lg:text-sm text-slate-400 uppercase tracking-wide">Venue</p>
  </div>
+ )}
  </div>
  </div>
  </div>
@@ -395,10 +403,12 @@ export default function NationalsEventsPage() {
  <p className="text-slate-200 text-lg font-medium">{event.ageCategory}</p>
  </div>
  </div>  <div className="space-y-4">
+ {(event as any).eventType !== 'AUDITION_EVENT' && (
  <div>
  <p className="text-slate-500 text-sm uppercase tracking-wide font-semibold mb-2">Venue</p>
  <p className="text-slate-200 text-lg font-medium">{event.venue}</p>
  </div>
+ )}
  <div>
  <p className="text-slate-500 text-sm uppercase tracking-wide font-semibold mb-2">Performance Types</p>
  <div className="flex flex-wrap gap-2">
@@ -410,7 +420,11 @@ export default function NationalsEventsPage() {
  </div>
  </div>
  </div> {/* Pricing */}
- <EventPricingPanel event={event} className="mb-6" /> {/* Registration Deadline */}
+ {(event as any).eventType === 'AUDITION_EVENT' ? (
+ <p className="mb-6 text-slate-200">{(event as any).auditionPaymentType === 'paid' ? `Entry fee: R${Number((event as any).auditionFlatFee || 0).toFixed(2)} per entry` : 'Free audition'}</p>
+ ) : (
+ <EventPricingPanel event={event} className="mb-6" />
+ )} {/* Registration Deadline */}
  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-6">
  <div className="flex items-center space-x-2 mb-2">
  <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">

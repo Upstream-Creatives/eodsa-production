@@ -4,7 +4,8 @@ import { emailService } from '@/lib/email';
 import { getExistingSoloEntries, validateAndCorrectEntryFee } from '@/lib/pricing-utils';
 import { calculateAgeCategoryForEntry } from '@/lib/age-category-calculator';
 import { checkAgeEligibility, getCompetitionAge } from '@/lib/competition-age';
-import { ITEM_STYLES } from '@/lib/types';
+import { ITEM_STYLES, isAuditionEvent } from '@/lib/types';
+import { ensurePerformanceForEntry } from '@/lib/ensure-performance';
 
 // Initialize database on first request
 let dbInitialized = false;
@@ -169,6 +170,27 @@ export async function POST(request: NextRequest) {
         { error: 'This event only accepts live entries. Virtual entries are not allowed.' },
         { status: 400 }
       );
+    }
+
+    const auditionEntry = isAuditionEvent((event as any).eventType);
+    if (auditionEntry) {
+      const statement = String(body.suitabilityStatement || '').trim();
+      const videoUrl = String(body.videoExternalUrl || '').trim();
+      if (!statement) {
+        return NextResponse.json(
+          { error: 'Please explain why you would be suitable for this opportunity.' },
+          { status: 400 }
+        );
+      }
+      if (!videoUrl) {
+        return NextResponse.json(
+          { error: 'A video link is required for audition entries.' },
+          { status: 400 }
+        );
+      }
+      body.suitabilityStatement = statement;
+      body.videoExternalUrl = videoUrl;
+      body.entryType = 'virtual';
     }
 
     // QUALIFICATION VALIDATION - Check if dancer meets qualification requirements
@@ -561,8 +583,11 @@ export async function POST(request: NextRequest) {
 
     // CRITICAL: Calculate correct fee based on existing entries (fix for solo pricing bug)
     let validatedFee = body.calculatedFee;
+    const auditionIsFree = auditionEntry && (event as any).auditionPaymentType !== 'paid';
     
-    if (performanceType === 'Solo') {
+    if (auditionEntry) {
+      validatedFee = auditionIsFree ? 0 : Number((event as any).auditionFlatFee) || 0;
+    } else if (performanceType === 'Solo') {
       // Get existing solo entries for this dancer/contestant and event
       const allEntries = await db.getAllEventEntries();
       
@@ -673,10 +698,10 @@ export async function POST(request: NextRequest) {
       eodsaId: body.eodsaId,
       participantIds: body.participantIds,
       calculatedFee: validatedFee, // Use the server-validated fee
-      paymentStatus: body.paymentStatus || 'pending',
-      paymentMethod: body.paymentMethod,
-      approved: body.approved || false,
-      qualifiedForNationals: body.qualifiedForNationals || false,
+      paymentStatus: auditionEntry ? (auditionIsFree ? 'paid' : (body.paymentStatus === 'paid' ? 'pending' : (body.paymentStatus || 'pending'))) : (body.paymentStatus || 'pending'),
+      paymentMethod: auditionIsFree ? undefined : body.paymentMethod,
+      approved: auditionIsFree ? true : (body.approved || false),
+      qualifiedForNationals: auditionEntry ? false : (body.qualifiedForNationals || false),
       itemNumber: body.itemNumber || null, // Allow admin to set this, but not required from contestants
       itemName: body.itemName,
       choreographer: body.choreographer,
@@ -692,8 +717,30 @@ export async function POST(request: NextRequest) {
       videoFileUrl: body.videoFileUrl || null,
       videoFileName: body.videoFileName || null,
       videoExternalUrl: body.videoExternalUrl || null,
-      videoExternalType: body.videoExternalType || null
+      videoExternalType: body.videoExternalType || null,
+      suitabilityStatement: body.suitabilityStatement || null
     });
+
+    if (auditionIsFree && eventEntry?.id) {
+      try {
+        await ensurePerformanceForEntry({
+          id: eventEntry.id,
+          event_id: body.eventId,
+          item_name: body.itemName,
+          contestant_id: finalContestantId,
+          participant_ids: body.participantIds,
+          choreographer: body.choreographer,
+          mastery: body.mastery,
+          item_style: body.itemStyle,
+          estimated_duration: body.estimatedDuration,
+          entry_type: 'virtual',
+          video_external_url: body.videoExternalUrl,
+          video_external_type: body.videoExternalType,
+        });
+      } catch (performanceError) {
+        console.error('Failed to create audition performance:', performanceError);
+      }
+    }
 
     // Email system disabled for Phase 1
     // try {

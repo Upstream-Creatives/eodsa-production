@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         OR ee.participant_ids::text LIKE ANY(${dancerIds.map(id => `%"${id}"%`)})
       )
       AND p.scores_published = true
+      AND COALESCE(e.event_type, '') <> 'AUDITION_EVENT'
       ORDER BY s.submitted_at DESC
     ` as any[];
 

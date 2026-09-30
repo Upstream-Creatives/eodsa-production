@@ -79,6 +79,31 @@ export async function POST(request: Request) {
     });
     
     // Validate required fields
+    const isAudition = body.eventType === 'AUDITION_EVENT';
+    if (isAudition) {
+      body.venue = body.venue || 'Virtual';
+      body.eventMode = 'VIRTUAL';
+      body.participationMode = 'virtual';
+      body.qualificationRequired = false;
+      body.qualificationSource = null;
+      body.minimumQualificationScore = null;
+      body.discountEnabled = false;
+      body.discountAmount = 0;
+      body.discountMinEntries = 0;
+      body.soloPrice = 0;
+      body.duetPrice = 0;
+      body.groupPrice = 0;
+      body.registrationFee = 0;
+      body.auditionPaymentType = body.auditionPaymentType === 'paid' ? 'paid' : 'free';
+      body.auditionFlatFee = body.auditionPaymentType === 'paid' ? Number(body.auditionFlatFee) || 0 : 0;
+      if (body.auditionPaymentType === 'paid' && body.auditionFlatFee <= 0) {
+        return NextResponse.json(
+          { success: false, error: 'Paid auditions need a flat entry amount greater than zero' },
+          { status: 400 }
+        );
+      }
+    }
+
     const requiredFields = [
       'name', 'description', 'region', 'ageCategory', 'performanceType',
       'eventDate', 'registrationDeadline', 'venue', 'entryFee', 'createdBy'
@@ -152,7 +177,9 @@ export async function POST(request: Request) {
       eventMode: body.eventMode || 'HYBRID',
       qualificationRequired: body.qualificationRequired ?? false,
       qualificationSource: body.qualificationSource || null,
-      minimumQualificationScore: body.minimumQualificationScore || null
+      minimumQualificationScore: body.minimumQualificationScore || null,
+      auditionPaymentType: body.auditionPaymentType || null,
+      auditionFlatFee: body.auditionFlatFee ?? 0
     } as any);
 
     // Log the event object returned from DB
