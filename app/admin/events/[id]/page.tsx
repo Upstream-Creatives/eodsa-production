@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAlert } from '@/components/ui/custom-alert';
-import { calculateEODSAFee } from '@/lib/types';
+import { calculateEODSAFee, ITEM_STYLES } from '@/lib/types';
 import {
  eventUsesFlatPricing,
  getExpectedFlatLineFees,
@@ -156,6 +156,8 @@ function EventParticipantsPage() {
  const [tempItemNumber, setTempItemNumber] = useState<string>('');
  const [isExporting, setIsExporting] = useState(false);
  const [deletingEntries, setDeletingEntries] = useState<Set<string>>(new Set());
+ const [entryDetailDraft, setEntryDetailDraft] = useState({ itemName: '', itemStyle: '' });
+ const [savingEntryDetails, setSavingEntryDetails] = useState(false);
  const [performanceTypeFilter, setPerformanceTypeFilter] = useState<string>('all');
  const [entryTypeFilter, setEntryTypeFilter] = useState<string>('all');
  const [withdrawingPerformances, setWithdrawingPerformances] = useState<Set<string>>(new Set());
@@ -523,6 +525,50 @@ function EventParticipantsPage() {
  const handleItemNumberCancel = () => {
  setEditingItemNumber(null);
  setTempItemNumber('');
+ };
+
+ const saveEntryDetails = async () => {
+ if (!entryModal || savingEntryDetails) return;
+ const itemName = entryDetailDraft.itemName.trim();
+ const itemStyle = entryDetailDraft.itemStyle.trim();
+ if (!itemName) {
+ showAlert('Item title is required.', 'error');
+ return;
+ }
+ if (!itemStyle) {
+ showAlert('Dance style is required.', 'error');
+ return;
+ }
+
+ const session = localStorage.getItem('adminSession');
+ if (!session) {
+ showAlert('Session expired. Please log in again.', 'error');
+ return;
+ }
+ const adminData = JSON.parse(session);
+
+ setSavingEntryDetails(true);
+ try {
+ const response = await fetch(`/api/admin/entries/${entryModal.id}`, {
+ method: 'PUT',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ adminId: adminData.id, itemName, itemStyle })
+ });
+ const data = await response.json();
+ if (!response.ok || !data.success) {
+ showAlert(data.error || 'Failed to update entry', 'error');
+ return;
+ }
+ setEntries(prev => prev.map(entry => entry.id === entryModal.id ? { ...entry, itemName, itemStyle } : entry));
+ setPerformances(prev => prev.map(performance => performance.eventEntryId === entryModal.id ? { ...performance, title: itemName, itemStyle } : performance));
+ setEntryModal({ ...entryModal, itemName, itemStyle });
+ showAlert('Entry title and style updated.', 'success');
+ } catch (saveError) {
+ console.error('Error updating entry details:', saveError);
+ showAlert('Failed to update entry', 'error');
+ } finally {
+ setSavingEntryDetails(false);
+ }
  };
 
  const deleteEntry = async (entryId: string, itemName: string) => {
@@ -1789,7 +1835,7 @@ function EventParticipantsPage() {
  </td>
  <td className={`${themeClasses.tableCellPadding} whitespace-nowrap text-sm font-medium`}>
  <button
- onClick={() => { setEntryModal(entry); setEntryModalTab('overview'); setShowEntryModal(true); }}
+ onClick={() => { setEntryModal(entry); setEntryDetailDraft({ itemName: entry.itemName || '', itemStyle: entry.itemStyle || '' }); setEntryModalTab('overview'); setShowEntryModal(true); }}
  className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${themeClasses.buttonPrimary}`}
  > View Details
  </button>
@@ -2126,6 +2172,45 @@ function EventParticipantsPage() {
  </div> {/* Tab Content */}
  <div className={themeClasses.cardPadding}> {entryModalTab === 'overview' && (
  <div className="space-y-4">
+ <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder} space-y-4`}>
+ <div>
+ <div className={`text-sm font-semibold ${themeClasses.textPrimary}`}>Edit item</div>
+ <p className={`text-xs ${themeClasses.textMuted} mt-1`}>Change the piece title or dance style after the entry is confirmed. Payment and balance stay as they are.</p>
+ </div>
+ <div>
+ <label className={`block ${themeClasses.label} mb-2`}>Item title</label>
+ <input
+ type="text"
+ value={entryDetailDraft.itemName}
+ onChange={(e) => setEntryDetailDraft(prev => ({ ...prev, itemName: e.target.value }))}
+ maxLength={200}
+ className={`w-full p-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
+ />
+ </div>
+ <div>
+ <label className={`block ${themeClasses.label} mb-2`}>Dance style</label>
+ <select
+ value={entryDetailDraft.itemStyle}
+ onChange={(e) => setEntryDetailDraft(prev => ({ ...prev, itemStyle: e.target.value }))}
+ className={`w-full p-3 ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.cardRadius} ${themeClasses.inputFocus} ${themeClasses.textPrimary}`}
+ >
+ {!entryDetailDraft.itemStyle && <option value="">Select a style</option>}
+ {entryDetailDraft.itemStyle && !ITEM_STYLES.includes(entryDetailDraft.itemStyle as (typeof ITEM_STYLES)[number]) && (
+ <option value={entryDetailDraft.itemStyle}>{entryDetailDraft.itemStyle}</option>
+ )}
+ {ITEM_STYLES.map(style => (
+ <option key={style} value={style}>{style}</option>
+ ))}
+ </select>
+ </div>
+ <button
+ onClick={saveEntryDetails}
+ disabled={savingEntryDetails || (entryDetailDraft.itemName.trim() === (entryModal.itemName || '') && entryDetailDraft.itemStyle === (entryModal.itemStyle || ''))}
+ className={`${themeClasses.buttonBase} ${themeClasses.buttonSuccess} ${savingEntryDetails ? themeClasses.buttonDisabled : ''}`}
+ >
+ {savingEntryDetails ? 'Saving...' : 'Save title and style'}
+ </button>
+ </div>
  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  <div className={`${themeClasses.metricCardBg} ${themeClasses.cardRadius} p-4 border ${themeClasses.metricCardBorder}`}>
  <div className={`text-sm ${themeClasses.textMuted} mb-1`}>Item #</div>
